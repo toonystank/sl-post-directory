@@ -1,6 +1,11 @@
 import Link from "next/link";
-import { Search, MapPin, Building2 } from "lucide-react";
+import { Search, MapPin, Building2, ChevronRight, Landmark } from "lucide-react";
 import { PrismaClient } from "@prisma/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 
 const prisma = new PrismaClient();
 
@@ -11,80 +16,113 @@ export default async function Home() {
   });
 
   return (
-    <div className="flex flex-col gap-12 pb-12">
+    <div className="flex flex-col min-h-screen">
       {/* Hero Section */}
-      <section className="relative pt-24 pb-20 px-4 text-center border-b border-[var(--surface-border)] overflow-hidden">
-        {/* Abstract Background Decoration */}
-        <div className="absolute inset-0 z-0 bg-gradient-to-b from-[var(--primary)]/5 to-[var(--background)] pointer-events-none" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-64 bg-[var(--primary)]/10 blur-[100px] rounded-full pointer-events-none" />
+      <section className="relative w-full pt-32 pb-40 flex items-center justify-center overflow-hidden border-b bg-background">
+        {/* Abstract Background Effects */}
+        <div className="absolute inset-0 w-full h-full bg-grid-white/[0.02] bg-[size:60px_60px]" />
+        <div className="absolute top-0 flex items-center justify-center w-full h-full">
+          <div className="w-[600px] h-[600px] bg-primary/20 rounded-full blur-[120px] opacity-50 mix-blend-screen" />
+          <div className="absolute w-[400px] h-[400px] bg-secondary/20 rounded-full blur-[100px] opacity-40 bottom-10 right-10 mix-blend-screen" />
+        </div>
 
-        <div className="relative z-10 max-w-4xl mx-auto space-y-6">
-          <h1 className="text-4xl md:text-6xl font-bold tracking-tight">
-            Find Any <span className="text-[var(--primary)]">Post Office</span> in Sri Lanka
+        <div className="relative z-10 container px-4 md:px-6 text-center">
+          <Badge variant="secondary" className="mb-6 py-1.5 px-4 text-sm rounded-full bg-secondary/10 text-secondary hover:bg-secondary/20 border-secondary/20 transition-colors">
+            <Landmark className="w-4 h-4 mr-2" /> V2.0 Redesign Live
+          </Badge>
+
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight mb-8">
+            Navigate Sri Lanka's <br className="hidden md:block" />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">
+              Postal Network
+            </span>
           </h1>
-          <p className="text-lg md:text-xl text-[var(--text-muted)] max-w-2xl mx-auto">
-            Search by name, postal code, or district to quickly find contact information and details.
+
+          <p className="mx-auto max-w-2xl text-lg md:text-xl text-muted-foreground mb-12">
+            The most comprehensive, unified directory for finding every post office, contact detail, and location across the island.
           </p>
 
-          {/* Search Bar */}
-          <div className="mt-8 max-w-2xl mx-auto">
-            <div className="glass-panel flex flex-col md:flex-row p-2 rounded-2xl gap-2 shadow-lg">
-              <div className="flex-1 flex items-center bg-[var(--background)] rounded-xl px-4 py-3 border border-[var(--surface-border)] focus-within:border-[var(--primary)] focus-within:ring-2 focus-within:ring-[var(--primary)]/20 transition-all">
-                <Search className="w-5 h-5 text-[var(--text-muted)] mr-3" />
-                <input
-                  type="text"
-                  placeholder="Search by name, city, or postal code..."
-                  className="w-full bg-transparent border-none outline-none text-[var(--foreground)] placeholder:text-[var(--text-muted)]"
-                />
-              </div>
-              <button className="btn btn-primary rounded-xl px-8 py-3 text-lg whitespace-nowrap hidden md:flex">
-                Search
-              </button>
+          {/* Search Bar Component */}
+          <div className="mx-auto max-w-2xl bg-card border shadow-2xl rounded-2xl p-2 flex items-center gap-2 transition-all hover:border-primary/50 focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/10">
+            <div className="flex-1 flex items-center pl-4 bg-transparent">
+              <Search className="w-5 h-5 text-muted-foreground shrink-0" />
+              <Input
+                type="text"
+                placeholder="Search by city, name, or postal code..."
+                className="border-0 shadow-none focus-visible:ring-0 text-base py-6 w-full placeholder:text-muted-foreground"
+              />
             </div>
+            <Button size="lg" className="rounded-xl px-8 h-12 text-md font-semibold hidden sm:flex shadow-md">
+              Search
+            </Button>
+          </div>
 
-            {/* Quick Filters */}
-            <div className="flex flex-wrap justify-center gap-2 mt-4">
-              <button className="flex items-center gap-2 px-4 py-2 rounded-full border border-[var(--surface-border)] bg-[var(--surface)] text-sm hover:border-[var(--primary)] transition-colors">
-                <Building2 className="w-4 h-4" /> Post Offices
-              </button>
-              <button className="flex items-center gap-2 px-4 py-2 rounded-full border border-[var(--surface-border)] bg-[var(--surface)] text-sm hover:border-[var(--primary)] transition-colors">
-                <Building2 className="w-4 h-4" /> Sub Post Offices
-              </button>
-              <button className="flex items-center gap-2 px-4 py-2 rounded-full border border-[var(--surface-border)] bg-[var(--surface)] text-sm hover:border-[var(--primary)] transition-colors">
-                <MapPin className="w-4 h-4" /> Western Province
-              </button>
-            </div>
+          <div className="flex flex-wrap justify-center gap-3 mt-8">
+            {["Colombo", "Kandy", "Galle", "Sub Post Offices"].map((tag) => (
+              <Badge key={tag} variant="outline" className="px-4 py-1.5 cursor-pointer hover:bg-primary hover:text-primary-foreground transition-all">
+                {tag}
+              </Badge>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Results Section */}
-      <section className="container mx-auto px-4">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-semibold">Directory</h2>
-          <span className="text-sm text-[var(--text-muted)]">Showing {postOffices.length} results</span>
+      {/* Directory Section */}
+      <section className="container mx-auto px-4 py-20 relative z-20">
+        <div className="flex flex-col md:flex-row justify-between items-end mb-10 gap-4">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight mb-2">Explore the Directory</h2>
+            <p className="text-muted-foreground">Showing 12 recently updated locations</p>
+          </div>
+          <Button variant="outline" className="rounded-full">
+            View All Map <MapPin className="ml-2 w-4 h-4" />
+          </Button>
         </div>
+
+        <Separator className="mb-10 opacity-50" />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {postOffices.map((po) => (
-            <Link href={`/office/${po.id}`} key={po.id} className="group block h-full">
-              <div className="glass-panel h-full flex flex-col rounded-2xl p-6 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-[var(--primary)]/50">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="p-2 bg-[var(--primary)]/10 text-[var(--primary)] rounded-lg">
-                    <Building2 className="w-6 h-6" />
+            <Link key={po.id} href={`/office/${po.id}`} className="group h-full">
+              <Card className="h-full flex flex-col hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300">
+                <CardHeader className="pb-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="p-2.5 bg-primary/10 rounded-xl group-hover:bg-primary group-hover:text-primary-foreground transition-colors text-primary">
+                      <Building2 className="w-5 h-5" />
+                    </div>
+                    <Badge variant="secondary" className="font-mono bg-secondary/10 text-secondary border-none">
+                      {po.postalCode}
+                    </Badge>
                   </div>
-                  <span className="text-xs font-semibold px-2 py-1 rounded-full bg-[var(--surface-border)] text-[var(--text-muted)]">
-                    {po.postalCode}
-                  </span>
-                </div>
-                <h3 className="text-xl font-bold mb-1 group-hover:text-[var(--primary)] transition-colors">{po.name}</h3>
+                  <CardTitle className="text-xl group-hover:text-primary transition-colors">
+                    {po.name}
+                  </CardTitle>
+                </CardHeader>
 
-                <div className="border-t border-[var(--surface-border)] pt-4 mt-auto">
-                  <span className="text-sm text-[var(--primary)] font-medium group-hover:underline">View details →</span>
-                </div>
-              </div>
+                <CardContent className="pb-6 flex-1">
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 shrink-0" />
+                      <span>Sri Lanka</span>
+                    </div>
+                  </div>
+                </CardContent>
+
+                <CardFooter className="pt-4 border-t border-border/40 pb-4">
+                  <div className="flex items-center text-sm font-medium text-primary w-full justify-between">
+                    View Details
+                    <ChevronRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </CardFooter>
+              </Card>
             </Link>
           ))}
+        </div>
+
+        <div className="mt-16 flex justify-center">
+          <Button variant="secondary" size="lg" className="rounded-full px-8 shadow-sm">
+            Load More Locations
+          </Button>
         </div>
       </section>
     </div>
