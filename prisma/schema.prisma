@@ -1,0 +1,56 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model PostOffice {
+  id         Int               @id @default(autoincrement())
+  name       String
+  postalCode String            @unique
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  fields     PostOfficeField[]
+  users      User[]
+  edits      EditRequest[]
+}
+
+model PostOfficeField {
+  id           Int        @id @default(autoincrement())
+  name         String
+  type         String     // TEXT, NUMBER, BOOLEAN
+  value        String
+  postOfficeId Int
+  postOffice   PostOffice @relation(fields: [postOfficeId], references: [id])
+}
+
+model User {
+  id           Int           @id @default(autoincrement())
+  name         String
+  email        String        @unique
+  passwordHash String
+  role         String        @default("EMPLOYEE")
+  postOfficeId Int?
+  postOffice   PostOffice?   @relation(fields: [postOfficeId], references: [id])
+  edits        EditRequest[]
+}
+
+model EditRequest {
+  id           Int        @id @default(autoincrement())
+  postOfficeId Int
+  requestedById Int
+  changes      String     // JSON string
+  status       String     @default("PENDING")
+  createdAt    DateTime   @default(now())
+  
+  postOffice   PostOffice @relation(fields: [postOfficeId], references: [id])
+  requestedBy  User       @relation(fields: [requestedById], references: [id])
+}
+
+
