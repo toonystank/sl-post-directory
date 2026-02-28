@@ -11,46 +11,49 @@ datasource db {
 }
 
 model PostOffice {
-  id         Int               @id @default(autoincrement())
+  id         String            @id @default(cuid())
   name       String
-  postalCode String            @unique
+  postalCode String
   createdAt  DateTime          @default(now())
   updatedAt  DateTime          @updatedAt
   fields     PostOfficeField[]
   users      User[]
   edits      EditRequest[]
+
+  @@index([postalCode])
+  @@index([name])
 }
 
 model PostOfficeField {
-  id           Int        @id @default(autoincrement())
+  id           String     @id @default(cuid())
   name         String
   type         String     // TEXT, NUMBER, BOOLEAN
   value        String
-  postOfficeId Int
-  postOffice   PostOffice @relation(fields: [postOfficeId], references: [id])
+  postOfficeId String
+  postOffice   PostOffice @relation(fields: [postOfficeId], references: [id], onDelete: Cascade)
+
+  @@index([postOfficeId, name])
 }
 
 model User {
-  id           Int           @id @default(autoincrement())
+  id           String        @id @default(cuid())
   name         String
   email        String        @unique
   passwordHash String
-  role         String        @default("EMPLOYEE")
-  postOfficeId Int?
+  role         String        @default("CONTRIBUTOR")
+  postOfficeId String?
   postOffice   PostOffice?   @relation(fields: [postOfficeId], references: [id])
   edits        EditRequest[]
 }
 
 model EditRequest {
-  id           Int        @id @default(autoincrement())
-  postOfficeId Int
-  requestedById Int
-  changes      String     // JSON string
-  status       String     @default("PENDING")
-  createdAt    DateTime   @default(now())
+  id            String     @id @default(cuid())
+  postOfficeId  String
+  requestedById String
+  changes       String     // JSON string
+  status        String     @default("PENDING")
+  createdAt     DateTime   @default(now())
   
-  postOffice   PostOffice @relation(fields: [postOfficeId], references: [id])
-  requestedBy  User       @relation(fields: [requestedById], references: [id])
+  postOffice    PostOffice @relation(fields: [postOfficeId], references: [id])
+  requestedBy   User       @relation(fields: [requestedById], references: [id])
 }
-
-

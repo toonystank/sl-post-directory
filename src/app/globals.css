@@ -102,9 +102,7 @@
     --input: 217.2 32.6% 17.5%;
     --ring: 250 89% 65%;
   }
-}
 
-@layer base {
   * {
     @apply border-border;
   }
@@ -129,4 +127,14 @@
 
 .btn-secondary {
   @apply bg-secondary text-secondary-foreground hover:bg-secondary/90 shadow-sm border border-secondary/20;
+}
+
+/* Hide scrollbar for horizontal scroll areas */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
