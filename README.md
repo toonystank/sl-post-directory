@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🇱🇰 SL Post Directory
+
+A modern, searchable directory of Sri Lanka Post offices built with **Next.js 16**, **Prisma**, and **PostgreSQL**.
+
+## Features
+
+- 🔍 **Smart Search** — Search by name, postal code, or division with debounced instant results
+- 📃 **Infinite Scroll** — Browse the full directory with lazy-loaded results
+- 🔤 **Alphabetic Filtering** — Jump to offices by letter
+- 📝 **Community Suggestions** — Anyone can submit edit requests for post office data
+- ✅ **Moderation Queue** — Admin dashboard with approve/reject/need-more-info workflow and before/after diff view
+- 👥 **Role-Based Access** — Super Admin, Admin, Moderator, and Contributor roles
+- 📧 **Email Notifications** — Automated emails via Resend for edit request status updates
+- 🌓 **Dark Mode** — Full light/dark theme support
+- 📱 **Mobile Ready** — Capacitor integration for native mobile builds
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 16 (App Router, Turbopack) |
+| Database | PostgreSQL (Neon) |
+| ORM | Prisma |
+| Auth | NextAuth.js (Credentials) |
+| Email | Resend |
+| Styling | Tailwind CSS v4 + shadcn/ui |
+| Mobile | Capacitor |
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your database URL, NextAuth secret, and Resend API key
+
+# Run database migrations
+npx prisma migrate dev
+
+# Start the dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to view the directory.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `NEXTAUTH_SECRET` | Random secret for JWT signing |
+| `NEXTAUTH_URL` | App URL (e.g. `http://localhost:3000`) |
+| `RESEND_API_KEY` | Resend API key for email notifications |
 
-## Learn More
+## Project Structure
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+├── app/
+│   ├── api/              # API routes (offices, auth, admin, suggest)
+│   ├── dashboard/        # Admin dashboard, moderation, user management
+│   ├── office/[id]/      # Office detail pages
+│   ├── suggest/          # Edit suggestion form
+│   └── login/            # Authentication
+├── components/           # Reusable UI components
+└── lib/                  # Prisma client, email utilities
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## License
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT
