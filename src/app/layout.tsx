@@ -22,7 +22,7 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="en" suppressHydrationWarning>
-            <body className={`${inter.variable} min-h-screen flex flex-col antialiased bg-background`}>
+            <body className={`${inter.variable} min-h-screen flex flex-col antialiased bg-background`} suppressHydrationWarning>
                 <AuthProvider>
                     <ThemeProvider
                         attribute="class"
