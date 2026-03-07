@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
 import { ShieldCheck, User, Edit3, Building2, TrendingUp, Check, X, PlusCircle, Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -10,19 +10,29 @@ import AdminOfficeManager from "./AdminOfficeManager";
 import ModerationQueue from "./ModerationQueue";
 
 interface SessionUser {
+    id?: string;
     name?: string | null;
     email?: string | null;
     image?: string | null;
     role?: string;
 }
 import { Badge } from "@/components/ui/badge";
+import ContributorDashboard from "./ContributorDashboard";
 
 export default async function AdminDashboard() {
     const session = await getServerSession(authOptions);
 
     const user = session?.user as SessionUser | undefined;
 
-    if (!session || !["ADMIN", "SUPER_ADMIN", "MODERATOR"].includes(user?.role || "")) {
+    if (!session) {
+        redirect("/login");
+    }
+
+    if (user?.role === "CONTRIBUTOR") {
+        return <ContributorDashboard userId={user.id!} userName={user.name!} />;
+    }
+
+    if (!["ADMIN", "SUPER_ADMIN", "MODERATOR"].includes(user?.role || "")) {
         redirect("/login");
     }
 
@@ -66,10 +76,12 @@ export default async function AdminDashboard() {
                             <PlusCircle className="w-4 h-4 mr-2" /> Add New Office
                         </Link>
                     </Button>
-                    <Badge variant="outline" className="w-fit flex items-center gap-2 px-4 py-2 text-sm">
-                        <User className="w-4 h-4" />
-                        {session.user?.name}
-                    </Badge>
+                    <Link href="/dashboard/profile">
+                        <Badge variant="outline" className="w-fit flex items-center gap-2 px-4 py-2 text-sm hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer">
+                            <User className="w-4 h-4" />
+                            {session.user?.name}
+                        </Badge>
+                    </Link>
                 </div>
             </div>
 

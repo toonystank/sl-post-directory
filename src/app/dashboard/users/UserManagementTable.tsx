@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { UserPlus, Shield, ShieldCheck, User, Save, Trash2, ShieldAlert } from "lucide-react";
+import { UserPlus, Shield, ShieldCheck, User, Save, Trash2, ShieldAlert, KeyRound, ShieldOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRouter } from "next/navigation";
 
 type Role = "SUPER_ADMIN" | "ADMIN" | "MODERATOR" | "CONTRIBUTOR";
@@ -14,6 +15,7 @@ interface UserData {
     name: string;
     email: string;
     role: string;
+    twoFactorEnabled?: boolean;
 }
 
 export default function UserManagementTable({ initialUsers }: { initialUsers: UserData[] }) {
@@ -128,6 +130,40 @@ export default function UserManagementTable({ initialUsers }: { initialUsers: Us
         }
     };
 
+    const handleResetPassword = async (userId: string, email: string) => {
+        const newPassword = window.prompt(`Enter new temporary password for ${email} (min 8 chars):`);
+        if (!newPassword || newPassword.length < 8) {
+            if (newPassword) setError("Password must be at least 8 characters.");
+            return;
+        }
+        setLoading(true); setError(""); setSuccess("");
+        try {
+            const res = await fetch(`/api/admin/users/${userId}/reset-password`, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ newPassword })
+            });
+            if (res.ok) {
+                setSuccess(`Password for ${email} has been reset.`);
+            } else {
+                const err = await res.json(); setError(err.error || "Failed to reset password");
+            }
+        } catch (err) { setError("Network error occurred"); } finally { setLoading(false); }
+    };
+
+    const handleReset2FA = async (userId: string, email: string) => {
+        if (!confirm(`Are you sure you want to disable 2FA for ${email}?`)) return;
+        setLoading(true); setError(""); setSuccess("");
+        try {
+            const res = await fetch(`/api/admin/users/${userId}/reset-2fa`, { method: "POST" });
+            if (res.ok) {
+                setUsers(users.map(u => u.id === userId ? { ...u, twoFactorEnabled: false } : u));
+                setSuccess(`2FA has been disabled for ${email}.`);
+            } else {
+                const err = await res.json(); setError(err.error || "Failed to disable 2FA");
+            }
+        } catch (err) { setError("Network error occurred"); } finally { setLoading(false); }
+    };
+
     return (
         <div>
             {/* Create User Form Header */}
@@ -154,15 +190,16 @@ export default function UserManagementTable({ initialUsers }: { initialUsers: Us
                     </div>
                     <div className="w-full md:w-40">
                         <label className="text-xs font-medium mb-1.5 block">Role</label>
-                        <select
-                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                            value={newUserRole}
-                            onChange={e => setNewUserRole(e.target.value as Role)}
-                        >
-                            <option value="MODERATOR">Moderator</option>
-                            <option value="ADMIN">Admin</option>
-                            <option value="SUPER_ADMIN">Super Admin</option>
-                        </select>
+                        <Select value={newUserRole} onValueChange={(val) => setNewUserRole(val as Role)}>
+                            <SelectTrigger className="h-10 w-full bg-background border-input">
+                                <SelectValue placeholder="Select role" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="MODERATOR">Moderator</SelectItem>
+                                <SelectItem value="ADMIN">Admin</SelectItem>
+                                <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
                     <Button type="submit" disabled={loading} className="w-full md:w-auto h-10">
                         Create
@@ -177,7 +214,7 @@ export default function UserManagementTable({ initialUsers }: { initialUsers: Us
                         <tr>
                             <th className="px-6 py-4 font-medium">User</th>
                             <th className="px-6 py-4 font-medium">Role Level</th>
-                            <th className="px-6 py-4 font-medium text-right">Danger Zone</th>
+                            <th className="px-6 py-4 font-medium text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-border/50">
@@ -188,27 +225,56 @@ export default function UserManagementTable({ initialUsers }: { initialUsers: Us
                                     <div className="text-xs text-muted-foreground mt-0.5">{u.email}</div>
                                 </td>
                                 <td className="px-6 py-4">
-                                    <select
-                                        className="text-xs font-medium bg-transparent border-0 focus:ring-0 cursor-pointer hover:bg-muted/50 p-1.5 rounded-md -ml-1.5"
+                                    <Select
                                         value={u.role}
+                                        onValueChange={(val) => handleUpdateRole(u.id, u.role, val)}
                                         disabled={loading}
-                                        onChange={(e) => handleUpdateRole(u.id, u.role, e.target.value)}
                                     >
-                                        <option value="CONTRIBUTOR">Contributor</option>
-                                        <option value="MODERATOR">Moderator</option>
-                                        <option value="ADMIN">Admin</option>
-                                        <option value="SUPER_ADMIN">Super Admin</option>
-                                    </select>
+                                        <SelectTrigger className="h-8 text-xs font-medium bg-transparent border-0 shadow-none focus:ring-0 cursor-pointer hover:bg-muted/50 w-fit p-1.5 px-2 rounded-md -ml-2 text-foreground data-[state=open]:bg-muted/50">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="CONTRIBUTOR" className="text-xs">Contributor</SelectItem>
+                                            <SelectItem value="MODERATOR" className="text-xs">Moderator</SelectItem>
+                                            <SelectItem value="ADMIN" className="text-xs">Admin</SelectItem>
+                                            <SelectItem value="SUPER_ADMIN" className="text-xs">Super Admin</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </td>
-                                <td className="px-6 py-4 text-right">
+                                <td className="px-6 py-4 text-right flex items-center justify-end gap-1">
                                     <Button
+                                        title="Reset Password"
                                         size="sm"
                                         variant="ghost"
-                                        className="h-8 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                        className="h-8 w-8 p-0 text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                                        onClick={() => handleResetPassword(u.id, u.email)}
+                                        disabled={loading}
+                                    >
+                                        <KeyRound className="w-4 h-4" />
+                                    </Button>
+
+                                    {u.twoFactorEnabled && (
+                                        <Button
+                                            title="Disable 2FA"
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-8 w-8 p-0 text-amber-500 hover:bg-amber-500/10 hover:text-amber-600"
+                                            onClick={() => handleReset2FA(u.id, u.email)}
+                                            disabled={loading}
+                                        >
+                                            <ShieldOff className="w-4 h-4" />
+                                        </Button>
+                                    )}
+
+                                    <Button
+                                        title="Revoke Access"
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-8 w-8 p-0 ml-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
                                         onClick={() => handleDeleteUser(u.id, u.email)}
                                         disabled={loading}
                                     >
-                                        <Trash2 className="w-4 h-4" /> Revoke
+                                        <Trash2 className="w-4 h-4" />
                                     </Button>
                                 </td>
                             </tr>

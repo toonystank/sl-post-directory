@@ -11,14 +11,18 @@ datasource db {
 }
 
 model PostOffice {
-  id         String            @id @default(cuid())
-  name       String
-  postalCode String
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
-  fields     PostOfficeField[]
-  users      User[]
-  edits      EditRequest[]
+  id             String            @id @default(cuid())
+  name           String
+  postalCode     String
+  latitude       Float?
+  longitude      Float?
+  operatingHours String?
+  services       String[]          @default([])
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  fields         PostOfficeField[]
+  users          User[]
+  edits          EditRequest[]
 
   @@index([postalCode])
   @@index([name])
@@ -36,14 +40,19 @@ model PostOfficeField {
 }
 
 model User {
-  id           String        @id @default(cuid())
-  name         String
-  email        String        @unique
-  passwordHash String
-  role         String        @default("CONTRIBUTOR")
-  postOfficeId String?
-  postOffice   PostOffice?   @relation(fields: [postOfficeId], references: [id])
-  edits        EditRequest[]
+  id                String        @id @default(cuid())
+  name              String
+  email             String        @unique
+  passwordHash      String
+  role              String        @default("CONTRIBUTOR")
+  emailVerified     DateTime?
+  verificationToken String?       @unique
+  twoFactorSecret   String?
+  twoFactorEnabled  Boolean       @default(false)
+  backupCodes       String[]      @default([])
+  postOfficeId      String?
+  postOffice        PostOffice?   @relation(fields: [postOfficeId], references: [id])
+  edits             EditRequest[]
 }
 
 model EditRequest {

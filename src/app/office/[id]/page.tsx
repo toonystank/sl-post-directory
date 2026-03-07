@@ -34,7 +34,7 @@ export default async function OfficeDetails({ params }: { params: Promise<{ id: 
                 {/* Background Accent */}
                 <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
 
-                <CardHeader className="relative z-10 pb-8 pt-10 px-8 md:px-12 border-b border-border/40 bg-card/80">
+                <CardHeader className="relative z-10 pb-8 pt-10 px-8 md:px-12 border-b border-border/40">
                     <div className="flex flex-col md:flex-row md:items-center gap-6 justify-between">
                         <div className="flex items-center gap-5">
                             <div className="p-4 bg-primary/10 text-primary rounded-2xl ring-1 ring-primary/20">
@@ -45,7 +45,7 @@ export default async function OfficeDetails({ params }: { params: Promise<{ id: 
                                 )}
                             </div>
                             <div>
-                                <Badge variant="secondary" className="mb-3 uppercase tracking-wider text-[10px] bg-secondary/10 text-secondary border-secondary/20 hover:bg-secondary/20">
+                                <Badge variant="outline" className="mb-3 uppercase tracking-wider text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 px-2 py-0.5 rounded-md font-semibold">
                                     Official Listing
                                 </Badge>
                                 <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-2">
@@ -61,10 +61,9 @@ export default async function OfficeDetails({ params }: { params: Promise<{ id: 
                         {/* Core Info Cards */}
                         <div className="group bg-background/50 border border-border/50 rounded-2xl p-6 flex flex-col items-start gap-4 hover:border-primary/50 transition-all hover:shadow-md hover:bg-card">
                             <div className="flex items-center gap-3 text-muted-foreground mb-2">
-                                <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                                    <Hash className="w-4 h-4" />
+                                <div className="px-3 py-1 bg-primary/10 rounded-lg text-primary text-xs font-semibold uppercase tracking-wider border border-primary/20">
+                                    <span className="flex items-center gap-1.5"><Hash className="w-3.5 h-3.5" /> Postal Code</span>
                                 </div>
-                                <span className="font-medium text-sm">Postal Code</span>
                             </div>
                             <div className="flex w-full justify-between items-center mt-auto">
                                 <p className="text-2xl font-bold tracking-tight">{office.postalCode}</p>
@@ -78,7 +77,7 @@ export default async function OfficeDetails({ params }: { params: Promise<{ id: 
                         {office.fields.filter(f => f.name !== 'Type').map((field) => (
                             <div key={field.id} className="group bg-background/50 border border-border/50 rounded-2xl p-6 flex flex-col items-start gap-4 hover:border-primary/50 transition-all hover:shadow-md hover:bg-card">
                                 <div className="flex items-center gap-3 text-muted-foreground mb-2">
-                                    <div className="px-3 py-1 bg-secondary/10 rounded-lg text-secondary text-xs font-semibold uppercase tracking-wider">
+                                    <div className="px-3 py-1 bg-blue-500/10 rounded-lg text-blue-400 text-xs font-semibold uppercase tracking-wider border border-blue-500/20">
                                         {field.name}
                                     </div>
                                 </div>

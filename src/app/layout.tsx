@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Outfit } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import AuthProvider from "@/context/AuthContext";
 import Navbar from "@/components/Navbar";
 
-const inter = Inter({
+const outfit = Outfit({
     subsets: ["latin"],
-    variable: "--font-inter",
+    variable: "--font-outfit",
 });
 
 export const metadata: Metadata = {
@@ -22,7 +22,7 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="en" suppressHydrationWarning>
-            <body className={`${inter.variable} min-h-screen flex flex-col antialiased bg-background`} suppressHydrationWarning>
+            <body className={`${outfit.variable} font-sans min-h-screen flex flex-col antialiased bg-background`} suppressHydrationWarning>
                 <AuthProvider>
                     <ThemeProvider
                         attribute="class"
