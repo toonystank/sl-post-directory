@@ -45,3 +45,4 @@ next-env.d.ts
 # Utility scripts with credentials
 update_admin.js
 check_users.js
+.vercel

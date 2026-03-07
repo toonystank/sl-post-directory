@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
+import { createOfficeSchema } from "@/lib/validations";
 
 export async function POST(req: Request) {
     try {
@@ -13,11 +14,16 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { name, postalCode, ...fields } = body;
 
-        if (!name || !postalCode) {
-            return NextResponse.json({ error: "Name and Postal Code are required" }, { status: 400 });
+        const validation = createOfficeSchema.safeParse(body);
+        if (!validation.success) {
+            return NextResponse.json(
+                { error: validation.error?.issues[0]?.message || "Invalid input" },
+                { status: 400 }
+            );
         }
+
+        const { name, postalCode, ...fields } = validation.data;
 
         // Build the dynamic fields array
         const dynamicFields: { name: string; value: string; type: string }[] = [];

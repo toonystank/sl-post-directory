@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
 import { ShieldAlert, Users, ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -24,6 +24,7 @@ export default async function UserManagementPage() {
             name: true,
             email: true,
             role: true,
+            twoFactorEnabled: true,
         }
     });
 
@@ -35,7 +36,7 @@ export default async function UserManagementPage() {
                 </Link>
             </Button>
 
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                 <div>
                     <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-3">
                         <div className="p-2.5 bg-destructive/10 text-destructive rounded-xl">
@@ -48,13 +49,11 @@ export default async function UserManagementPage() {
             </div>
 
             <Card className="border-border/50 overflow-hidden shadow-2xl bg-card/50 backdrop-blur-xl">
-                <CardHeader className="border-b border-border/40 bg-card/80">
-                    <div className="flex items-center gap-3">
-                        <Users className="w-5 h-5 text-primary" />
-                        <div>
-                            <CardTitle className="text-lg">Registered Users</CardTitle>
-                            <CardDescription>View all accounts and quickly upgrade/downgrade privileges.</CardDescription>
-                        </div>
+                <CardHeader className="flex flex-row items-center gap-3 border-b border-border/40 bg-card/80 p-6">
+                    <Users className="w-5 h-5 text-primary mt-1" />
+                    <div className="flex flex-col gap-1.5">
+                        <CardTitle className="text-lg">Registered Users</CardTitle>
+                        <CardDescription>View all accounts and quickly upgrade/downgrade privileges.</CardDescription>
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">

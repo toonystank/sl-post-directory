@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Responsive Layout Wireframe</title>
+    <!-- We use Tailwind CDN just for this rapid visualization -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .glass {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .card-bg {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-white min-h-screen font-sans">
+
+    <!-- Navbar (Sticky Top) -->
+    <nav class="sticky top-0 z-50 glass h-16 flex items-center justify-between px-6">
+        <div class="font-bold text-lg tracking-tight">SL Post Directory</div>
+        <div class="flex gap-4 text-sm font-medium">
+            <span class="text-blue-400">Home</span>
+            <span class="text-gray-400">Login</span>
+        </div>
+    </nav>
+
+    <!-- Hero Section (Reduced Height) -->
+    <header class="py-12 bg-gray-800/50 border-b border-gray-800 text-center px-4">
+        <div
+            class="inline-block bg-blue-500/20 text-blue-400 text-xs px-3 py-1 rounded-full mb-4 border border-blue-500/30">
+            V2.0 Redesign Live
+        </div>
+        <h1 class="text-3xl md:text-5xl font-extrabold tracking-tight mb-4">
+            Navigate Sri Lanka's<br>Postal Network
+        </h1>
+        <p class="text-gray-400 max-w-xl mx-auto">The most comprehensive, unified directory for finding every post
+            office.</p>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="container mx-auto px-4 py-8 relative">
+        <div class="flex flex-col lg:flex-row gap-8 items-start">
+
+            <!-- ====== LEFT SIDEBAR (Desktop) / TOP STACK (Mobile) ====== -->
+            <aside
+                class="w-full lg:w-80 flex-shrink-0 lg:sticky lg:top-24 bg-gray-800 rounded-xl border border-gray-700 p-5 shadow-xl">
+
+                <!-- Search Bar -->
+                <div class="bg-gray-900 border border-gray-700 p-3 rounded-lg mb-6 flex items-center text-gray-400">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                    <span>Search offices, locations...</span>
+                </div>
+
+                <!-- Desktop Focus: Vertical Filters -->
+                <div class="hidden lg:block">
+                    <h3 class="text-xs uppercase text-gray-400 font-bold mb-3 tracking-wider">Browse Alphabetically</h3>
+                    <div class="grid grid-cols-6 gap-2 mb-8">
+                        <!-- Simulated letters -->
+                        <button
+                            class="bg-blue-600 text-white font-medium aspect-square rounded-md flex items-center justify-center">A</button>
+                        <button
+                            class="bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium aspect-square rounded-md flex items-center justify-center">B</button>
+                        <button
+                            class="bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium aspect-square rounded-md flex items-center justify-center">C</button>
+                        <button
+                            class="bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium aspect-square rounded-md flex items-center justify-center">D</button>
+                        <button
+                            class="bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium aspect-square rounded-md flex items-center justify-center">E</button>
+                        <button
+                            class="bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium aspect-square rounded-md flex items-center justify-center">F</button>
+                    </div>
+
+                    <h3 class="text-xs uppercase text-gray-400 font-bold mb-3 tracking-wider">Services</h3>
+                    <div class="space-y-2">
+                        <label class="flex items-center space-x-3 cursor-pointer p-2 rounded hover:bg-gray-700/50">
+                            <input type="checkbox" checked
+                                class="form-checkbox h-4 w-4 text-blue-600 bg-gray-900 border-gray-700 rounded focus:ring-blue-500">
+                            <span class="text-sm font-medium">Foreign parcel unit</span>
+                        </label>
+                        <label class="flex items-center space-x-3 cursor-pointer p-2 rounded hover:bg-gray-700/50">
+                            <input type="checkbox"
+                                class="form-checkbox h-4 w-4 text-blue-600 bg-gray-900 border-gray-700 rounded focus:ring-blue-500">
+                            <span class="text-sm font-medium">EMS Center</span>
+                        </label>
+                        <label class="flex items-center space-x-3 cursor-pointer p-2 rounded hover:bg-gray-700/50">
+                            <input type="checkbox"
+                                class="form-checkbox h-4 w-4 text-blue-600 bg-gray-900 border-gray-700 rounded focus:ring-blue-500">
+                            <span class="text-sm font-medium">Sorting facility</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Mobile Focus: Horizontal Pills -->
+                <div class="block lg:hidden w-full overflow-hidden">
+                    <h3 class="text-xs uppercase text-gray-400 font-bold mb-2 tracking-wider">Post Office Type</h3>
+                    <div class="flex overflow-x-auto gap-2 mb-4 pb-2 scrollbar-hide" style="scrollbar-width: none;">
+                        <button
+                            class="flex-shrink-0 bg-blue-600 text-white px-4 py-1.5 rounded-full text-sm font-medium shadow-lg shadow-blue-500/20">All
+                            Types</button>
+                        <button
+                            class="flex-shrink-0 bg-gray-700 text-gray-300 px-4 py-1.5 rounded-full text-sm font-medium">Sub
+                            Post Offices</button>
+                        <button
+                            class="flex-shrink-0 bg-gray-700 text-gray-300 px-4 py-1.5 rounded-full text-sm font-medium">Main
+                            Offices</button>
+                        <button
+                            class="flex-shrink-0 bg-gray-700 text-gray-300 px-4 py-1.5 rounded-full text-sm font-medium">Agency</button>
+                    </div>
+
+                    <h3 class="text-xs uppercase text-gray-400 font-bold mb-2 tracking-wider">Alphabet</h3>
+                    <div class="flex overflow-x-auto gap-2 pb-2 scrollbar-hide" style="scrollbar-width: none;">
+                        <button
+                            class="flex-shrink-0 bg-blue-600 text-white w-8 h-8 rounded-full text-sm font-medium shadow-lg shadow-blue-500/20 flex items-center justify-center">A</button>
+                        <button
+                            class="flex-shrink-0 bg-gray-700 text-gray-300 w-8 h-8 rounded-full text-sm font-medium flex items-center justify-center">B</button>
+                        <button
+                            class="flex-shrink-0 bg-gray-700 text-gray-300 w-8 h-8 rounded-full text-sm font-medium flex items-center justify-center">C</button>
+                        <button
+                            class="flex-shrink-0 bg-gray-700 text-gray-300 w-8 h-8 rounded-full text-sm font-medium flex items-center justify-center">D</button>
+                        <button
+                            class="flex-shrink-0 bg-gray-700 text-gray-300 w-8 h-8 rounded-full text-sm font-medium flex items-center justify-center">E</button>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- ====== RIGHT GRID SECTION ====== -->
+            <section class="flex-1 w-full min-w-0">
+                <div class="flex justify-between items-end mb-6 border-b border-gray-800 pb-4">
+                    <div>
+                        <h2 class="text-2xl font-bold tracking-tight">4,000+ Post Offices</h2>
+                        <p class="text-gray-400 text-sm">Showing results for "A"</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    <!-- Cards -->
+                    <div class="card-bg p-5 rounded-xl hover:border-blue-500/50 transition-colors group cursor-pointer">
+                        <div class="flex justify-between items-start mb-4">
+                            <div
+                                class="w-10 h-10 bg-blue-500/10 text-blue-400 rounded-lg flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4">
+                                    </path>
+                                </svg>
+                            </div>
+                            <span class="bg-gray-800 text-xs text-gray-300 px-2 py-1 rounded font-mono">10200</span>
+                        </div>
+                        <h3 class="font-bold text-lg mb-1">Akkaraipattu</h3>
+                        <p class="text-xs text-blue-400 mb-4">Main Post Office</p>
+                        <div class="text-sm text-gray-400 space-y-2">
+                            <div class="flex items-center gap-2"><svg class="w-4 h-4 text-gray-500" fill="none"
+                                    stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z">
+                                    </path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                </svg>Ampara</div>
+                            <div class="flex items-center gap-2"><svg class="w-4 h-4 text-gray-500" fill="none"
+                                    stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z">
+                                    </path>
+                                </svg>0672277250</div>
+                        </div>
+                    </div>
+
+                    <div class="card-bg p-5 rounded-xl hover:border-blue-500/50 transition-colors group cursor-pointer">
+                        <div class="flex justify-between items-start mb-4">
+                            <div
+                                class="w-10 h-10 bg-blue-500/10 text-blue-400 rounded-lg flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4">
+                                    </path>
+                                </svg>
+                            </div>
+                            <span class="bg-gray-800 text-xs text-gray-300 px-2 py-1 rounded font-mono">11000</span>
+                        </div>
+                        <h3 class="font-bold text-lg mb-1">Anuradhapura</h3>
+                        <p class="text-xs text-blue-400 mb-4">Main Post Office</p>
+                        <div class="text-sm text-gray-400 space-y-2">
+                            <div class="flex items-center gap-2"><svg class="w-4 h-4 text-gray-500" fill="none"
+                                    stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z">
+                                    </path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                </svg>Anuradhapura</div>
+                            <div class="flex items-center gap-2"><svg class="w-4 h-4 text-gray-500" fill="none"
+                                    stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z">
+                                    </path>
+                                </svg>0252222250</div>
+                        </div>
+                    </div>
+
+                    <div class="card-bg p-5 rounded-xl hover:border-blue-500/50 transition-colors group cursor-pointer">
+                        <div class="flex justify-between items-start mb-4">
+                            <div
+                                class="w-10 h-10 bg-blue-500/10 text-blue-400 rounded-lg flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6">
+                                    </path>
+                                </svg>
+                            </div>
+                            <span class="bg-gray-800 text-xs text-gray-300 px-2 py-1 rounded font-mono">11012</span>
+                        </div>
+                        <h3 class="font-bold text-lg mb-1">Agbopura</h3>
+                        <p class="text-xs text-blue-400 mb-4">Sub Post Office</p>
+                        <div class="text-sm text-gray-400 space-y-2">
+                            <div class="flex items-center gap-2"><svg class="w-4 h-4 text-gray-500" fill="none"
+                                    stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z">
+                                    </path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                </svg>Trincomalee</div>
+                            <div class="flex items-center gap-2"><svg class="w-4 h-4 text-gray-500" fill="none"
+                                    stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z">
+                                    </path>
+                                </svg>0262244250</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Spacer to allow scrolling demonstration -->
+                <div
+                    class="h-[800px] mt-8 bg-gray-900\/50 rounded-xl border border-gray-800 border-dashed flex items-center justify-center text-gray-600">
+                    Scroll down to see the sticky sidebar in action! (More cards would go here...)
+                </div>
+            </section>
+        </div>
+    </main>
+
+</body>
+
+</html>

@@ -20,7 +20,13 @@ export default function AdminOfficeManager() {
     const [searchQuery, setSearchQuery] = useState("");
     const [loading, setLoading] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [bulkAction, setBulkAction] = useState<string>("add_service");
+    const [bulkService, setBulkService] = useState<string>("Foreign parcel unit");
+    const [isBulking, setIsBulking] = useState(false);
     const router = useRouter();
+
+    const SERVICE_TAGS = ["Foreign parcel unit", "postal complex", "regional sorting unit"];
 
     const fetchOffices = async (query: string = "") => {
         setLoading(true);
@@ -70,6 +76,55 @@ export default function AdminOfficeManager() {
         }
     };
 
+    const toggleSelect = (id: string) => {
+        const newSet = new Set(selectedIds);
+        if (newSet.has(id)) newSet.delete(id);
+        else newSet.add(id);
+        setSelectedIds(newSet);
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIds.size === offices.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(offices.map((o) => o.id)));
+        }
+    };
+
+    const handleBulkAction = async () => {
+        if (selectedIds.size === 0) return;
+        if (bulkAction === 'delete' && !confirm(`Are you sure you want to delete ${selectedIds.size} post offices?`)) {
+            return;
+        }
+
+        setIsBulking(true);
+        try {
+            const res = await fetch('/api/admin/bulk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    officeIds: Array.from(selectedIds),
+                    action: bulkAction,
+                    serviceQuery: bulkService
+                })
+            });
+
+            if (res.ok) {
+                alert(`Bulk operation successful on ${selectedIds.size} offices.`);
+                setSelectedIds(new Set());
+                fetchOffices(searchQuery);
+                router.refresh();
+            } else {
+                alert('Bulk operation failed.');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Error during bulk operation.');
+        } finally {
+            setIsBulking(false);
+        }
+    };
+
     return (
         <Card className="border-border/50">
             <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/40 bg-card/80">
@@ -91,6 +146,39 @@ export default function AdminOfficeManager() {
                     </div>
                 </div>
             </CardHeader>
+            <div className="bg-muted/20 border-b border-border/40 p-3 flex flex-wrap items-center justify-between gap-4">
+                <span className="text-sm font-medium text-muted-foreground">
+                    {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select items below for bulk actions'}
+                </span>
+
+                <div className={`flex items-center gap-2 transition-opacity ${selectedIds.size > 0 ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+                    <select
+                        className="text-sm rounded-lg border border-border bg-background px-3 py-1.5"
+                        value={bulkAction}
+                        onChange={(e) => setBulkAction(e.target.value)}
+                    >
+                        <option value="add_service">Add Service Tag</option>
+                        <option value="remove_service">Remove Service Tag</option>
+                        <option value="delete">Delete Offices</option>
+                    </select>
+
+                    {(bulkAction === 'add_service' || bulkAction === 'remove_service') && (
+                        <select
+                            className="text-sm rounded-lg border border-border bg-background px-3 py-1.5"
+                            value={bulkService}
+                            onChange={(e) => setBulkService(e.target.value)}
+                        >
+                            {SERVICE_TAGS.map(tag => (
+                                <option key={tag} value={tag}>{tag}</option>
+                            ))}
+                        </select>
+                    )}
+
+                    <Button size="sm" onClick={handleBulkAction} disabled={isBulking}>
+                        {isBulking ? 'Applying...' : 'Apply Action'}
+                    </Button>
+                </div>
+            </div>
             <CardContent className="p-0">
                 {offices.length === 0 ? (
                     <div className="text-center py-12 text-muted-foreground">
@@ -102,6 +190,14 @@ export default function AdminOfficeManager() {
                         <table className="w-full text-sm text-left relative">
                             <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border/50 sticky top-0 z-10">
                                 <tr>
+                                    <th className="px-6 py-4 font-medium w-12">
+                                        <input
+                                            type="checkbox"
+                                            onChange={toggleSelectAll}
+                                            checked={offices.length > 0 && selectedIds.size === offices.length}
+                                            className="rounded border-border"
+                                        />
+                                    </th>
                                     <th className="px-6 py-4 font-medium">Post Office</th>
                                     <th className="px-6 py-4 font-medium">Postal Code</th>
                                     <th className="px-6 py-4 font-medium text-right">Actions</th>
@@ -109,7 +205,15 @@ export default function AdminOfficeManager() {
                             </thead>
                             <tbody className="divide-y divide-border/50">
                                 {offices.map((office) => (
-                                    <tr key={office.id} className="hover:bg-muted/30 transition-colors">
+                                    <tr key={office.id} className={`hover:bg-muted/30 transition-colors ${selectedIds.has(office.id) ? 'bg-primary/5' : ''}`}>
+                                        <td className="px-6 py-3 w-12">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.has(office.id)}
+                                                onChange={() => toggleSelect(office.id)}
+                                                className="rounded border-border text-primary focus:ring-primary"
+                                            />
+                                        </td>
                                         <td className="px-6 py-3">
                                             <div className="font-medium text-foreground">{office.name}</div>
                                             <div className="text-xs text-muted-foreground mt-0.5 font-mono">{office.id}</div>
