@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
+export const revalidate = 86400; // Cache the post office page for 24 hours
+
 export default async function OfficeDetails({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
 
