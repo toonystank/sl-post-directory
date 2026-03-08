@@ -10,43 +10,46 @@ interface HeroSectionProps {
 
 export default function HeroSection({ children }: HeroSectionProps) {
     return (
-        <section className="relative w-full pt-10 pb-8 md:pt-16 md:pb-12 flex items-center justify-center overflow-hidden bg-background border-b border-border/50">
+        <section className="relative z-[70] w-full pt-10 pb-8 md:pt-16 md:pb-12 flex items-center justify-center bg-background border-b border-border/50">
 
-            {/* Animated Abstract Background */}
-            <div className="absolute inset-0 w-full h-full bg-grid-white/[0.02] bg-[size:60px_60px]" />
+            {/* Background Container for clipping orbs */}
+            <div className="absolute inset-0 w-full h-full overflow-hidden overflow-x-clip border-b border-border/50">
+                {/* Animated Abstract Background */}
+                <div className="absolute inset-0 w-full h-full bg-grid-white/[0.02] bg-[size:60px_60px]" />
 
-            <div className="absolute top-0 flex items-center justify-center w-full h-full">
-                {/* Glow Orb 1 - Cyan/Primary */}
-                <motion.div
-                    animate={{
-                        scale: [1, 1.2, 1],
-                        opacity: [0.3, 0.5, 0.3],
-                        x: [0, 50, 0],
-                    }}
-                    transition={{
-                        duration: 8,
-                        repeat: Infinity,
-                        ease: "easeInOut"
-                    }}
-                    className="absolute w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px] mix-blend-screen"
-                />
+                <div className="absolute top-0 flex items-center justify-center w-full h-full overflow-hidden">
+                    {/* Glow Orb 1 - Cyan/Primary */}
+                    <motion.div
+                        animate={{
+                            scale: [1, 1.2, 1],
+                            opacity: [0.3, 0.5, 0.3],
+                            x: [0, 50, 0],
+                        }}
+                        transition={{
+                            duration: 8,
+                            repeat: Infinity,
+                            ease: "easeInOut"
+                        }}
+                        className="absolute w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px] mix-blend-screen"
+                    />
 
-                {/* Glow Orb 2 - Deep Blue/Secondary */}
-                <motion.div
-                    animate={{
-                        scale: [1, 1.5, 1],
-                        opacity: [0.2, 0.4, 0.2],
-                        x: [0, -50, 0],
-                        y: [0, 30, 0],
-                    }}
-                    transition={{
-                        duration: 10,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                        delay: 1
-                    }}
-                    className="absolute w-[600px] h-[600px] bg-secondary/30 rounded-full blur-[120px] bottom-[-10%] right-[-10%] mix-blend-screen"
-                />
+                    {/* Glow Orb 2 - Deep Blue/Secondary */}
+                    <motion.div
+                        animate={{
+                            scale: [1, 1.5, 1],
+                            opacity: [0.2, 0.4, 0.2],
+                            x: [0, -50, 0],
+                            y: [0, 30, 0],
+                        }}
+                        transition={{
+                            duration: 10,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                            delay: 1
+                        }}
+                        className="absolute w-[600px] h-[600px] bg-secondary/30 rounded-full blur-[120px] bottom-[-10%] right-[-10%] mix-blend-screen"
+                    />
+                </div>
             </div>
 
             <div className="relative z-10 container px-4 md:px-6 text-center">
