@@ -98,7 +98,16 @@ export async function GET(request: NextRequest) {
 
         const nextCursor = cursor + limit < total ? cursor + limit : null;
 
-        return NextResponse.json({ offices, total, nextCursor });
+        return NextResponse.json(
+            { offices, total, nextCursor },
+            {
+                status: 200,
+                headers: {
+                    // Cache generously for 24 hours at the Edge (CDN) level
+                    "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400",
+                },
+            }
+        );
     } catch (error) {
         console.error("Error in /api/offices:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
