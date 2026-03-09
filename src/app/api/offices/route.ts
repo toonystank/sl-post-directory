@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
     try {
         const searchParams = request.nextUrl.searchParams;
@@ -100,13 +102,7 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json(
             { offices, total, nextCursor },
-            {
-                status: 200,
-                headers: {
-                    // Cache generously for 24 hours at the Edge (CDN) level
-                    "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400",
-                },
-            }
+            { status: 200 }
         );
     } catch (error) {
         console.error("Error in /api/offices:", error);

@@ -3,6 +3,7 @@ import { ShieldCheck, User, Edit3, CheckCircle2, XCircle, Clock, AlertCircle } f
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import AdminOfficeManager from "./AdminOfficeManager";
 
 interface ContributorDashboardProps {
     userId: string;
@@ -13,7 +14,7 @@ export default async function ContributorDashboard({ userId, userName }: Contrib
     const myEdits = await prisma.editRequest.findMany({
         where: { requestedById: userId },
         include: {
-            postOffice: { select: { name: true, postalCode: true } }
+            postOffice: { select: { name: true, postalCode: true, fields: true } }
         },
         orderBy: { createdAt: 'desc' }
     });
@@ -83,6 +84,10 @@ export default async function ContributorDashboard({ userId, userName }: Contrib
                 </Card>
             </div>
 
+            <div className="mb-12">
+                <AdminOfficeManager isContributor={true} />
+            </div>
+
             <h2 className="text-2xl font-bold tracking-tight mb-6 flex items-center gap-2">
                 <Edit3 className="w-5 h-5 text-primary" /> Your Contribution History
             </h2>
@@ -127,12 +132,22 @@ export default async function ContributorDashboard({ userId, userName }: Contrib
                                     </div>
 
                                     <div>
-                                        <h3 className="text-xl font-bold flex items-center gap-2">
-                                            {edit.postOffice.name}
+                                        <h3 className="text-xl font-bold flex items-center gap-2 mb-2">
+                                            {edit.postOffice?.name || (() => { try { return JSON.parse(edit.changes).name || "New Post Office" } catch { return "New Post Office" } })()}
+                                            <Badge variant="outline" className={`text-[10px] uppercase font-bold tracking-wider ${edit.type === "ADD" ? "text-blue-500 bg-blue-500/10 border-blue-500/30" :
+                                                edit.type === "REMOVAL" ? "text-destructive bg-destructive/10 border-destructive/30" :
+                                                    "text-primary bg-primary/10 border-primary/30"
+                                                }`}>
+                                                {edit.type || "EDIT"}
+                                            </Badge>
                                         </h3>
-                                        <p className="text-sm text-muted-foreground mt-1">
-                                            Postal Code: <span className="font-medium text-foreground">{edit.postOffice.postalCode}</span>
+                                        <p className="text-sm text-muted-foreground mb-4">
+                                            Postal Code: <span className="font-medium text-foreground">{edit.postOffice?.postalCode || (() => { try { return JSON.parse(edit.changes).postalCode || "N/A" } catch { return "N/A" } })()}</span>
                                         </p>
+                                        <div className="bg-background/50 rounded-xl p-4 border border-border/50">
+                                            {/* @ts-ignore */}
+                                            <RenderChanges edit={edit} />
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -142,4 +157,111 @@ export default async function ContributorDashboard({ userId, userName }: Contrib
             </div>
         </div>
     );
+}
+
+function RenderChanges({ edit }: { edit: any }) {
+    const changesJson = edit.changes;
+    const type = edit.type || "EDIT";
+    const reason = edit.reason;
+    const currentOffice: { name?: string, postalCode?: string, fields: Array<{ name: string, value: string }> } = edit.postOffice || { fields: [] };
+
+    if (type === "REMOVAL") {
+        return (
+            <div className="space-y-3 text-sm">
+                <div className="p-4 bg-destructive/10 text-destructive rounded-xl border border-destructive/20 shadow-sm">
+                    <span className="font-bold flex items-center gap-2 mb-1"><ShieldCheck className="w-4 h-4" /> Reason for removal requested:</span>
+                    {reason || "No reason provided."}
+                </div>
+            </div>
+        );
+    }
+
+    try {
+        const changes = JSON.parse(changesJson || "{}");
+
+        if (type === "ADD") {
+            return (
+                <div className="space-y-3 text-sm">
+                    {reason && (
+                        <div className="p-3 mb-4 bg-muted/40 rounded-lg text-muted-foreground border border-border/50">
+                            <span className="font-bold text-foreground">Submitter notes:</span> {reason}
+                        </div>
+                    )}
+                    <div className="flex items-center gap-3 py-1.5 px-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                        <span className="font-medium text-muted-foreground w-24 shrink-0">Name</span>
+                        <span className="text-emerald-500 font-medium">+ {changes.name}</span>
+                    </div>
+                    <div className="flex items-center gap-3 py-1.5 px-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                        <span className="font-medium text-muted-foreground w-24 shrink-0">Postal Code</span>
+                        <span className="text-emerald-500 font-medium">+ {changes.postalCode}</span>
+                    </div>
+                    {changes.fields && changes.fields.map((f: any, i: number) => (
+                        <div key={i} className="flex items-center gap-3 py-1.5 px-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                            <span className="font-medium text-muted-foreground w-24 shrink-0">{f.name}</span>
+                            <span className="text-emerald-500 font-medium">+ {f.value}</span>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        // EDIT logic
+        const currentFieldMap = new Map(currentOffice.fields?.map((f: any) => [f.name, f.value]) || []);
+
+        return (
+            <div className="space-y-3 text-sm">
+                {/* Basic fields — name & postalCode */}
+                {changes.name && (
+                    <div className="flex items-center gap-3 py-1.5 px-3 bg-muted/30 rounded-lg">
+                        <span className="font-medium text-muted-foreground w-24 shrink-0">Name</span>
+                        <span className="line-through text-muted-foreground/60">{currentOffice.name}</span>
+                        <span className="text-muted-foreground">→</span>
+                        <span className="text-emerald-500 font-medium">{changes.name}</span>
+                    </div>
+                )}
+                {changes.postalCode && (
+                    <div className="flex items-center gap-3 py-1.5 px-3 bg-muted/30 rounded-lg">
+                        <span className="font-medium text-muted-foreground w-24 shrink-0">Postal Code</span>
+                        <span className="line-through text-muted-foreground/60">{currentOffice.postalCode}</span>
+                        <span className="text-muted-foreground">→</span>
+                        <span className="text-emerald-500 font-medium">{changes.postalCode}</span>
+                    </div>
+                )}
+
+                {/* Dynamic fields */}
+                {changes.fields && changes.fields.length > 0 && (
+                    <div className="space-y-1.5">
+                        {changes.fields.map((f: { name: string; value: string }, i: number) => {
+                            const currentValue = currentFieldMap.get(f.name);
+                            const isNew = currentValue === undefined;
+                            const isChanged = !isNew && currentValue !== f.value;
+
+                            return (
+                                <div key={i} className="flex items-center gap-3 py-1.5 px-3 bg-muted/30 rounded-lg">
+                                    <span className="font-medium text-muted-foreground w-24 shrink-0">{f.name}</span>
+                                    {isNew ? (
+                                        <span className="text-emerald-500 font-medium italic">+ {f.value} (new field)</span>
+                                    ) : isChanged ? (
+                                        <>
+                                            <span className="line-through text-muted-foreground/60">{currentValue}</span>
+                                            <span className="text-muted-foreground">→</span>
+                                            <span className="text-emerald-500 font-medium">{f.value}</span>
+                                        </>
+                                    ) : (
+                                        <span className="text-muted-foreground/60 italic">No change ({f.value})</span>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {(!changes.name && !changes.postalCode && (!changes.fields || changes.fields.length === 0)) && (
+                    <span className="text-muted-foreground italic">No fields were modified.</span>
+                )}
+            </div>
+        );
+    } catch {
+        return <p className="text-sm text-muted-foreground italic">Could not parse changes.</p>;
+    }
 }

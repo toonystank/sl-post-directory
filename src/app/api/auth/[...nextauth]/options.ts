@@ -38,12 +38,13 @@ export const authOptions: AuthOptions = {
                 }
 
                 if (user.twoFactorEnabled) {
-                    if (!credentials.token) {
+                    const token = credentials.token?.trim();
+                    if (!token || token === 'undefined') {
                         throw new Error("2FA_REQUIRED");
                     }
 
                     // Check if the token is a backup code
-                    const isBackupCode = user.backupCodes?.includes(credentials.token);
+                    const isBackupCode = user.backupCodes?.includes(token);
 
                     if (isBackupCode) {
                         // Consume the backup code
@@ -51,14 +52,18 @@ export const authOptions: AuthOptions = {
                             where: { id: user.id },
                             data: {
                                 backupCodes: {
-                                    set: user.backupCodes.filter(c => c !== credentials.token)
+                                    set: user.backupCodes.filter(c => c !== token)
                                 }
                             }
                         });
                     } else {
+                        // Validate token format before calling verifySync
+                        if (!/^\d{6}$/.test(token)) {
+                            throw new Error("Invalid 2FA code. Please enter a 6-digit code.");
+                        }
                         // Verify as a TOTP token
                         const isValidTokenObj = verifySync({
-                            token: credentials.token,
+                            token,
                             secret: user.twoFactorSecret!
                         });
 
@@ -83,12 +88,14 @@ export const authOptions: AuthOptions = {
         async jwt({ token, user }) {
             if (user) {
                 token.role = (user as any).role;
+                token.id = user.id;
             }
             return token;
         },
         async session({ session, token }) {
             if (session.user) {
                 (session.user as any).role = token.role;
+                (session.user as any).id = token.id;
             }
             return session;
         },

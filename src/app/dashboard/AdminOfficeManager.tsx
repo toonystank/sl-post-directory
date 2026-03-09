@@ -15,7 +15,7 @@ interface Office {
     postalCode: string;
 }
 
-export default function AdminOfficeManager() {
+export default function AdminOfficeManager({ isContributor = false }: { isContributor?: boolean }) {
     const [offices, setOffices] = useState<Office[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [loading, setLoading] = useState(false);
@@ -130,9 +130,13 @@ export default function AdminOfficeManager() {
             <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/40 bg-card/80">
                 <div>
                     <CardTitle className="text-lg flex items-center gap-2">
-                        Directory Management
+                        {isContributor ? "Directory Search" : "Directory Management"}
                     </CardTitle>
-                    <CardDescription>Search explicitly to edit or delete any existing directory entry.</CardDescription>
+                    <CardDescription>
+                        {isContributor
+                            ? "Search the directory to find post offices and suggest edits."
+                            : "Search explicitly to edit or delete any existing directory entry."}
+                    </CardDescription>
                 </div>
                 <div className="flex items-center gap-3">
                     <div className="relative w-full sm:w-64">
@@ -146,39 +150,43 @@ export default function AdminOfficeManager() {
                     </div>
                 </div>
             </CardHeader>
-            <div className="bg-muted/20 border-b border-border/40 p-3 flex flex-wrap items-center justify-between gap-4">
-                <span className="text-sm font-medium text-muted-foreground">
-                    {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select items below for bulk actions'}
-                </span>
 
-                <div className={`flex items-center gap-2 transition-opacity ${selectedIds.size > 0 ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
-                    <select
-                        className="text-sm rounded-lg border border-border bg-background px-3 py-1.5"
-                        value={bulkAction}
-                        onChange={(e) => setBulkAction(e.target.value)}
-                    >
-                        <option value="add_service">Add Service Tag</option>
-                        <option value="remove_service">Remove Service Tag</option>
-                        <option value="delete">Delete Offices</option>
-                    </select>
+            {!isContributor && (
+                <div className="bg-muted/20 border-b border-border/40 p-3 flex flex-wrap items-center justify-between gap-4">
+                    <span className="text-sm font-medium text-muted-foreground">
+                        {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select items below for bulk actions'}
+                    </span>
 
-                    {(bulkAction === 'add_service' || bulkAction === 'remove_service') && (
+                    <div className={`flex items-center gap-2 transition-opacity ${selectedIds.size > 0 ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
                         <select
                             className="text-sm rounded-lg border border-border bg-background px-3 py-1.5"
-                            value={bulkService}
-                            onChange={(e) => setBulkService(e.target.value)}
+                            value={bulkAction}
+                            onChange={(e) => setBulkAction(e.target.value)}
                         >
-                            {SERVICE_TAGS.map(tag => (
-                                <option key={tag} value={tag}>{tag}</option>
-                            ))}
+                            <option value="add_service">Add Service Tag</option>
+                            <option value="remove_service">Remove Service Tag</option>
+                            <option value="delete">Delete Offices</option>
                         </select>
-                    )}
 
-                    <Button size="sm" onClick={handleBulkAction} disabled={isBulking}>
-                        {isBulking ? 'Applying...' : 'Apply Action'}
-                    </Button>
+                        {(bulkAction === 'add_service' || bulkAction === 'remove_service') && (
+                            <select
+                                className="text-sm rounded-lg border border-border bg-background px-3 py-1.5"
+                                value={bulkService}
+                                onChange={(e) => setBulkService(e.target.value)}
+                            >
+                                {SERVICE_TAGS.map(tag => (
+                                    <option key={tag} value={tag}>{tag}</option>
+                                ))}
+                            </select>
+                        )}
+
+                        <Button size="sm" onClick={handleBulkAction} disabled={isBulking}>
+                            {isBulking ? 'Applying...' : 'Apply Action'}
+                        </Button>
+                    </div>
                 </div>
-            </div>
+            )}
+
             <CardContent className="p-0">
                 {offices.length === 0 ? (
                     <div className="text-center py-12 text-muted-foreground">
@@ -190,14 +198,16 @@ export default function AdminOfficeManager() {
                         <table className="w-full text-sm text-left relative">
                             <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border/50 sticky top-0 z-10">
                                 <tr>
-                                    <th className="px-6 py-4 font-medium w-12">
-                                        <input
-                                            type="checkbox"
-                                            onChange={toggleSelectAll}
-                                            checked={offices.length > 0 && selectedIds.size === offices.length}
-                                            className="rounded border-border"
-                                        />
-                                    </th>
+                                    {!isContributor && (
+                                        <th className="px-6 py-4 font-medium w-12">
+                                            <input
+                                                type="checkbox"
+                                                onChange={toggleSelectAll}
+                                                checked={offices.length > 0 && selectedIds.size === offices.length}
+                                                className="rounded border-border"
+                                            />
+                                        </th>
+                                    )}
                                     <th className="px-6 py-4 font-medium">Post Office</th>
                                     <th className="px-6 py-4 font-medium">Postal Code</th>
                                     <th className="px-6 py-4 font-medium text-right">Actions</th>
@@ -206,14 +216,16 @@ export default function AdminOfficeManager() {
                             <tbody className="divide-y divide-border/50">
                                 {offices.map((office) => (
                                     <tr key={office.id} className={`hover:bg-muted/30 transition-colors ${selectedIds.has(office.id) ? 'bg-primary/5' : ''}`}>
-                                        <td className="px-6 py-3 w-12">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedIds.has(office.id)}
-                                                onChange={() => toggleSelect(office.id)}
-                                                className="rounded border-border text-primary focus:ring-primary"
-                                            />
-                                        </td>
+                                        {!isContributor && (
+                                            <td className="px-6 py-3 w-12">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.has(office.id)}
+                                                    onChange={() => toggleSelect(office.id)}
+                                                    className="rounded border-border text-primary focus:ring-primary"
+                                                />
+                                            </td>
+                                        )}
                                         <td className="px-6 py-3">
                                             <div className="font-medium text-foreground">{office.name}</div>
                                             <div className="text-xs text-muted-foreground mt-0.5 font-mono">{office.id}</div>
@@ -223,20 +235,30 @@ export default function AdminOfficeManager() {
                                         </td>
                                         <td className="px-6 py-3 text-right">
                                             <div className="flex items-center justify-end gap-2">
-                                                <Button asChild size="sm" variant="outline" className="h-8 shadow-none gap-1">
-                                                    <Link href={`/dashboard/edit/${office.id}`}>
-                                                        <Edit3 className="w-3.5 h-3.5" /> Edit
-                                                    </Link>
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    className="h-8 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                                    onClick={() => handleDelete(office.id, office.name)}
-                                                    disabled={deletingId === office.id}
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
+                                                {isContributor ? (
+                                                    <Button asChild size="sm" variant="outline" className="h-8 shadow-none gap-1 hover:bg-primary/10 hover:text-primary">
+                                                        <Link href={`/suggest/${office.id}`}>
+                                                            <Edit3 className="w-3.5 h-3.5" /> Suggest Edit
+                                                        </Link>
+                                                    </Button>
+                                                ) : (
+                                                    <>
+                                                        <Button asChild size="sm" variant="outline" className="h-8 shadow-none gap-1">
+                                                            <Link href={`/dashboard/edit/${office.id}`}>
+                                                                <Edit3 className="w-3.5 h-3.5" /> Edit
+                                                            </Link>
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            className="h-8 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                                            onClick={() => handleDelete(office.id, office.name)}
+                                                            disabled={deletingId === office.id}
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    </>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
