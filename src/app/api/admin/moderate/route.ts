@@ -7,9 +7,9 @@ import { sendEditRequestApprovedEmail, sendEditRequestRejectedEmail, sendEditReq
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions);
-        const user = session?.user as { role?: string } | undefined;
+        const user = session?.user as { id?: string, role?: string } | undefined;
 
-        if (!session || (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN" && user?.role !== "MODERATOR")) {
+        if (!session || !user?.id || (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN" && user?.role !== "MODERATOR")) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
@@ -32,6 +32,8 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Edit request not found" }, { status: 404 });
         }
 
+        const officeName = editRequest.postOffice?.name || JSON.parse(editRequest.changes || "{}").name || "New Post Office";
+
         if (editRequest.status !== "PENDING" && editRequest.status !== "MORE_INFO") {
             return NextResponse.json({ error: "Request is already processed" }, { status: 400 });
         }
@@ -42,10 +44,18 @@ export async function POST(req: Request) {
                 data: { status: "REJECTED" }
             });
 
+            await prisma.actionLog.create({
+                data: {
+                    userId: user.id!,
+                    action: "REJECTED_EDIT",
+                    details: JSON.stringify({ requestId, type: editRequest.type, postOfficeName: officeName })
+                }
+            });
+
             await sendEditRequestRejectedEmail(
                 editRequest.requestedBy.email,
                 editRequest.requestedBy.name,
-                editRequest.postOffice.name
+                officeName
             );
 
             return NextResponse.json({ success: true, message: "Request rejected successfully" });
@@ -57,10 +67,18 @@ export async function POST(req: Request) {
                 data: { status: "MORE_INFO" }
             });
 
+            await prisma.actionLog.create({
+                data: {
+                    userId: user.id!,
+                    action: "REQUESTED_MORE_INFO",
+                    details: JSON.stringify({ requestId, type: editRequest.type, postOfficeName: officeName })
+                }
+            });
+
             await sendEditRequestMoreInfoEmail(
                 editRequest.requestedBy.email,
                 editRequest.requestedBy.name,
-                editRequest.postOffice.name
+                officeName
             );
 
             return NextResponse.json({ success: true, message: "Requested more info successfully" });
@@ -71,39 +89,72 @@ export async function POST(req: Request) {
 
             // Execute the approval in a transaction to ensure atomic updates
             await prisma.$transaction(async (tx) => {
-                // Update basic fields
-                await tx.postOffice.update({
-                    where: { id: editRequest.postOfficeId },
-                    data: {
-                        name: changes.name || editRequest.postOffice.name,
-                        postalCode: changes.postalCode || editRequest.postOffice.postalCode,
-                    }
-                });
-
-                // Upsert only the changed fields — preserve untouched ones
-                if (changes.fields && Array.isArray(changes.fields)) {
-                    for (const field of changes.fields) {
-                        const existing = await tx.postOfficeField.findFirst({
-                            where: {
-                                postOfficeId: editRequest.postOfficeId,
-                                name: field.name,
-                            }
+                // @ts-ignore
+                if (editRequest.type === "REMOVAL") {
+                    if (editRequest.postOfficeId) {
+                        await tx.postOffice.delete({
+                            where: { id: editRequest.postOfficeId }
                         });
-
-                        if (existing) {
-                            await tx.postOfficeField.update({
-                                where: { id: existing.id },
-                                data: { value: field.value }
-                            });
-                        } else {
-                            await tx.postOfficeField.create({
-                                data: {
+                    }
+                    // @ts-ignore
+                } else if (editRequest.type === "ADD") {
+                    const newOffice = await tx.postOffice.create({
+                        data: {
+                            name: changes.name,
+                            postalCode: changes.postalCode,
+                            fields: {
+                                create: changes.fields?.map((field: any) => ({
                                     name: field.name,
                                     value: field.value,
-                                    type: "TEXT",
+                                    type: "TEXT"
+                                })) || []
+                            }
+                        }
+                    });
+
+                    // Update the request with the new officeID
+                    await tx.editRequest.update({
+                        where: { id: requestId },
+                        data: { postOfficeId: newOffice.id }
+                    });
+                } else {
+                    // Default EDIT flow
+                    if (!editRequest.postOfficeId) throw new Error("Missing postOfficeId for edit request");
+
+                    // Update basic fields
+                    await tx.postOffice.update({
+                        where: { id: editRequest.postOfficeId },
+                        data: {
+                            name: changes.name || editRequest.postOffice?.name,
+                            postalCode: changes.postalCode || editRequest.postOffice?.postalCode,
+                        }
+                    });
+
+                    // Upsert only the changed fields — preserve untouched ones
+                    if (changes.fields && Array.isArray(changes.fields)) {
+                        for (const field of changes.fields) {
+                            const existing = await tx.postOfficeField.findFirst({
+                                where: {
                                     postOfficeId: editRequest.postOfficeId,
+                                    name: field.name,
                                 }
                             });
+
+                            if (existing) {
+                                await tx.postOfficeField.update({
+                                    where: { id: existing.id },
+                                    data: { value: field.value }
+                                });
+                            } else {
+                                await tx.postOfficeField.create({
+                                    data: {
+                                        name: field.name,
+                                        value: field.value,
+                                        type: "TEXT",
+                                        postOfficeId: editRequest.postOfficeId,
+                                    }
+                                });
+                            }
                         }
                     }
                 }
@@ -113,12 +164,21 @@ export async function POST(req: Request) {
                     where: { id: requestId },
                     data: { status: "APPROVED" }
                 });
+
+                // Log the approval action
+                await tx.actionLog.create({
+                    data: {
+                        userId: user.id!,
+                        action: "APPROVED_EDIT",
+                        details: JSON.stringify({ requestId, type: editRequest.type, postOfficeName: officeName })
+                    }
+                });
             });
 
             await sendEditRequestApprovedEmail(
                 editRequest.requestedBy.email,
                 editRequest.requestedBy.name,
-                editRequest.postOffice.name
+                officeName
             );
 
             return NextResponse.json({ success: true, message: "Request approved and applied successfully" });

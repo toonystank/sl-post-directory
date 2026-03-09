@@ -53,16 +53,30 @@ model User {
   postOfficeId      String?
   postOffice        PostOffice?   @relation(fields: [postOfficeId], references: [id])
   edits             EditRequest[]
+  actionLogs        ActionLog[]
+}
+
+model ActionLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String   // e.g., "APPROVED_EDIT", "REJECTED_EDIT", "CREATED_OFFICE"
+  details   String   // JSON string storing target ID and context
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model EditRequest {
   id            String     @id @default(cuid())
-  postOfficeId  String
+  postOfficeId  String?
   requestedById String
+  type          String     @default("EDIT")   // EDIT, REMOVAL, ADD
   changes       String     // JSON string
+  reason        String?
   status        String     @default("PENDING")
   createdAt     DateTime   @default(now())
   
-  postOffice    PostOffice @relation(fields: [postOfficeId], references: [id])
+  postOffice    PostOffice? @relation(fields: [postOfficeId], references: [id])
   requestedBy   User       @relation(fields: [requestedById], references: [id])
 }

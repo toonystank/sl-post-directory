@@ -12,14 +12,16 @@ interface ModerationQueueProps {
         id: string;
         createdAt: Date;
         status: string;
+        type: string;
+        reason?: string | null;
         changes: string;
-        postOfficeId: string;
+        postOfficeId?: string | null;
         requestedById: string;
-        postOffice: {
+        postOffice?: {
             name: string;
             postalCode: string;
             fields: Array<{ name: string; value: string }>;
-        };
+        } | null;
         requestedBy: {
             name: string;
             email: string;
@@ -70,10 +72,54 @@ export default function ModerationQueue({ initialPendingEdits, initialPendingEdi
         setExpandedId(expandedId === id ? null : id);
     };
 
-    const renderChanges = (changesJson: string, currentOffice: { name: string; postalCode: string; fields: Array<{ name: string; value: string }> }) => {
+    const renderChanges = (edit: any) => {
+        const changesJson = edit.changes;
+        const type = edit.type || "EDIT";
+        const reason = edit.reason;
+        const currentOffice: { name?: string, postalCode?: string, fields: Array<{ name: string, value: string }> } = edit.postOffice || { fields: [] };
+
+        if (type === "REMOVAL") {
+            return (
+                <div className="space-y-3 text-sm">
+                    <div className="p-4 bg-destructive/10 text-destructive rounded-xl border border-destructive/20 shadow-sm">
+                        <span className="font-bold flex items-center gap-2 mb-1"><ShieldCheck className="w-4 h-4" /> Reason for removal requested:</span>
+                        {reason || "No reason provided."}
+                    </div>
+                </div>
+            );
+        }
+
         try {
-            const changes = JSON.parse(changesJson);
-            const currentFieldMap = new Map(currentOffice.fields.map(f => [f.name, f.value]));
+            const changes = JSON.parse(changesJson || "{}");
+
+            if (type === "ADD") {
+                return (
+                    <div className="space-y-3 text-sm">
+                        {reason && (
+                            <div className="p-3 mb-4 bg-muted/40 rounded-lg text-muted-foreground border border-border/50">
+                                <span className="font-bold text-foreground">Submitter notes:</span> {reason}
+                            </div>
+                        )}
+                        <div className="flex items-center gap-3 py-1.5 px-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                            <span className="font-medium text-muted-foreground w-24 shrink-0">Name</span>
+                            <span className="text-emerald-500 font-medium">+ {changes.name}</span>
+                        </div>
+                        <div className="flex items-center gap-3 py-1.5 px-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                            <span className="font-medium text-muted-foreground w-24 shrink-0">Postal Code</span>
+                            <span className="text-emerald-500 font-medium">+ {changes.postalCode}</span>
+                        </div>
+                        {changes.fields && changes.fields.map((f: any, i: number) => (
+                            <div key={i} className="flex items-center gap-3 py-1.5 px-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                                <span className="font-medium text-muted-foreground w-24 shrink-0">{f.name}</span>
+                                <span className="text-emerald-500 font-medium">+ {f.value}</span>
+                            </div>
+                        ))}
+                    </div>
+                );
+            }
+
+            // EDIT logic
+            const currentFieldMap = new Map(currentOffice.fields.map((f: any) => [f.name, f.value]));
 
             return (
                 <div className="space-y-3 text-sm">
@@ -158,8 +204,18 @@ export default function ModerationQueue({ initialPendingEdits, initialPendingEdi
                                     <Fragment key={edit.id}>
                                         <tr className="hover:bg-muted/30 transition-colors">
                                             <td className="px-6 py-4">
-                                                <div className="font-medium text-foreground">{edit.postOffice.name}</div>
-                                                <div className="text-xs text-muted-foreground mt-0.5">{edit.postOffice.postalCode}</div>
+                                                <div className="font-medium text-foreground flex items-center gap-2">
+                                                    {String(edit.postOffice?.name || (() => { try { return JSON.parse(edit.changes).name || "New Office" } catch { return "New Office" } })())}
+                                                    <Badge variant="outline" className={`text-[10px] uppercase font-bold tracking-wider ${edit.type === "ADD" ? "text-blue-500 bg-blue-500/10 border-blue-500/30" :
+                                                        edit.type === "REMOVAL" ? "text-destructive bg-destructive/10 border-destructive/30" :
+                                                            "text-primary bg-primary/10 border-primary/30"
+                                                        }`}>
+                                                        {edit.type || "EDIT"}
+                                                    </Badge>
+                                                </div>
+                                                <div className="text-xs text-muted-foreground mt-1">
+                                                    {String(edit.postOffice?.postalCode || (() => { try { return JSON.parse(edit.changes).postalCode || "N/A" } catch { return "N/A" } })())}
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-2">
@@ -226,8 +282,8 @@ export default function ModerationQueue({ initialPendingEdits, initialPendingEdi
                                             <tr>
                                                 <td colSpan={5} className="px-6 py-4 bg-muted/20 border-t border-border/30">
                                                     <div className="max-w-2xl">
-                                                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Proposed Changes</p>
-                                                        {renderChanges(edit.changes, edit.postOffice)}
+                                                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Proposed {edit.type === "REMOVAL" ? "Details" : "Changes"}</p>
+                                                        {renderChanges(edit)}
                                                     </div>
                                                 </td>
                                             </tr>

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
 
 function LoginForm() {
     const [email, setEmail] = useState("");
@@ -30,7 +31,7 @@ function LoginForm() {
             const res = await signIn("credentials", {
                 email,
                 password,
-                token: show2FA ? token : undefined,
+                token: show2FA ? token : "",
                 redirect: false,
             });
 
@@ -121,25 +122,36 @@ function LoginForm() {
                         </Button>
                     </>
                 ) : (
-                    <div>
-                        <label className="block text-sm font-medium text-muted-foreground mb-1.5" htmlFor="token">
-                            Authentication Code (2FA)
-                        </label>
-                        <Input
-                            id="token"
-                            type="text"
-                            value={token}
-                            onChange={(e) => setToken(e.target.value)}
-                            className="py-5 rounded-xl text-center tracking-widest text-xl font-mono"
-                            placeholder="000000"
-                            required
-                            maxLength={6}
-                        />
-                        <p className="text-xs text-muted-foreground text-center mt-3">
-                            Open your authenticator app to view your 6-digit code.
-                        </p>
+                    <div className="space-y-4">
+                        <div className="text-center mb-2">
+                            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-3">
+                                <Lock className="w-6 h-6 text-primary" />
+                            </div>
+                            <h2 className="text-lg font-semibold">Two-Factor Authentication</h2>
+                            <p className="text-sm text-muted-foreground mt-1">
+                                Enter the 6-digit code from your authenticator app
+                            </p>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-muted-foreground mb-1.5" htmlFor="token">
+                                Authentication Code
+                            </label>
+                            <Input
+                                id="token"
+                                type="text"
+                                inputMode="numeric"
+                                autoComplete="one-time-code"
+                                value={token}
+                                onChange={(e) => setToken(e.target.value.replace(/\D/g, ''))}
+                                className="py-5 rounded-xl text-center tracking-widest text-xl font-mono"
+                                placeholder="000000"
+                                required
+                                maxLength={6}
+                                autoFocus
+                            />
+                        </div>
 
-                        <div className="flex flex-col gap-2 mt-6">
+                        <div className="flex flex-col gap-2 mt-4">
                             <Button
                                 type="submit"
                                 disabled={loading || token.length < 6}
@@ -160,12 +172,21 @@ function LoginForm() {
                                     setError("");
                                 }}
                             >
-                                Cancel
+                                ← Back to Sign In
                             </Button>
                         </div>
                     </div>
                 )}
             </form>
+
+            {!show2FA && (
+                <div className="mt-6 text-center text-sm text-muted-foreground">
+                    Don't have an account?{" "}
+                    <Link href="/register" className="text-primary hover:underline font-medium">
+                        Register
+                    </Link>
+                </div>
+            )}
         </CardContent>
     );
 }

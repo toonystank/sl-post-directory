@@ -6,7 +6,7 @@ import crypto from "node:crypto";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/options";
 import { checkRateLimit } from "@/lib/rate-limiter";
-import { suggestSchema } from "@/lib/validations";
+import { suggestSchema, suggestAddSchema } from "@/lib/validations";
 
 export async function POST(req: Request) {
     try {
@@ -20,8 +20,10 @@ export async function POST(req: Request) {
 
         const body = await req.json();
 
-        // Validate Payload using Zod
-        const validation = suggestSchema.safeParse(body);
+        // Validate Payload using Zod based on the type
+        const isAddRequest = body.type === "ADD";
+        const validation = isAddRequest ? suggestAddSchema.safeParse(body) : suggestSchema.safeParse(body);
+
         if (!validation.success) {
             return NextResponse.json(
                 { error: validation.error?.issues[0]?.message || "Invalid input" },
@@ -29,7 +31,31 @@ export async function POST(req: Request) {
             );
         }
 
-        const { officeId, submitterName, submitterEmail, submitterPassword, turnstileToken, name, postalCode, newFieldName, newFieldValue, ...fields } = validation.data;
+        const data = validation.data;
+        const type = data.type || "EDIT";
+        const reason = data.reason || null;
+        const officeId = isAddRequest ? null : (data as any).officeId;
+
+        const { submitterName, submitterEmail, submitterPassword, turnstileToken, name, postalCode, newFieldName, newFieldValue, ...fields } = data as any;
+
+        // Verify Captcha (Required for all users now)
+        const turnstileSecret = process.env.TURNSTILE_SECRET_KEY;
+        if (turnstileSecret && turnstileToken) {
+            const formData = new FormData();
+            formData.append("secret", turnstileSecret);
+            formData.append("response", turnstileToken);
+
+            const result = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+                body: formData,
+                method: "POST",
+            });
+            const outcome = await result.json();
+            if (!outcome.success) {
+                return NextResponse.json({ error: "Captcha verification failed" }, { status: 400 });
+            }
+        } else if (turnstileSecret && !turnstileToken) {
+            return NextResponse.json({ error: "Please complete the Captcha" }, { status: 400 });
+        }
 
         let user;
         const session = await getServerSession(authOptions);
@@ -48,24 +74,7 @@ export async function POST(req: Request) {
                 return NextResponse.json({ error: "Name, email, and password are required to create an account." }, { status: 400 });
             }
 
-            // Verify Captcha
-            const turnstileSecret = process.env.TURNSTILE_SECRET_KEY;
-            if (turnstileSecret && turnstileToken) {
-                const formData = new FormData();
-                formData.append("secret", turnstileSecret);
-                formData.append("response", turnstileToken);
 
-                const result = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-                    body: formData,
-                    method: "POST",
-                });
-                const outcome = await result.json();
-                if (!outcome.success) {
-                    return NextResponse.json({ error: "Captcha verification failed" }, { status: 400 });
-                }
-            } else if (turnstileSecret && !turnstileToken) {
-                return NextResponse.json({ error: "Please complete the Captcha" }, { status: 400 });
-            }
 
             // Check existing user
             const existingUser = await prisma.user.findUnique({
@@ -94,19 +103,22 @@ export async function POST(req: Request) {
             await sendVerificationEmail(submitterEmail, submitterName, verificationToken);
         }
 
-        if (!officeId) {
-            return NextResponse.json({ error: "Office ID is required" }, { status: 400 });
+        let office = null;
+        if (!isAddRequest) {
+            if (!officeId) {
+                return NextResponse.json({ error: "Office ID is required" }, { status: 400 });
+            }
+
+            office = await prisma.postOffice.findUnique({
+                where: { id: officeId }
+            });
+
+            if (!office) {
+                return NextResponse.json({ error: "Post office not found" }, { status: 404 });
+            }
         }
 
-        const office = await prisma.postOffice.findUnique({
-            where: { id: officeId }
-        });
-
-        if (!office) {
-            return NextResponse.json({ error: "Post office not found" }, { status: 404 });
-        }
-
-        // Build the changes object
+        // Build the changes object (for EDIT and ADD)
         const changes: any = {
             name,
             postalCode,
@@ -115,7 +127,7 @@ export async function POST(req: Request) {
 
         // Process dynamic fields
         for (const [key, value] of Object.entries(fields)) {
-            if (key.startsWith("field_")) {
+            if (key.startsWith("field_") && key !== "type" && key !== "reason") {
                 const fieldName = key.replace("field_", "");
                 changes.fields.push({ name: fieldName, value });
             }
@@ -131,17 +143,20 @@ export async function POST(req: Request) {
             data: {
                 postOfficeId: officeId,
                 requestedById: user.id,
+                type: type,
+                reason: reason,
                 changes: JSON.stringify(changes),
                 status: "PENDING"
             }
         });
 
         // Trigger email notification for the edit
-        await sendEditRequestReceivedEmail(user.email, user.name, office.name);
+        const emailOfficeName = isAddRequest ? name || "New Office" : office?.name || "";
+        await sendEditRequestReceivedEmail(user.email, user.name, emailOfficeName);
 
         return NextResponse.json({
             success: true,
-            message: "Edit request submitted successfully",
+            message: `${type === "ADD" ? "Addition" : type === "REMOVAL" ? "Removal" : "Edit"} request submitted successfully`,
             requestId: editRequest.id
         });
 

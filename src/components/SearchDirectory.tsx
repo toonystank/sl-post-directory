@@ -3,13 +3,14 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Search, MapPin, Building2, Store, ChevronRight, Loader2, Phone, X, Sparkles, ArrowUp } from "lucide-react";
+import { Search, MapPin, Building2, Store, ChevronRight, Loader2, Phone, X, Sparkles, ArrowUp, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import HeroSection from "@/components/HeroSection";
+import AddOfficeModal from "@/components/AddOfficeModal";
 
 interface OfficeField {
     name: string;
@@ -109,6 +110,7 @@ export default function SearchDirectory() {
                 params.set("mode", mode);
                 params.set("cursor", cursor.toString());
                 params.set("limit", "24");
+                params.set("_t", Date.now().toString());
 
                 const res = await fetch(`/api/offices?${params.toString()}`);
                 if (!res.ok) {
@@ -466,13 +468,13 @@ export default function SearchDirectory() {
                 <div className="flex flex-wrap gap-2">
                     <button
                         onClick={() => handleModeSwitch("name")}
-                        className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all ${searchMode === "name" ? "bg-primary text-primary-foreground border-primary shadow-sm" : "bg-card/60 backdrop-blur-md text-muted-foreground border-border/50 hover:bg-card/80"}`}
+                        className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 ${searchMode === "name" ? "bg-primary text-primary-foreground border-primary shadow-sm" : "bg-card/60 backdrop-blur-md text-muted-foreground border-border/50 hover:bg-white/10 hover:text-white hover:border-white/30 hover:scale-105"}`}
                     >
                         Name
                     </button>
                     <button
                         onClick={() => handleModeSwitch("division")}
-                        className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all ${searchMode === "division" ? "bg-secondary text-secondary-foreground border-secondary shadow-sm" : "bg-card/60 backdrop-blur-md text-muted-foreground border-border/50 hover:bg-card/80"}`}
+                        className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 ${searchMode === "division" ? "bg-secondary text-secondary-foreground border-secondary shadow-sm" : "bg-card/60 backdrop-blur-md text-muted-foreground border-border/50 hover:bg-white/10 hover:text-white hover:border-white/30 hover:scale-105"}`}
                     >
                         Area
                     </button>
@@ -496,12 +498,12 @@ export default function SearchDirectory() {
                                 <button onClick={clearLetter} className="text-[10px] text-destructive hover:text-destructive/80 font-medium">Clear</button>
                             )}
                         </div>
-                        <div className="grid grid-cols-7 gap-1.5">
+                        <div className="grid grid-cols-7 gap-1">
                             {ALPHABET.map((letter) => (
                                 <button
                                     key={letter}
                                     onClick={() => handleLetterFilter(letter)}
-                                    className={`aspect-square rounded-md text-[11px] font-semibold transition-all flex items-center justify-center border ${activeLetter === letter
+                                    className={`h-8 rounded-md text-[11px] font-semibold transition-all flex items-center justify-center border ${activeLetter === letter
                                         ? "bg-primary text-primary-foreground border-primary shadow-sm scale-105"
                                         : "bg-background/50 border-border/50 text-muted-foreground hover:bg-primary/10"
                                         }`}
@@ -630,12 +632,12 @@ export default function SearchDirectory() {
                                         )}
                                     </div>
                                     <div className="relative">
-                                        <div className="grid grid-cols-6 gap-1.5 overflow-hidden">
-                                            {(isAlphabetExpanded ? ALPHABET : ALPHABET.slice(0, 18)).map((letter) => (
+                                        <div className="grid grid-cols-7 gap-1 overflow-hidden">
+                                            {(isAlphabetExpanded ? ALPHABET : ALPHABET.slice(0, 21)).map((letter) => (
                                                 <button
                                                     key={letter}
                                                     onClick={() => handleLetterFilter(letter)}
-                                                    className={`aspect-square rounded-md text-xs font-semibold transition-all flex items-center justify-center border ${activeLetter === letter
+                                                    className={`h-8 rounded-md text-xs font-semibold transition-all flex items-center justify-center border ${activeLetter === letter
                                                         ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20 scale-105"
                                                         : "bg-background/40 border-border/40 text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30"
                                                         }`}
@@ -717,7 +719,7 @@ export default function SearchDirectory() {
                     <section className="flex-1 w-full min-w-0">
 
                         {/* Active Filter Summary Header */}
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 pb-4 border-b border-border/40">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 pb-4 border-b border-border/40 gap-4">
                             <div>
                                 <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-1">
                                     {activeLetter && query
@@ -733,14 +735,21 @@ export default function SearchDirectory() {
                                 </p>
                             </div>
 
-                            {hasActiveFilters && (
-                                <button
-                                    onClick={clearAll}
-                                    className="mt-4 md:mt-0 text-xs font-medium text-destructive hover:bg-destructive/10 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
-                                >
-                                    <X className="w-3.5 h-3.5" /> Clear All Filters
-                                </button>
-                            )}
+                            <div className="flex items-center gap-3 w-full md:w-auto">
+                                {hasActiveFilters && (
+                                    <button
+                                        onClick={clearAll}
+                                        className="text-xs font-medium text-destructive hover:bg-destructive/10 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shrink-0"
+                                    >
+                                        <X className="w-3.5 h-3.5" /> Clear All Filters
+                                    </button>
+                                )}
+                                <AddOfficeModal>
+                                    <Button variant="default" size="sm" className="rounded-xl font-medium shadow-sm w-full md:w-auto bg-primary hover:bg-primary/90">
+                                        <Plus className="w-4 h-4 mr-1.5" /> Add Post Office
+                                    </Button>
+                                </AddOfficeModal>
+                            </div>
                         </div>
 
                         {/* Grid Content */}

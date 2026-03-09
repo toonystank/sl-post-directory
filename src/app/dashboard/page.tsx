@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
-import { ShieldCheck, User, Edit3, Building2, TrendingUp, Check, X, PlusCircle, Users } from "lucide-react";
+import { ShieldCheck, User, Edit3, Building2, TrendingUp, Check, X, PlusCircle, Users, Clock, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -71,6 +71,16 @@ export default async function AdminDashboard() {
                             </Link>
                         </Button>
                     )}
+                    <Button asChild variant="outline" className="rounded-xl hidden sm:flex border-blue-500/20 text-blue-500 hover:bg-blue-500/10 hover:text-blue-500">
+                        <Link href="/dashboard/activity">
+                            <Clock className="w-4 h-4 mr-2" /> Activity Log
+                        </Link>
+                    </Button>
+                    <Button asChild variant="outline" className="rounded-xl hidden sm:flex border-amber-500/20 text-amber-500 hover:bg-amber-500/10 hover:text-amber-500">
+                        <a href="/api/admin/backup" download>
+                            <Download className="w-4 h-4 mr-2" /> Backup Data
+                        </a>
+                    </Button>
                     <Button asChild variant="default" className="rounded-xl hidden sm:flex">
                         <Link href="/dashboard/add">
                             <PlusCircle className="w-4 h-4 mr-2" /> Add New Office
