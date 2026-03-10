@@ -1,9 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Outfit } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import AuthProvider from "@/context/AuthContext";
 import Navbar from "@/components/Navbar";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 
 const outfit = Outfit({
     subsets: ["latin"],
@@ -13,6 +14,18 @@ const outfit = Outfit({
 export const metadata: Metadata = {
     title: "SL Post Directory",
     description: "A comprehensive, modern directory for Sri Lanka Post Offices.",
+    appleWebApp: {
+        capable: true,
+        statusBarStyle: "default",
+        title: "SL Post Directory",
+    },
+    formatDetection: {
+        telephone: false,
+    },
+};
+
+export const viewport: Viewport = {
+    themeColor: "#0f172a",
 };
 
 export default function RootLayout({
@@ -30,6 +43,7 @@ export default function RootLayout({
                         enableSystem
                         disableTransitionOnChange
                     >
+                        <ServiceWorkerRegister />
                         <Navbar />
                         <main className="flex-1">
                             {children}
