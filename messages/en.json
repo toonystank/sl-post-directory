@@ -1,0 +1,40 @@
+{
+  "Hero": {
+    "title": "Navigate the Island's",
+    "subtitle": "Postal Network",
+    "description": "The most comprehensive directory for finding every post office, contact detail, and location across Sri Lanka."
+  },
+  "Search": {
+    "placeholder": "Search by office name or postal code...",
+    "modeName": "Name",
+    "modeArea": "Area",
+    "moreFilters": "More Filters",
+    "hideFilters": "Hide Filters",
+    "addOffice": "Add Post Office",
+    "allOffices": "All Post Offices",
+    "startingWith": "Starting with \"{letter}\"",
+    "resultsFor": "Results for \"{query}\"",
+    "resultsForIn": "Results for \"{query}\" in \"{letter}\"",
+    "searching": "Searching directory...",
+    "found": "Found {count} locations",
+    "clearAll": "Clear All Filters"
+  },
+  "Filters": {
+    "alphabetical": "Alphabetical",
+    "service": "Service",
+    "popular": "Popular Searches",
+    "clearAll": "Clear All Filters"
+  },
+  "Status": {
+    "open": "Open",
+    "closed": "Closed",
+    "counterOnly": "Counter Only",
+    "holiday": "Public Holiday"
+  },
+  "Nav": {
+    "directory": "Directory",
+    "dashboard": "Dashboard",
+    "login": "Login",
+    "logout": "Logout"
+  }
+}
