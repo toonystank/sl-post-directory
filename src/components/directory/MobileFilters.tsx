@@ -25,7 +25,7 @@ export default function MobileFilters({
                     <div className="flex items-center justify-between mb-3">
                         <h3 className="text-[11px] uppercase text-muted-foreground font-bold tracking-wider">Alphabetically</h3>
                         {activeLetter && (
-                            <button onClick={clearLetter} className="text-[10px] text-destructive hover:text-destructive/80 font-medium">Clear</button>
+                            <button onClick={clearLetter} className="text-[10px] uppercase font-bold tracking-wider text-destructive hover:text-destructive/80">Clear</button>
                         )}
                     </div>
                     <div className="grid grid-cols-7 gap-1">
@@ -51,7 +51,7 @@ export default function MobileFilters({
                     <div className="flex items-center justify-between mb-3">
                         <h3 className="text-[11px] uppercase text-muted-foreground font-bold tracking-wider">Services</h3>
                         {activeService && (
-                            <button onClick={clearService} className="text-[10px] text-destructive hover:text-destructive/80 font-medium">Clear</button>
+                            <button onClick={clearService} className="text-[10px] uppercase font-bold tracking-wider text-destructive hover:text-destructive/80">Clear</button>
                         )}
                     </div>
                     <div className="flex flex-col gap-1.5">

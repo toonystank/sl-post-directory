@@ -111,7 +111,7 @@ export default function SearchBar({
 
     return (
         <div className="w-full relative" id={`search-container-${id}`} ref={actualContainerRef}>
-            <div className={`bg-background/90 backdrop-blur-md border shadow-sm flex items-center gap-2 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all ${isSticky ? 'rounded-b-2xl p-2 px-3' : 'rounded-xl p-1.5'}`}>
+            <div className={`bg-background/90 backdrop-blur-md border shadow-sm flex items-center gap-2 focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/30 focus-within:shadow-[0_0_20px_hsl(var(--primary)/0.2)] transition-all duration-300 ${isSticky ? 'rounded-b-2xl p-2 px-3' : 'rounded-xl p-1.5'}`}>
                 <div className="flex-1 flex items-center pl-3">
                     <Search className={`text-muted-foreground shrink-0 ${isSticky ? 'w-5 h-5 text-primary/80' : 'w-4 h-4'}`} />
                     <Input

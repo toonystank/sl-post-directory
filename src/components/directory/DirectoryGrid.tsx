@@ -3,6 +3,7 @@ import { Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PostOffice, SearchMode } from "./types";
 import PostOfficeCard from "./PostOfficeCard";
+import { motion } from "framer-motion";
 
 interface DirectoryGridProps {
     offices: PostOffice[];
@@ -33,11 +34,23 @@ export default function DirectoryGrid({
 
     if (offices.length === 0) {
         return (
-            <div className="text-center py-16 bg-card/30 rounded-2xl border border-border/30 border-dashed">
-                <div className="w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <Search className="w-8 h-8 text-muted-foreground opacity-50" />
-                </div>
-                <p className="text-lg font-medium mb-1">No post offices found</p>
+            <div className="text-center py-20 bg-card/20 backdrop-blur-sm rounded-3xl border border-border/40 border-dashed shadow-sm">
+                <motion.div 
+                    animate={{ y: [0, -10, 0] }}
+                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                    className="relative w-24 h-24 mx-auto mb-6"
+                >
+                    <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl" />
+                    <div className="relative w-full h-full bg-card border border-border/50 rounded-2xl flex items-center justify-center shadow-lg">
+                        <motion.div
+                            animate={{ rotate: [-10, 10, -10], scale: [1, 1.1, 1] }}
+                            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+                        >
+                            <Search className="w-10 h-10 text-primary/80" />
+                        </motion.div>
+                    </div>
+                </motion.div>
+                <h3 className="text-xl font-bold mb-2 tracking-tight">No post offices found</h3>
                 <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
                     Try adjusting your filters or search terms. Browse the alphabet sidebar to explore all locations.
                 </p>

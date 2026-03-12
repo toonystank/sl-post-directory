@@ -24,9 +24,9 @@ export default function HeroSection({ children }: HeroSectionProps) {
         <section className="relative z-[70] w-full pt-10 pb-8 md:pt-16 md:pb-12 flex items-center justify-center bg-background border-b border-border/50">
 
             {/* Bright Floating Aurora Background */}
-            <div className="absolute inset-0 w-full h-full overflow-hidden overflow-x-clip border-b border-border/50 bg-[#020817]">
+            <div className="absolute inset-0 w-full h-full overflow-hidden overflow-x-clip border-b border-border/50 bg-slate-50 dark:bg-[#020817]">
                 {/* Subtle grid base */}
-                <div className="absolute inset-0 w-full h-full bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:3rem_3rem]" />
+                <div className="absolute inset-0 w-full h-full bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:3rem_3rem]" />
 
                 {/* Floating glow effects */}
                 <div className="absolute top-0 left-0 w-full h-full overflow-hidden">
@@ -38,7 +38,7 @@ export default function HeroSection({ children }: HeroSectionProps) {
                             y: ["0%", "15%", "-15%", "0%"],
                         }}
                         transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
-                        className="absolute -top-[100px] -left-[100px] w-[500px] h-[500px] bg-fuchsia-600/40 rounded-full blur-[120px]"
+                        className="absolute -top-[100px] -left-[100px] w-[500px] h-[500px] bg-fuchsia-600/10 dark:bg-fuchsia-600/40 rounded-full blur-[120px]"
                     />
 
                     {/* Blue/Cyan glow */}
@@ -49,7 +49,7 @@ export default function HeroSection({ children }: HeroSectionProps) {
                             y: ["0%", "-20%", "20%", "0%"],
                         }}
                         transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-                        className="absolute top-0 right-[-100px] w-[600px] h-[600px] bg-blue-600/40 rounded-full blur-[130px]"
+                        className="absolute top-0 right-[-100px] w-[600px] h-[600px] bg-blue-600/10 dark:bg-blue-600/40 rounded-full blur-[130px]"
                     />
 
                     {/* Teal/Emerald glow in center-bottom */}
@@ -60,7 +60,7 @@ export default function HeroSection({ children }: HeroSectionProps) {
                             y: ["10%", "-15%", "5%", "10%"],
                         }}
                         transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-                        className="absolute bottom-[-100px] left-[30%] w-[500px] h-[500px] bg-teal-500/30 rounded-full blur-[140px]"
+                        className="absolute bottom-[-100px] left-[30%] w-[500px] h-[500px] bg-teal-500/10 dark:bg-teal-500/30 rounded-full blur-[140px]"
                     />
                 </div>
 
@@ -79,7 +79,7 @@ export default function HeroSection({ children }: HeroSectionProps) {
                                 repeat: Infinity,
                                 delay: p.delay,
                             }}
-                            className="absolute rounded-full bg-white"
+                            className="absolute rounded-full bg-slate-300 dark:bg-white"
                             style={{
                                 width: p.size + "px",
                                 height: p.size + "px",
@@ -99,10 +99,10 @@ export default function HeroSection({ children }: HeroSectionProps) {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.1 }}
-                    className="text-4xl md:text-5xl lg:text-5xl font-extrabold tracking-tight mb-6 md:mb-4 text-white"
+                    className="text-4xl md:text-5xl lg:text-5xl font-extrabold tracking-tight mb-6 md:mb-4 text-foreground dark:text-white"
                 >
                     Navigate the Island&apos;s <br className="hidden md:block" />
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-400">
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-indigo-600 dark:from-primary dark:to-blue-400">
                         Postal Network
                     </span>
                 </motion.h1>
@@ -111,7 +111,7 @@ export default function HeroSection({ children }: HeroSectionProps) {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.2 }}
-                    className="hidden md:block mx-auto max-w-2xl text-base md:text-lg text-white/80 mb-8"
+                    className="hidden md:block mx-auto max-w-2xl text-base md:text-lg text-muted-foreground dark:text-white/80 mb-8"
                 >
                     The most comprehensive directory for finding every post office, contact detail, and location across Sri Lanka.
                 </motion.p>
