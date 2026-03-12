@@ -39,18 +39,17 @@ export async function POST(req: Request) {
                 select: { id: true, services: true }
             });
 
-            const updatePromises = offices.map((office) => {
-                const currentServices = office.services || [];
-                if (!currentServices.includes(serviceQuery)) {
-                    return prisma.postOffice.update({
-                        where: { id: office.id },
-                        data: { services: [...currentServices, serviceQuery] }
-                    });
-                }
-                return Promise.resolve();
-            });
+            await prisma.$transaction(
+                offices
+                    .filter(office => !(office.services || []).includes(serviceQuery))
+                    .map(office =>
+                        prisma.postOffice.update({
+                            where: { id: office.id },
+                            data: { services: [...(office.services || []), serviceQuery] }
+                        })
+                    )
+            );
 
-            await Promise.all(updatePromises);
             return NextResponse.json({ success: true, message: "Services added" });
         }
 
@@ -62,18 +61,17 @@ export async function POST(req: Request) {
                 select: { id: true, services: true }
             });
 
-            const updatePromises = offices.map((office) => {
-                const currentServices = office.services || [];
-                if (currentServices.includes(serviceQuery)) {
-                    return prisma.postOffice.update({
-                        where: { id: office.id },
-                        data: { services: currentServices.filter(s => s !== serviceQuery) }
-                    });
-                }
-                return Promise.resolve();
-            });
+            await prisma.$transaction(
+                offices
+                    .filter(office => (office.services || []).includes(serviceQuery))
+                    .map(office =>
+                        prisma.postOffice.update({
+                            where: { id: office.id },
+                            data: { services: (office.services || []).filter(s => s !== serviceQuery) }
+                        })
+                    )
+            );
 
-            await Promise.all(updatePromises);
             return NextResponse.json({ success: true, message: "Services removed" });
         }
 

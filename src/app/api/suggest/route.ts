@@ -5,14 +5,13 @@ import bcrypt from "bcrypt";
 import crypto from "node:crypto";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/options";
-import { checkRateLimit } from "@/lib/rate-limiter";
+import { checkRateLimit, rateLimiters } from "@/lib/rate-limiter";
 import { suggestSchema, suggestAddSchema } from "@/lib/validations";
 
 export async function POST(req: Request) {
     try {
         // Enforce Rate Limit: Max 15 suggestions per hour per IP
-        const rateLimitConfig = { limit: 15, windowMs: 60 * 60 * 1000 };
-        const rateLimit = checkRateLimit(req, rateLimitConfig);
+        const rateLimit = await checkRateLimit(req, rateLimiters.suggest);
 
         if (rateLimit.isRateLimited) {
             return NextResponse.json({ error: "Rate limit exceeded. Try again later." }, { status: 429 });
@@ -38,7 +37,7 @@ export async function POST(req: Request) {
 
         const { submitterName, submitterEmail, submitterPassword, turnstileToken, name, postalCode, newFieldName, newFieldValue, ...fields } = data as any;
 
-        // Verify Captcha (Required for all users now)
+        // Verify Captcha — fail-closed in production
         const turnstileSecret = process.env.TURNSTILE_SECRET_KEY;
         if (turnstileSecret && turnstileToken) {
             const formData = new FormData();
@@ -55,6 +54,9 @@ export async function POST(req: Request) {
             }
         } else if (turnstileSecret && !turnstileToken) {
             return NextResponse.json({ error: "Please complete the Captcha" }, { status: 400 });
+        } else if (!turnstileSecret && process.env.NODE_ENV === "production") {
+            console.error("CRITICAL: TURNSTILE_SECRET_KEY is not configured in production!");
+            return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
         }
 
         let user;
@@ -82,7 +84,8 @@ export async function POST(req: Request) {
             });
 
             if (existingUser) {
-                return NextResponse.json({ error: "An account with this email already exists. Please log in first." }, { status: 400 });
+                // Generic error to prevent user enumeration
+                return NextResponse.json({ error: "Please log in to submit suggestions." }, { status: 400 });
             }
 
             // Create new user

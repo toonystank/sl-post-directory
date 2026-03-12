@@ -80,3 +80,9 @@ model EditRequest {
   postOffice    PostOffice? @relation(fields: [postOfficeId], references: [id])
   requestedBy   User       @relation(fields: [requestedById], references: [id])
 }
+
+model SiteSettings {
+  id         String   @id @default("default")
+  adsEnabled Boolean  @default(true)
+  updatedAt  DateTime @updatedAt
+}

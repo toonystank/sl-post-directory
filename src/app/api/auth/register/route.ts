@@ -4,13 +4,12 @@ import bcrypt from "bcrypt";
 import crypto from "node:crypto";
 import { sendVerificationEmail } from "@/lib/email";
 import { registerSchema } from "@/lib/validations";
-import { checkRateLimit } from "@/lib/rate-limiter";
+import { checkRateLimit, rateLimiters } from "@/lib/rate-limiter";
 
 export async function POST(req: Request) {
     try {
         // Enforce Rate Limit: Max 5 accounts per hour per IP
-        const rateLimitConfig = { limit: 5, windowMs: 60 * 60 * 1000 };
-        const rateLimit = checkRateLimit(req, rateLimitConfig);
+        const rateLimit = await checkRateLimit(req, rateLimiters.register);
 
         if (rateLimit.isRateLimited) {
             return NextResponse.json({ error: "Too many registration attempts. Please try again later." }, { status: 429 });
@@ -29,14 +28,12 @@ export async function POST(req: Request) {
 
         const { name, email, password, turnstileToken } = validation.data;
 
-        // Verify Turnstile Captcha if secret key is present
+        // Verify Turnstile Captcha — fail-closed in production
         const turnstileSecret = process.env.TURNSTILE_SECRET_KEY;
         if (turnstileSecret && turnstileToken) {
             const formData = new FormData();
             formData.append("secret", turnstileSecret);
             formData.append("response", turnstileToken);
-
-            // Client IP could be sent as 'remoteip' but is optional
 
             const result = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
                 body: formData,
@@ -49,6 +46,9 @@ export async function POST(req: Request) {
             }
         } else if (turnstileSecret && !turnstileToken) {
             return NextResponse.json({ error: "Please complete the Captcha" }, { status: 400 });
+        } else if (!turnstileSecret && process.env.NODE_ENV === "production") {
+            console.error("CRITICAL: TURNSTILE_SECRET_KEY is not configured in production!");
+            return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
         }
 
         // Check if user already exists
@@ -57,7 +57,11 @@ export async function POST(req: Request) {
         });
 
         if (existingUser) {
-            return NextResponse.json({ error: "An account with this email already exists" }, { status: 400 });
+            // Generic response to prevent user enumeration
+            return NextResponse.json({
+                success: true,
+                message: "If this email is available, a verification email has been sent.",
+            });
         }
 
         // Hash password

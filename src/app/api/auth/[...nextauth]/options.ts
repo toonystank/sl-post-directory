@@ -2,7 +2,23 @@ import { prisma } from "@/lib/prisma";
 import NextAuth, { AuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcrypt";
+import crypto from "node:crypto";
 import { verifySync } from "otplib";
+
+// Constant-time backup code comparison to prevent timing attacks
+function findBackupCode(codes: string[], candidate: string): string | undefined {
+    let matchedCode: string | undefined;
+    for (const code of codes) {
+        if (code.length === candidate.length) {
+            const a = Buffer.from(code, "utf8");
+            const b = Buffer.from(candidate, "utf8");
+            if (crypto.timingSafeEqual(a, b)) {
+                matchedCode = code;
+            }
+        }
+    }
+    return matchedCode;
+}
 
 export const authOptions: AuthOptions = {
     providers: [
@@ -43,16 +59,16 @@ export const authOptions: AuthOptions = {
                         throw new Error("2FA_REQUIRED");
                     }
 
-                    // Check if the token is a backup code
-                    const isBackupCode = user.backupCodes?.includes(token);
+                    // Check if the token is a backup code (timing-safe)
+                    const matchedBackupCode = user.backupCodes ? findBackupCode(user.backupCodes, token) : undefined;
 
-                    if (isBackupCode) {
+                    if (matchedBackupCode) {
                         // Consume the backup code
                         await prisma.user.update({
                             where: { id: user.id },
                             data: {
                                 backupCodes: {
-                                    set: user.backupCodes.filter(c => c !== token)
+                                    set: user.backupCodes!.filter(c => c !== matchedBackupCode)
                                 }
                             }
                         });

@@ -53,12 +53,12 @@ export default function Navbar() {
                     <ThemeToggle />
                     {session ? (
                         <div className="flex items-center gap-2">
-                            <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
-                                <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">
+                            <Link href="/dashboard/profile" className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors cursor-pointer rounded-full p-1 pr-3 hover:bg-primary/10">
+                                <div className="w-7 h-7 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold">
                                     {user?.name?.charAt(0)?.toUpperCase() || <User className="w-3.5 h-3.5" />}
                                 </div>
                                 <span className="font-medium text-foreground">{user?.name}</span>
-                            </div>
+                            </Link>
                             <Button
                                 variant="ghost"
                                 size="sm"
@@ -70,7 +70,7 @@ export default function Navbar() {
                             </Button>
                         </div>
                     ) : (
-                        <Button asChild variant="default" size="sm" className="hidden sm:inline-flex rounded-full">
+                        <Button asChild variant="default" size="sm" className="rounded-full">
                             <Link href="/login">Login</Link>
                         </Button>
                     )}

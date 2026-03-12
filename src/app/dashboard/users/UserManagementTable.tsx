@@ -208,9 +208,10 @@ export default function UserManagementTable({ initialUsers }: { initialUsers: Us
             </div>
 
             {/* Users Table */}
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left relative">
-                    <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border/50">
+            <div className="overflow-y-auto overflow-x-hidden max-h-[600px]">
+                {/* Desktop Table */}
+                <table className="hidden md:table w-full text-sm text-left relative">
+                    <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border/50 sticky top-0 z-10">
                         <tr>
                             <th className="px-6 py-4 font-medium">User</th>
                             <th className="px-6 py-4 font-medium">Role Level</th>
@@ -241,12 +242,88 @@ export default function UserManagementTable({ initialUsers }: { initialUsers: Us
                                         </SelectContent>
                                     </Select>
                                 </td>
-                                <td className="px-6 py-4 text-right flex items-center justify-end gap-1">
+                                <td className="px-6 py-4 text-right">
+                                    <div className="flex items-center justify-end gap-1">
+                                        <Button
+                                            title="Reset Password"
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-8 w-8 p-0 text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                                            onClick={() => handleResetPassword(u.id, u.email)}
+                                            disabled={loading}
+                                        >
+                                            <KeyRound className="w-4 h-4" />
+                                        </Button>
+
+                                        {u.twoFactorEnabled && (
+                                            <Button
+                                                title="Disable 2FA"
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-8 w-8 p-0 text-amber-500 hover:bg-amber-500/10 hover:text-amber-600"
+                                                onClick={() => handleReset2FA(u.id, u.email)}
+                                                disabled={loading}
+                                            >
+                                                <ShieldOff className="w-4 h-4" />
+                                            </Button>
+                                        )}
+
+                                        <Button
+                                            title="Revoke Access"
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-8 w-8 p-0 ml-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                            onClick={() => handleDeleteUser(u.id, u.email)}
+                                            disabled={loading}
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+
+                {/* Mobile Cards */}
+                <div className="md:hidden flex flex-col divide-y divide-border/50">
+                    {users.map((u) => (
+                        <div key={`mob-${u.id}`} className="p-4 flex flex-col gap-3 hover:bg-muted/30 transition-colors">
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold shrink-0">
+                                        {u.name.charAt(0)}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="font-medium text-foreground truncate">{u.name}</div>
+                                        <div className="text-xs text-muted-foreground truncate">{u.email}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="flex flex-wrap items-center justify-between gap-3 mt-1">
+                                <Select
+                                    value={u.role}
+                                    onValueChange={(val) => handleUpdateRole(u.id, u.role, val)}
+                                    disabled={loading}
+                                >
+                                    <SelectTrigger className="h-8 text-xs font-medium bg-muted/40 border-border/50 shadow-none focus:ring-0 cursor-pointer hover:bg-muted/70 w-auto px-3 rounded-lg text-foreground data-[state=open]:bg-muted/70 flex-1 max-w-[160px]">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="CONTRIBUTOR" className="text-xs">Contributor</SelectItem>
+                                        <SelectItem value="MODERATOR" className="text-xs">Moderator</SelectItem>
+                                        <SelectItem value="ADMIN" className="text-xs">Admin</SelectItem>
+                                        <SelectItem value="SUPER_ADMIN" className="text-xs">Super Admin</SelectItem>
+                                    </SelectContent>
+                                </Select>
+
+                                <div className="flex items-center gap-1 shrink-0">
                                     <Button
                                         title="Reset Password"
                                         size="sm"
                                         variant="ghost"
-                                        className="h-8 w-8 p-0 text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                                        className="h-8 w-8 p-0 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-lg border border-transparent hover:border-primary/20"
                                         onClick={() => handleResetPassword(u.id, u.email)}
                                         disabled={loading}
                                     >
@@ -258,7 +335,7 @@ export default function UserManagementTable({ initialUsers }: { initialUsers: Us
                                             title="Disable 2FA"
                                             size="sm"
                                             variant="ghost"
-                                            className="h-8 w-8 p-0 text-amber-500 hover:bg-amber-500/10 hover:text-amber-600"
+                                            className="h-8 w-8 p-0 text-amber-500 hover:bg-amber-500/10 hover:text-amber-600 rounded-lg border border-transparent hover:border-amber-500/20"
                                             onClick={() => handleReset2FA(u.id, u.email)}
                                             disabled={loading}
                                         >
@@ -270,17 +347,17 @@ export default function UserManagementTable({ initialUsers }: { initialUsers: Us
                                         title="Revoke Access"
                                         size="sm"
                                         variant="ghost"
-                                        className="h-8 w-8 p-0 ml-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                        className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10 hover:text-destructive rounded-lg border border-transparent hover:border-destructive/20 ml-1"
                                         onClick={() => handleDeleteUser(u.id, u.email)}
                                         disabled={loading}
                                     >
                                         <Trash2 className="w-4 h-4" />
                                     </Button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     );

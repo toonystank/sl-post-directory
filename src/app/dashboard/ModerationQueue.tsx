@@ -34,6 +34,7 @@ export default function ModerationQueue({ initialPendingEdits, initialPendingEdi
     const [pendingEditItems, setPendingEditItems] = useState(initialPendingEditItems);
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [isMobileCollapsed, setIsMobileCollapsed] = useState(true);
     const router = useRouter();
 
     const handleAction = async (requestId: string, action: "APPROVE" | "REJECT" | "MORE_INFO") => {
@@ -177,10 +178,23 @@ export default function ModerationQueue({ initialPendingEdits, initialPendingEdi
 
     return (
         <Card className="border-border/50 overflow-hidden">
-            <CardHeader className="border-b border-border/40 bg-card/80">
-                <CardTitle className="text-lg">Moderation Queue</CardTitle>
+            <CardHeader 
+                className="border-b border-border/40 bg-card/80 flex flex-row items-center justify-between cursor-pointer md:cursor-default"
+                onClick={() => window.innerWidth < 768 && setIsMobileCollapsed(!isMobileCollapsed)}
+            >
+                <CardTitle className="text-lg flex items-center gap-2">
+                    Moderation Queue
+                    {pendingEdits > 0 && (
+                        <Badge variant="destructive" className="ml-2 rounded-full px-2 h-5 text-xs flex items-center justify-center">
+                            {pendingEdits}
+                        </Badge>
+                    )}
+                </CardTitle>
+                <div className="md:hidden text-muted-foreground flex items-center">
+                    {isMobileCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+                </div>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className={`p-0 ${isMobileCollapsed ? 'hidden md:block' : ''}`}>
                 {pendingEdits === 0 ? (
                     <div className="text-center py-16 text-muted-foreground">
                         <ShieldCheck className="w-16 h-16 mx-auto mb-4 opacity-15" />
@@ -188,9 +202,10 @@ export default function ModerationQueue({ initialPendingEdits, initialPendingEdi
                         <p className="text-sm">No pending edit requests to moderate.</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left">
-                            <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border/50">
+                    <div className="overflow-y-auto overflow-x-hidden max-h-[600px]">
+                        {/* Desktop Table */}
+                        <table className="hidden md:table w-full text-sm text-left relative">
+                            <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border/50 sticky top-0 z-10">
                                 <tr>
                                     <th className="px-6 py-4 font-medium">Post Office</th>
                                     <th className="px-6 py-4 font-medium">Requested By</th>
@@ -204,7 +219,7 @@ export default function ModerationQueue({ initialPendingEdits, initialPendingEdi
                                     <Fragment key={edit.id}>
                                         <tr className="hover:bg-muted/30 transition-colors">
                                             <td className="px-6 py-4">
-                                                <div className="font-medium text-foreground flex items-center gap-2">
+                                                <div className="font-medium text-foreground flex flex-wrap items-center gap-2">
                                                     {String(edit.postOffice?.name || (() => { try { return JSON.parse(edit.changes).name || "New Office" } catch { return "New Office" } })())}
                                                     <Badge variant="outline" className={`text-[10px] uppercase font-bold tracking-wider ${edit.type === "ADD" ? "text-blue-500 bg-blue-500/10 border-blue-500/30" :
                                                         edit.type === "REMOVAL" ? "text-destructive bg-destructive/10 border-destructive/30" :
@@ -213,18 +228,18 @@ export default function ModerationQueue({ initialPendingEdits, initialPendingEdi
                                                         {edit.type || "EDIT"}
                                                     </Badge>
                                                 </div>
-                                                <div className="text-xs text-muted-foreground mt-1">
+                                                <div className="text-xs text-muted-foreground mt-1 font-mono">
                                                     {String(edit.postOffice?.postalCode || (() => { try { return JSON.parse(edit.changes).postalCode || "N/A" } catch { return "N/A" } })())}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">
+                                                    <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
                                                         {edit.requestedBy.name.charAt(0)}
                                                     </div>
-                                                    <div>
-                                                        <div className="font-medium text-foreground">{edit.requestedBy.name}</div>
-                                                        <div className="text-xs text-muted-foreground mt-0.5">{edit.requestedBy.email}</div>
+                                                    <div className="min-w-0">
+                                                        <div className="font-medium text-foreground truncate">{edit.requestedBy.name}</div>
+                                                        <div className="text-xs text-muted-foreground mt-0.5 truncate">{edit.requestedBy.email}</div>
                                                     </div>
                                                 </div>
                                             </td>
@@ -239,7 +254,7 @@ export default function ModerationQueue({ initialPendingEdits, initialPendingEdi
                                                     </Badge>
                                                 )}
                                             </td>
-                                            <td className="px-6 py-4 text-muted-foreground">
+                                            <td className="px-6 py-4 text-muted-foreground font-mono text-xs">
                                                 {new Date(edit.createdAt).toLocaleDateString()}
                                             </td>
                                             <td className="px-6 py-4 text-right">
@@ -292,6 +307,89 @@ export default function ModerationQueue({ initialPendingEdits, initialPendingEdi
                                 ))}
                             </tbody>
                         </table>
+
+                        {/* Mobile Cards */}
+                        <div className="md:hidden flex flex-col divide-y divide-border/50">
+                            {pendingEditItems.map((edit) => (
+                                <div key={`mob-${edit.id}`} className="p-4 flex flex-col gap-3 hover:bg-muted/30 transition-colors">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="min-w-0">
+                                            <div className="font-medium text-foreground flex flex-wrap items-center gap-2">
+                                                <span className="truncate">{String(edit.postOffice?.name || (() => { try { return JSON.parse(edit.changes).name || "New Office" } catch { return "New Office" } })())}</span>
+                                                <Badge variant="outline" className={`text-[10px] uppercase font-bold tracking-wider shrink-0 ${edit.type === "ADD" ? "text-blue-500 bg-blue-500/10 border-blue-500/30" : edit.type === "REMOVAL" ? "text-destructive bg-destructive/10 border-destructive/30" : "text-primary bg-primary/10 border-primary/30"}`}>
+                                                    {edit.type || "EDIT"}
+                                                </Badge>
+                                            </div>
+                                            <div className="text-xs text-muted-foreground mt-1 font-mono">
+                                                {String(edit.postOffice?.postalCode || (() => { try { return JSON.parse(edit.changes).postalCode || "N/A" } catch { return "N/A" } })())}
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col items-end gap-1 shrink-0">
+                                            {edit.status === "MORE_INFO" ? (
+                                                <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-500 bg-amber-500/10">Needs Info</Badge>
+                                            ) : (
+                                                <Badge variant="outline" className="text-[10px] border-primary/30 text-primary bg-primary/10">Pending</Badge>
+                                            )}
+                                            <span className="text-[10px] font-mono text-muted-foreground">{new Date(edit.createdAt).toLocaleDateString()}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-2 bg-background/50 p-2.5 rounded-lg border border-border/50">
+                                        <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
+                                            {edit.requestedBy.name.charAt(0)}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="text-sm font-medium text-foreground truncate">{edit.requestedBy.name}</div>
+                                            <div className="text-xs text-muted-foreground truncate">{edit.requestedBy.email}</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between mt-1">
+                                        <button
+                                            className="text-xs font-medium text-primary cursor-pointer hover:underline flex items-center gap-1"
+                                            onClick={() => toggleDetails(edit.id)}
+                                        >
+                                            {expandedId === edit.id ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                            {expandedId === edit.id ? "Hide Details" : "View Details"}
+                                        </button>
+                                        
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-colors disabled:opacity-50"
+                                                title="Approve"
+                                                disabled={processingId === edit.id}
+                                                onClick={() => handleAction(edit.id, "APPROVE")}
+                                            >
+                                                <Check className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                className="p-1.5 text-amber-500 hover:bg-amber-500/10 rounded-lg transition-colors disabled:opacity-50"
+                                                title="Need More Info"
+                                                disabled={processingId === edit.id}
+                                                onClick={() => handleAction(edit.id, "MORE_INFO")}
+                                            >
+                                                <Info className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                className="p-1.5 text-destructive hover:bg-destructive/10 rounded-lg transition-colors disabled:opacity-50"
+                                                title="Reject"
+                                                disabled={processingId === edit.id}
+                                                onClick={() => handleAction(edit.id, "REJECT")}
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {expandedId === edit.id && (
+                                        <div className="mt-2 p-3 bg-muted/20 border border-border/30 rounded-xl">
+                                            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Proposed {edit.type === "REMOVAL" ? "Details" : "Changes"}</p>
+                                            {renderChanges(edit)}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 )}
             </CardContent>

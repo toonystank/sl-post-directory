@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { checkRateLimit } from "@/lib/rate-limiter";
+import { checkRateLimit, rateLimiters } from "@/lib/rate-limiter";
 
 export async function GET(req: Request) {
     try {
-        // Enforce Rate Limit: Max 10 attempts per 15 minutes per IP
-        const rateLimitConfig = { limit: 10, windowMs: 15 * 60 * 1000 };
-        const rateLimit = checkRateLimit(req, rateLimitConfig);
+        // Enforce Rate Limit: Max 5 attempts per hour per IP (same as registration)
+        const rateLimit = await checkRateLimit(req, rateLimiters.register);
 
         if (rateLimit.isRateLimited) {
             return NextResponse.json({ error: "Too many verification attempts. Please try again later." }, { status: 429 });

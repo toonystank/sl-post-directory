@@ -3,9 +3,16 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcrypt";
 import { NextResponse } from "next/server";
+import { checkRateLimit, rateLimiters } from "@/lib/rate-limiter";
 
 export async function PUT(req: Request) {
     try {
+        // Rate limit: 5 password change attempts per 15 minutes
+        const rateLimit = await checkRateLimit(req, rateLimiters.password);
+        if (rateLimit.isRateLimited) {
+            return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
+        }
+
         const session = await getServerSession(authOptions);
         if (!session?.user?.email) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

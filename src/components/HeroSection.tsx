@@ -99,7 +99,7 @@ export default function HeroSection({ children }: HeroSectionProps) {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.1 }}
-                    className="text-4xl md:text-5xl lg:text-5xl font-extrabold tracking-tight mb-6 md:mb-4"
+                    className="text-4xl md:text-5xl lg:text-5xl font-extrabold tracking-tight mb-6 md:mb-4 text-white"
                 >
                     Navigate the Island&apos;s <br className="hidden md:block" />
                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-400">
@@ -111,7 +111,7 @@ export default function HeroSection({ children }: HeroSectionProps) {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.2 }}
-                    className="hidden md:block mx-auto max-w-2xl text-base md:text-lg text-muted-foreground mb-8"
+                    className="hidden md:block mx-auto max-w-2xl text-base md:text-lg text-white/80 mb-8"
                 >
                     The most comprehensive directory for finding every post office, contact detail, and location across Sri Lanka.
                 </motion.p>
