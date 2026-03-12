@@ -8,6 +8,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import AdminOfficeManager from "./AdminOfficeManager";
 import ModerationQueue from "./ModerationQueue";
+import AdToggle from "./AdToggle";
 
 interface SessionUser {
     id?: string;
@@ -63,77 +64,78 @@ export default async function AdminDashboard() {
                     </h1>
                     <p className="text-muted-foreground mt-2 ml-[52px]">Manage directories, user roles, and moderation queues.</p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto mt-4 md:mt-0">
                     {user?.role === "SUPER_ADMIN" && (
-                        <Button asChild variant="outline" className="rounded-xl hidden sm:flex">
+                        <Button asChild variant="outline" className="rounded-xl flex-1 min-w-[140px] sm:flex-none">
                             <Link href="/dashboard/users">
-                                <Users className="w-4 h-4 mr-2" /> Manage Users
+                                <Users className="w-4 h-4 mr-2 shrink-0" /> <span className="truncate">Manage Users</span>
                             </Link>
                         </Button>
                     )}
-                    <Button asChild variant="outline" className="rounded-xl hidden sm:flex border-blue-500/20 text-blue-500 hover:bg-blue-500/10 hover:text-blue-500">
+                    <Button asChild variant="outline" className="rounded-xl flex-1 min-w-[140px] sm:flex-none border-blue-500/20 text-blue-500 hover:bg-blue-500/10 hover:text-blue-500">
                         <Link href="/dashboard/activity">
-                            <Clock className="w-4 h-4 mr-2" /> Activity Log
+                            <Clock className="w-4 h-4 mr-2 shrink-0" /> <span className="truncate">Activity Log</span>
                         </Link>
                     </Button>
-                    <Button asChild variant="outline" className="rounded-xl hidden sm:flex border-amber-500/20 text-amber-500 hover:bg-amber-500/10 hover:text-amber-500">
+                    <Button asChild variant="outline" className="rounded-xl flex-1 min-w-[140px] sm:flex-none border-amber-500/20 text-amber-500 hover:bg-amber-500/10 hover:text-amber-500">
                         <a href="/api/admin/backup" download>
-                            <Download className="w-4 h-4 mr-2" /> Backup Data
+                            <Download className="w-4 h-4 mr-2 shrink-0" /> <span className="truncate">Backup Data</span>
                         </a>
                     </Button>
-                    <Button asChild variant="default" className="rounded-xl hidden sm:flex">
+                    <Button asChild variant="default" className="rounded-xl flex-1 min-w-[140px] sm:flex-none">
                         <Link href="/dashboard/add">
-                            <PlusCircle className="w-4 h-4 mr-2" /> Add New Office
+                            <PlusCircle className="w-4 h-4 mr-2 shrink-0" /> <span className="truncate">Add New Office</span>
                         </Link>
                     </Button>
-                    <Link href="/dashboard/profile">
-                        <Badge variant="outline" className="w-fit flex items-center gap-2 px-4 py-2 text-sm hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer">
-                            <User className="w-4 h-4" />
-                            {session.user?.name}
-                        </Badge>
-                    </Link>
                 </div>
             </div>
 
+            {/* Super Admin: Ad Toggle */}
+            {user?.role === "SUPER_ADMIN" && (
+                <div className="mb-6">
+                    <AdToggle />
+                </div>
+            )}
+
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-                <Card className="border-border/50 hover:shadow-lg hover:shadow-primary/5 transition-all">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <Card className="border-border/50 hover:shadow-lg hover:shadow-primary/5 transition-all py-4 md:py-6 gap-3 md:gap-6">
+                    <CardHeader className="flex flex-row items-center justify-between pb-0 px-5 md:px-6">
                         <CardTitle className="text-sm font-medium text-muted-foreground">Total Directories</CardTitle>
                         <div className="p-2 bg-primary/10 rounded-lg text-primary">
                             <Building2 className="w-4 h-4" />
                         </div>
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-4xl font-extrabold tracking-tight">{totalOffices.toLocaleString()}</div>
+                    <CardContent className="px-5 md:px-6">
+                        <div className="text-3xl md:text-4xl font-extrabold tracking-tight">{totalOffices.toLocaleString()}</div>
                         <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                             <TrendingUp className="w-3 h-3 text-secondary" /> All registered offices
                         </p>
                     </CardContent>
                 </Card>
 
-                <Card className="border-border/50 hover:shadow-lg hover:shadow-amber-500/5 transition-all">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <Card className="border-border/50 hover:shadow-lg hover:shadow-amber-500/5 transition-all py-4 md:py-6 gap-3 md:gap-6">
+                    <CardHeader className="flex flex-row items-center justify-between pb-0 px-5 md:px-6">
                         <CardTitle className="text-sm font-medium text-muted-foreground">Pending Edits</CardTitle>
                         <div className="p-2 bg-amber-500/10 rounded-lg text-amber-500">
                             <Edit3 className="w-4 h-4" />
                         </div>
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-4xl font-extrabold tracking-tight">{pendingEdits}</div>
+                    <CardContent className="px-5 md:px-6">
+                        <div className="text-3xl md:text-4xl font-extrabold tracking-tight">{pendingEdits}</div>
                         <p className="text-xs text-muted-foreground mt-1">Awaiting moderation</p>
                     </CardContent>
                 </Card>
 
-                <Card className="border-border/50 hover:shadow-lg hover:shadow-secondary/5 transition-all">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <Card className="border-border/50 hover:shadow-lg hover:shadow-secondary/5 transition-all py-4 md:py-6 gap-3 md:gap-6">
+                    <CardHeader className="flex flex-row items-center justify-between pb-0 px-5 md:px-6">
                         <CardTitle className="text-sm font-medium text-muted-foreground">Approved Contributors</CardTitle>
                         <div className="p-2 bg-secondary/10 rounded-lg text-secondary">
                             <User className="w-4 h-4" />
                         </div>
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-4xl font-extrabold tracking-tight">{employeeCount}</div>
+                    <CardContent className="px-5 md:px-6">
+                        <div className="text-3xl md:text-4xl font-extrabold tracking-tight">{employeeCount}</div>
                         <p className="text-xs text-muted-foreground mt-1">Registered contributors</p>
                     </CardContent>
                 </Card>

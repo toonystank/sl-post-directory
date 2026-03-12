@@ -46,3 +46,6 @@ next-env.d.ts
 update_admin.js
 check_users.js
 .vercel
+
+# Database files
+*.db

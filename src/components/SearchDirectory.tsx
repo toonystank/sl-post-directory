@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Search, MapPin, Building2, Store, ChevronRight, Loader2, Phone, X, Sparkles, ArrowUp, Plus } from "lucide-react";
@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import HeroSection from "@/components/HeroSection";
 import AddOfficeModal from "@/components/AddOfficeModal";
+import AdBanner from "@/components/ads/AdBanner";
 
 interface OfficeField {
     name: string;
@@ -735,20 +736,23 @@ export default function SearchDirectory() {
                                 </p>
                             </div>
 
-                            <div className="flex items-center gap-3 w-full md:w-auto">
+                            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto mt-2 md:mt-0">
                                 {hasActiveFilters && (
                                     <button
                                         onClick={clearAll}
-                                        className="text-xs font-medium text-destructive hover:bg-destructive/10 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shrink-0"
+                                        className="text-xs font-medium text-destructive hover:bg-destructive/10 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shrink-0 border border-transparent hover:border-destructive/20"
                                     >
                                         <X className="w-3.5 h-3.5" /> Clear All Filters
                                     </button>
                                 )}
-                                <AddOfficeModal>
-                                    <Button variant="default" size="sm" className="rounded-xl font-medium shadow-sm w-full md:w-auto bg-primary hover:bg-primary/90">
-                                        <Plus className="w-4 h-4 mr-1.5" /> Add Post Office
-                                    </Button>
-                                </AddOfficeModal>
+                                <div className="flex-1 min-w-[140px]">
+                                    <AddOfficeModal>
+                                        <Button variant="default" size="sm" className="rounded-xl font-medium shadow-sm w-full bg-primary hover:bg-primary/90 overflow-hidden">
+                                            <Plus className="w-4 h-4 mr-1.5 shrink-0" />
+                                            <span className="truncate">Add Post Office</span>
+                                        </Button>
+                                    </AddOfficeModal>
+                                </div>
                             </div>
                         </div>
 
@@ -778,7 +782,7 @@ export default function SearchDirectory() {
                         ) : (
                             <>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-                                    {offices.map((po) => {
+                                    {offices.map((po, index) => {
                                         const fieldMap = Object.fromEntries(po.fields.map(f => [f.name, f.value]));
                                         const type = fieldMap["Type"];
                                         const phone = fieldMap["Phone"];
@@ -786,8 +790,12 @@ export default function SearchDirectory() {
                                         const delivery = fieldMap["Delivery"];
                                         const isRealPostcode = po.postalCode && po.postalCode.length > 0;
 
+                                        // Insert an ad every 6th item (not for the very first item though)
+                                        const showAdAfter = index > 0 && index % 5 === 0;
+
                                         return (
-                                            <Link key={po.id} href={`/office/${po.id}`} className="group h-full">
+                                            <React.Fragment key={po.id}>
+                                            <Link href={`/office/${po.id}`} className="group h-full">
                                                 <Card className="h-full flex flex-col bg-card/40 backdrop-blur-sm hover:bg-card hover:border-primary/40 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300">
                                                     <CardHeader className="px-5 pt-4 pb-2">
                                                         <div className="flex justify-between items-start mb-2.5">
@@ -846,6 +854,8 @@ export default function SearchDirectory() {
                                                     </CardContent>
                                                 </Card>
                                             </Link>
+                                            {showAdAfter && <AdBanner position="in-feed" className="col-span-1 sm:col-span-2 xl:col-span-3" />}
+                                            </React.Fragment>
                                         );
                                     })}
                                 </div>

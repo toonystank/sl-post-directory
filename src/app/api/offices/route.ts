@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
 
         let limit = parseInt(searchParams.get("limit") || "12");
         if (isNaN(limit)) limit = 12;
+        limit = Math.min(Math.max(limit, 1), 100); // Clamp between 1 and 100
 
         const conditions: Prisma.PostOfficeWhereInput[] = [];
 
@@ -102,7 +103,12 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json(
             { offices, total, nextCursor },
-            { status: 200 }
+            {
+                status: 200,
+                headers: {
+                    'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+                },
+            }
         );
     } catch (error) {
         console.error("Error in /api/offices:", error);

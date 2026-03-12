@@ -34,7 +34,7 @@ export const suggestSchema = z.object({
     // Dynamic fields
     newFieldName: z.string().max(50).optional(),
     newFieldValue: z.string().max(255).optional(),
-}).catchall(z.union([z.string(), z.undefined()])); // Allow the `field_` prefix entries
+}).passthrough(); // Allow dynamic field_* keys through; API routes filter by prefix
 
 // Add Post Office Request Payload
 export const suggestAddSchema = z.object({
@@ -48,10 +48,10 @@ export const suggestAddSchema = z.object({
     submitterEmail: emailSchema.optional(),
     submitterPassword: passwordSchema.optional(),
     turnstileToken: turnstileTokenSchema,
-}).catchall(z.union([z.string(), z.undefined()]));
+}).passthrough(); // Allow dynamic field_* keys through; API routes filter by prefix
 
 // Create Office Payload (Admin)
 export const createOfficeSchema = z.object({
     name: z.string().min(2, "Office name must be at least 2 characters").max(100),
     postalCode: z.string().min(2, "Postal code is required").max(20),
-}).catchall(z.union([z.string(), z.undefined()])); 
+}).passthrough(); // Allow dynamic field_* keys through; API routes filter by prefix

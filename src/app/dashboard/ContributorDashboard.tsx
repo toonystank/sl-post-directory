@@ -47,39 +47,39 @@ export default async function ContributorDashboard({ userId, userName }: Contrib
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-                <Card className="border-border/50 hover:shadow-lg hover:shadow-primary/5 transition-all">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <Card className="border-border/50 hover:shadow-lg hover:shadow-primary/5 transition-all py-4 md:py-6 gap-3 md:gap-6">
+                    <CardHeader className="flex flex-row items-center justify-between pb-0 px-5 md:px-6">
                         <CardTitle className="text-sm font-medium text-muted-foreground">Total Contributions</CardTitle>
                         <div className="p-2 bg-primary/10 rounded-lg text-primary">
                             <Edit3 className="w-4 h-4" />
                         </div>
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-4xl font-extrabold tracking-tight">{myEdits.length}</div>
+                    <CardContent className="px-5 md:px-6">
+                        <div className="text-3xl md:text-4xl font-extrabold tracking-tight">{myEdits.length}</div>
                     </CardContent>
                 </Card>
 
-                <Card className="border-border/50 hover:shadow-lg hover:shadow-emerald-500/5 transition-all">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <Card className="border-border/50 hover:shadow-lg hover:shadow-emerald-500/5 transition-all py-4 md:py-6 gap-3 md:gap-6">
+                    <CardHeader className="flex flex-row items-center justify-between pb-0 px-5 md:px-6">
                         <CardTitle className="text-sm font-medium text-muted-foreground">Approved Edits</CardTitle>
                         <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-500">
                             <CheckCircle2 className="w-4 h-4" />
                         </div>
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-4xl font-extrabold tracking-tight">{approvedEdits.length}</div>
+                    <CardContent className="px-5 md:px-6">
+                        <div className="text-3xl md:text-4xl font-extrabold tracking-tight">{approvedEdits.length}</div>
                     </CardContent>
                 </Card>
 
-                <Card className="border-border/50 hover:shadow-lg hover:shadow-amber-500/5 transition-all">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <Card className="border-border/50 hover:shadow-lg hover:shadow-amber-500/5 transition-all py-4 md:py-6 gap-3 md:gap-6">
+                    <CardHeader className="flex flex-row items-center justify-between pb-0 px-5 md:px-6">
                         <CardTitle className="text-sm font-medium text-muted-foreground">Pending Review</CardTitle>
                         <div className="p-2 bg-amber-500/10 rounded-lg text-amber-500">
                             <Clock className="w-4 h-4" />
                         </div>
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-4xl font-extrabold tracking-tight">{pendingEdits.length}</div>
+                    <CardContent className="px-5 md:px-6">
+                        <div className="text-3xl md:text-4xl font-extrabold tracking-tight">{pendingEdits.length}</div>
                     </CardContent>
                 </Card>
             </div>

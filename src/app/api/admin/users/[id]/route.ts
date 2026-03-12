@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
 
+const VALID_ROLES = ["CONTRIBUTOR", "MODERATOR", "ADMIN", "SUPER_ADMIN"] as const;
+
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
@@ -15,6 +17,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
         const body = await req.json();
         const { role } = body;
+
+        if (!role || !VALID_ROLES.includes(role)) {
+            return NextResponse.json({ error: `Invalid role. Must be one of: ${VALID_ROLES.join(", ")}` }, { status: 400 });
+        }
 
         // Prevent modifying the user's own role to avoid accidental lockouts
         const targetUser = await prisma.user.findUnique({ where: { id } });
@@ -51,14 +57,11 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
             return NextResponse.json({ error: "Cannot delete your own account." }, { status: 400 });
         }
 
-        // Before deleting the user, decide what happens to their edit requests.
-        // Usually, we'd either cascade delete or re-assign. We'll cascade here.
-        await prisma.editRequest.deleteMany({
-            where: { requestedById: id }
-        });
-
-        await prisma.user.delete({
-            where: { id }
+        // Atomic deletion: remove edit requests, action logs, and user in a single transaction
+        await prisma.$transaction(async (tx) => {
+            await tx.actionLog.deleteMany({ where: { userId: id } });
+            await tx.editRequest.deleteMany({ where: { requestedById: id } });
+            await tx.user.delete({ where: { id } });
         });
 
         return NextResponse.json({ success: true });

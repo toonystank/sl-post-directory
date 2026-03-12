@@ -4,6 +4,8 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcrypt";
 
+const VALID_ROLES = ["CONTRIBUTOR", "MODERATOR", "ADMIN", "SUPER_ADMIN"] as const;
+
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions);
@@ -18,6 +20,10 @@ export async function POST(req: Request) {
 
         if (!name || !email || !password || !role) {
             return NextResponse.json({ error: "All fields are required" }, { status: 400 });
+        }
+
+        if (!VALID_ROLES.includes(role)) {
+            return NextResponse.json({ error: `Invalid role. Must be one of: ${VALID_ROLES.join(", ")}` }, { status: 400 });
         }
 
         const existingUser = await prisma.user.findUnique({ where: { email } });
