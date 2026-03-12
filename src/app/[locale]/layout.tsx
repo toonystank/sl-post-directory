@@ -76,7 +76,12 @@ export default async function RootLayout({
                                 <InstallPrompt />
                                 <footer className="border-t border-border/40 bg-card">
                                     <div className="container mx-auto px-4 py-8 text-center text-sm text-muted-foreground">
-                                        <p>© {new Date().getFullYear()} SL Post Directory. Modern Edition.</p>
+                                        <p className="mb-2">
+                                            <strong>Disclaimer:</strong> This project is not affiliated with, endorsed by, or a product of the Department of Posts - Sri Lanka. It is an independent open-source initiative.
+                                        </p>
+                                        <p>
+                                            © {new Date().getFullYear()} <a href="https://github.com/toonystank/sl-post-directory" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors underline underline-offset-4">ToonyStank</a>. All rights reserved.
+                                        </p>
                                     </div>
                                 </footer>
                                 <AdBanner position="sticky-bottom" />
