@@ -23,9 +23,22 @@ model PostOffice {
   fields         PostOfficeField[]
   users          User[]
   edits          EditRequest[]
+  photos         CommunityPhoto[]
 
   @@index([postalCode])
   @@index([name])
+}
+
+model CommunityPhoto {
+  id           String     @id @default(cuid())
+  url          String
+  caption      String?
+  status       String     @default("APPROVED") // APPROVED by default for now
+  postOfficeId String
+  postOffice   PostOffice @relation(fields: [postOfficeId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@index([postOfficeId])
 }
 
 model PostOfficeField {

@@ -24,14 +24,20 @@ export async function GET(request: NextRequest) {
         let suggestions: string[] = [];
 
         if (mode === "name") {
-            // Find post offices using fuzzy matching (pg_trgm)
+            // Find post offices using tiered matching (pg_trgm)
             const offices = await prisma.$queryRaw<{ name: string }[]>`
                 SELECT name FROM (
                     SELECT DISTINCT name, similarity(name, ${q}) as sim
                     FROM "PostOffice"
                     WHERE name ILIKE ${q + '%'} OR similarity(name, ${q}) > 0.15
                 ) as subquery
-                ORDER BY sim DESC, name ASC
+                ORDER BY
+                  CASE
+                    WHEN LOWER(name) = LOWER(${q}) THEN 0
+                    WHEN name ILIKE ${q + '%'} THEN 1
+                    ELSE 2
+                  END,
+                  sim DESC, name ASC
                 LIMIT 5;
             `;
             suggestions = offices.map((o) => o.name);

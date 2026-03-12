@@ -8,6 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import PhotoUpload from "@/components/office/PhotoUpload";
+import PhotoGallery from "@/components/office/PhotoGallery";
+import { PhotoUploadClient } from "./PhotoUploadClient";
 
 export const revalidate = 86400; // Cache the post office page for 24 hours
 
@@ -18,6 +21,10 @@ export default async function OfficeDetails({ params }: { params: Promise<{ id: 
         where: { id },
         include: {
             fields: true, // Include any dynamic fields
+            photos: {
+                where: { status: "APPROVED" },
+                orderBy: { createdAt: 'desc' }
+            }
         }
     });
 
@@ -89,6 +96,27 @@ export default async function OfficeDetails({ params }: { params: Promise<{ id: 
                                 </div>
                             </div>
                         ))}
+                    </div>
+
+                    {/* Community Photos Section */}
+                    <Separator className="my-12 opacity-50" />
+                    <div className="space-y-6">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-6">
+                            <div>
+                                <h2 className="text-2xl font-bold tracking-tight mb-1">Community Photos</h2>
+                                <p className="text-sm text-muted-foreground">Photos uploaded by people visiting this post office.</p>
+                            </div>
+                        </div>
+                        
+                        <PhotoGallery 
+                            photos={office.photos.map(p => ({ ...p, caption: p.caption ?? undefined }))} 
+                            officeName={office.name} 
+                        />
+                        
+                        <div className="mt-8 pt-8 border-t border-border/30">
+                            <h3 className="text-lg font-semibold mb-4">Add a Photo</h3>
+                            <PhotoUploadClient officeId={office.id} />
+                        </div>
                     </div>
 
                     {/* Suggestion Section */}

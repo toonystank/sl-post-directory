@@ -1,9 +1,41 @@
+"use client";
+
 import React from "react";
-import Link from "next/link";
+import { Link } from "@/navigation";
 import { Building2, Store, MapPin, Phone } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PostOffice } from "./types";
 import AdBanner from "@/components/ads/AdBanner";
+import { useTranslations } from "next-intl";
+import { getPostOfficeStatus } from "@/lib/holidays";
+import { useLocale } from "next-intl";
+
+const statusConfig: Record<string, { color: string; bgColor: string; borderColor: string; icon: string }> = {
+    open: {
+        color: "text-emerald-400",
+        bgColor: "bg-emerald-500/10",
+        borderColor: "border-emerald-500/20",
+        icon: "🟢",
+    },
+    closed: {
+        color: "text-red-400",
+        bgColor: "bg-red-500/10",
+        borderColor: "border-red-500/20",
+        icon: "🔴",
+    },
+    "counter-only": {
+        color: "text-amber-400",
+        bgColor: "bg-amber-500/10",
+        borderColor: "border-amber-500/20",
+        icon: "🟡",
+    },
+    holiday: {
+        color: "text-purple-400",
+        bgColor: "bg-purple-500/10",
+        borderColor: "border-purple-500/20",
+        icon: "🟣",
+    },
+};
 
 interface PostOfficeCardProps {
     office: PostOffice;
@@ -17,6 +49,11 @@ export default function PostOfficeCard({ office, index }: PostOfficeCardProps) {
     const division = fieldMap["Division"];
     const delivery = fieldMap["Delivery"];
     const isRealPostcode = office.postalCode && office.postalCode.length > 0;
+
+    const locale = useLocale();
+    const t = useTranslations("Status");
+    const currentStatus = getPostOfficeStatus(locale);
+    const style = statusConfig[currentStatus.status];
 
     // Insert an ad every 6th item (not for the very first item though)
     const showAdAfter = index > 0 && index % 5 === 0;
@@ -35,6 +72,11 @@ export default function PostOfficeCard({ office, index }: PostOfficeCardProps) {
                                 )}
                             </div>
                             <div className="flex gap-1.5 flex-col items-end">
+                                {/* Status Badge */}
+                                <div className={`px-2 py-0.5 rounded-md text-xs uppercase tracking-wider font-medium border flex items-center gap-1 ${style.bgColor} ${style.color} ${style.borderColor}`}>
+                                    <span className="text-[10px]">{style.icon}</span>
+                                    {currentStatus.status === "holiday" ? t("holiday") : t(currentStatus.label)}
+                                </div>
                                 {isRealPostcode && (
                                     <div className="px-2 py-0.5 rounded-md font-mono text-xs uppercase tracking-wider bg-primary/10 text-primary font-medium border border-primary/20">
                                         {office.postalCode}

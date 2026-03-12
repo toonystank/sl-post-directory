@@ -1,16 +1,18 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Link, usePathname } from "@/navigation";
 import { useSession, signOut } from "next-auth/react";
+import { useTranslations } from "next-intl";
 import { ThemeToggle } from "./theme-toggle";
 import { PackageSearch, LayoutDashboard, Building2, LogOut, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
+import LanguageSwitcher from "./LanguageSwitcher";
 
 export default function Navbar() {
     const pathname = usePathname();
     const { data: session } = useSession();
+    const t = useTranslations("Nav");
     const user = session?.user as { name?: string | null; role?: string } | undefined;
     const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN" || user?.role === "MODERATOR";
 
@@ -34,7 +36,7 @@ export default function Navbar() {
                             pathname === "/" ? "text-foreground" : "text-foreground/60"
                         )}
                     >
-                        <Building2 className="w-4 h-4 hidden sm:block" /> Directory
+                        <Building2 className="w-4 h-4 hidden sm:block" /> {t("directory")}
                     </Link>
                     {isAdmin && (
                         <Link
@@ -44,12 +46,13 @@ export default function Navbar() {
                                 pathname?.startsWith("/dashboard") ? "text-foreground" : "text-foreground/60"
                             )}
                         >
-                            <LayoutDashboard className="w-4 h-4 hidden sm:block" /> Dashboard
+                            <LayoutDashboard className="w-4 h-4 hidden sm:block" /> {t("dashboard")}
                         </Link>
                     )}
                 </nav>
 
                 <div className="flex items-center gap-3">
+                    <LanguageSwitcher />
                     <ThemeToggle />
                     {session ? (
                         <div className="flex items-center gap-2">
@@ -66,12 +69,12 @@ export default function Navbar() {
                                 onClick={() => signOut({ callbackUrl: "/" })}
                             >
                                 <LogOut className="w-4 h-4" />
-                                <span className="hidden sm:inline ml-1.5">Logout</span>
+                                <span className="hidden sm:inline ml-1.5">{t("logout")}</span>
                             </Button>
                         </div>
                     ) : (
                         <Button asChild variant="default" size="sm" className="rounded-full">
-                            <Link href="/login">Login</Link>
+                            <Link href="/login">{t("login")}</Link>
                         </Button>
                     )}
                 </div>

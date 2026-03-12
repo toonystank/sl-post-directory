@@ -3,6 +3,7 @@
 import React, { useRef, useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
 import { Plus, X } from "lucide-react";
 import HeroSection from "@/components/HeroSection";
 import AddOfficeModal from "@/components/AddOfficeModal";
@@ -15,6 +16,7 @@ import MobileFilters from "./directory/MobileFilters";
 import DirectoryGrid from "./directory/DirectoryGrid";
 
 export default function SearchDirectory() {
+    const t = useTranslations("Search");
     const {
         query, setQuery,
         searchMode, setSearchMode,
@@ -135,20 +137,20 @@ export default function SearchDirectory() {
                                         onClick={() => handleModeSwitch("name")}
                                         className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 ${searchMode === "name" ? "bg-primary text-primary-foreground border-primary shadow-sm" : "bg-white dark:bg-card/60 shadow-sm backdrop-blur-md text-muted-foreground border-border/50 hover:bg-card hover:text-foreground hover:border-border hover:scale-105"}`}
                                     >
-                                        Name
+                                        {t("modeName")}
                                     </button>
                                     <button
                                         onClick={() => handleModeSwitch("division")}
                                         className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 ${searchMode === "division" ? "bg-secondary text-secondary-foreground border-secondary shadow-sm" : "bg-white dark:bg-card/60 shadow-sm backdrop-blur-md text-muted-foreground border-border/50 hover:bg-card hover:text-foreground hover:border-border hover:scale-105"}`}
                                     >
-                                        Area
+                                        {t("modeArea")}
                                     </button>
                                 </div>
                                 <button
                                     onClick={() => setIsMobileExpanded(!isMobileExpanded)}
                                     className={`text-xs px-4 py-1.5 rounded-full font-bold uppercase tracking-wider border transition-all flex items-center gap-1 shadow-sm ${isMobileExpanded || activeLetter || activeService ? "bg-primary/20 text-primary border-primary/30 backdrop-blur-md" : "bg-white dark:bg-card/60 backdrop-blur-md text-muted-foreground border-border/50 hover:bg-card hover:text-foreground"}`}
                                 >
-                                    {isMobileExpanded ? "Hide Filters" : "More Filters"}
+                                    {isMobileExpanded ? t("hideFilters") : t("moreFilters")}
                                 </button>
                             </div>
                             <MobileFilters
@@ -225,26 +227,26 @@ export default function SearchDirectory() {
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 pb-4 border-b border-border/40 gap-4">
                             <div>
                                 <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-1">
-                                    {activeLetter && query ? `Results for "${query}" in "${activeLetter}"`
-                                        : activeLetter ? `Starting with "${activeLetter}"`
-                                        : query ? `Results for "${query}"`
-                                        : "All Post Offices"}
+                                    {activeLetter && query ? t("resultsForIn", { query, letter: activeLetter })
+                                        : activeLetter ? t("startingWith", { letter: activeLetter })
+                                        : query ? t("resultsFor", { query })
+                                        : t("allOffices")}
                                 </h2>
                                 <p className="text-sm text-muted-foreground">
-                                    {initialLoading ? "Searching directory..." : `Found ${total.toLocaleString()} locations`}
+                                    {initialLoading ? t("searching") : t("found", { count: total.toLocaleString() })}
                                 </p>
                             </div>
                             <div className="flex flex-wrap items-center gap-3 w-full md:w-auto mt-2 md:mt-0">
                                 {hasActiveFilters && (
                                     <button onClick={clearAll} className="text-xs font-medium text-destructive hover:bg-destructive/10 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shrink-0 border border-transparent hover:border-destructive/20">
-                                        <X className="w-3.5 h-3.5" /> Clear All Filters
+                                        <X className="w-3.5 h-3.5" /> {t("clearAll")}
                                     </button>
                                 )}
                                 <div className="flex-1 min-w-[140px]">
                                     <AddOfficeModal>
                                         <Button variant="default" size="sm" className="rounded-xl font-medium shadow-sm w-full bg-primary hover:bg-primary/90 overflow-hidden">
                                             <Plus className="w-4 h-4 mr-1.5 shrink-0" />
-                                            <span className="truncate">Add Post Office</span>
+                                            <span className="truncate">{t("addOffice")}</span>
                                         </Button>
                                     </AddOfficeModal>
                                 </div>
