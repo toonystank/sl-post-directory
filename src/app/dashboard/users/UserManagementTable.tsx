@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { UserPlus, Shield, ShieldCheck, User, Save, Trash2, ShieldAlert, KeyRound, ShieldOff } from "lucide-react";
+import { UserPlus, Shield, ShieldCheck, User, Save, Trash2, ShieldAlert, KeyRound, ShieldOff, MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ interface UserData {
     email: string;
     role: string;
     twoFactorEnabled?: boolean;
+    emailVerified?: Date | null;
 }
 
 export default function UserManagementTable({ initialUsers }: { initialUsers: UserData[] }) {
@@ -164,6 +165,20 @@ export default function UserManagementTable({ initialUsers }: { initialUsers: Us
         } catch (err) { setError("Network error occurred"); } finally { setLoading(false); }
     };
 
+    const handleVerifyEmail = async (userId: string, email: string) => {
+        if (!confirm(`Are you sure you want to forcefully verify the email for ${email}?`)) return;
+        setLoading(true); setError(""); setSuccess("");
+        try {
+            const res = await fetch(`/api/admin/users/${userId}/verify-email`, { method: "POST" });
+            if (res.ok) {
+                setUsers(users.map(u => u.id === userId ? { ...u, emailVerified: new Date() } : u));
+                setSuccess(`Email verified for ${email}.`);
+            } else {
+                const err = await res.json(); setError(err.error || "Failed to verify email");
+            }
+        } catch (err) { setError("Network error occurred"); } finally { setLoading(false); }
+    };
+
     return (
         <div>
             {/* Create User Form Header */}
@@ -255,6 +270,19 @@ export default function UserManagementTable({ initialUsers }: { initialUsers: Us
                                             <KeyRound className="w-4 h-4" />
                                         </Button>
 
+                                        {!u.emailVerified && (
+                                            <Button
+                                                title="Force Verify Email"
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-8 w-8 p-0 text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-600"
+                                                onClick={() => handleVerifyEmail(u.id, u.email)}
+                                                disabled={loading}
+                                            >
+                                                <MailCheck className="w-4 h-4" />
+                                            </Button>
+                                        )}
+
                                         {u.twoFactorEnabled && (
                                             <Button
                                                 title="Disable 2FA"
@@ -329,6 +357,19 @@ export default function UserManagementTable({ initialUsers }: { initialUsers: Us
                                     >
                                         <KeyRound className="w-4 h-4" />
                                     </Button>
+
+                                    {!u.emailVerified && (
+                                        <Button
+                                            title="Force Verify Email"
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-8 w-8 p-0 text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-600 rounded-lg border border-transparent hover:border-emerald-500/20"
+                                            onClick={() => handleVerifyEmail(u.id, u.email)}
+                                            disabled={loading}
+                                        >
+                                            <MailCheck className="w-4 h-4" />
+                                        </Button>
+                                    )}
 
                                     {u.twoFactorEnabled && (
                                         <Button
