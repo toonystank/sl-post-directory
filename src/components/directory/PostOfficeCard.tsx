@@ -27,7 +27,7 @@ export default function PostOfficeCard({ office, index }: PostOfficeCardProps) {
                 <Card className="h-full flex flex-col bg-card/40 backdrop-blur-sm hover:bg-card hover:border-primary/40 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300">
                     <CardHeader className="px-5 pt-4 pb-2">
                         <div className="flex justify-between items-start mb-2.5">
-                            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors text-primary shadow-inner">
+                            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground group-hover:scale-105 transition-all duration-300 text-primary shadow-inner">
                                 {type === "Sub Post office" ? (
                                     <Store className="w-5 h-5" />
                                 ) : (
@@ -36,12 +36,12 @@ export default function PostOfficeCard({ office, index }: PostOfficeCardProps) {
                             </div>
                             <div className="flex gap-1.5 flex-col items-end">
                                 {isRealPostcode && (
-                                    <div className="px-2 py-0.5 rounded-md font-mono text-[10px] bg-primary/10 text-primary font-medium border border-primary/20">
+                                    <div className="px-2 py-0.5 rounded-md font-mono text-xs uppercase tracking-wider bg-primary/10 text-primary font-medium border border-primary/20">
                                         {office.postalCode}
                                     </div>
                                 )}
                                 {delivery === "Yes" && (
-                                    <div className="px-2 py-0.5 rounded-md text-[10px] bg-emerald-500/10 text-emerald-400 font-medium border border-emerald-500/20">
+                                    <div className="px-2 py-0.5 rounded-md text-xs uppercase tracking-wider bg-emerald-500/10 text-emerald-400 font-medium border border-emerald-500/20">
                                         Delivery
                                     </div>
                                 )}
@@ -73,7 +73,7 @@ export default function PostOfficeCard({ office, index }: PostOfficeCardProps) {
                         {office.services && office.services.length > 0 && (
                             <div className="flex flex-wrap gap-1.5 mt-4 pt-3 border-t border-border/30">
                                 {office.services.map((service, idx) => (
-                                    <span key={idx} className="text-[10px] px-1.5 py-0.5 rounded-sm bg-blue-500/10 text-blue-400 font-medium">
+                                    <span key={idx} className="text-xs uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-blue-500/10 text-blue-400 font-medium">
                                         {service}
                                     </span>
                                 ))}

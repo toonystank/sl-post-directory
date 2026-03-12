@@ -133,20 +133,20 @@ export default function SearchDirectory() {
                                 <div className="flex flex-wrap gap-2">
                                     <button
                                         onClick={() => handleModeSwitch("name")}
-                                        className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 ${searchMode === "name" ? "bg-primary text-primary-foreground border-primary shadow-sm" : "bg-card/60 backdrop-blur-md text-muted-foreground border-border/50 hover:bg-white/10 hover:text-white hover:border-white/30 hover:scale-105"}`}
+                                        className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 ${searchMode === "name" ? "bg-primary text-primary-foreground border-primary shadow-sm" : "bg-white dark:bg-card/60 shadow-sm backdrop-blur-md text-muted-foreground border-border/50 hover:bg-card hover:text-foreground hover:border-border hover:scale-105"}`}
                                     >
                                         Name
                                     </button>
                                     <button
                                         onClick={() => handleModeSwitch("division")}
-                                        className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 ${searchMode === "division" ? "bg-secondary text-secondary-foreground border-secondary shadow-sm" : "bg-card/60 backdrop-blur-md text-muted-foreground border-border/50 hover:bg-white/10 hover:text-white hover:border-white/30 hover:scale-105"}`}
+                                        className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 ${searchMode === "division" ? "bg-secondary text-secondary-foreground border-secondary shadow-sm" : "bg-white dark:bg-card/60 shadow-sm backdrop-blur-md text-muted-foreground border-border/50 hover:bg-card hover:text-foreground hover:border-border hover:scale-105"}`}
                                     >
                                         Area
                                     </button>
                                 </div>
                                 <button
                                     onClick={() => setIsMobileExpanded(!isMobileExpanded)}
-                                    className={`text-[10px] px-4 py-1.5 rounded-full font-bold uppercase tracking-wider border transition-all flex items-center gap-1 ${isMobileExpanded || activeLetter || activeService ? "bg-primary/20 text-primary border-primary/30 backdrop-blur-md" : "bg-card/60 backdrop-blur-md text-muted-foreground border-border/50 hover:bg-card/80"}`}
+                                    className={`text-xs px-4 py-1.5 rounded-full font-bold uppercase tracking-wider border transition-all flex items-center gap-1 shadow-sm ${isMobileExpanded || activeLetter || activeService ? "bg-primary/20 text-primary border-primary/30 backdrop-blur-md" : "bg-white dark:bg-card/60 backdrop-blur-md text-muted-foreground border-border/50 hover:bg-card hover:text-foreground"}`}
                                 >
                                     {isMobileExpanded ? "Hide Filters" : "More Filters"}
                                 </button>
