@@ -24,22 +24,16 @@ export async function GET(request: NextRequest) {
         let suggestions: string[] = [];
 
         if (mode === "name") {
-            // Find post offices whose name starts with 'q'
-            const offices = await prisma.postOffice.findMany({
-                where: {
-                    name: {
-                        startsWith: q,
-                        mode: "insensitive",
-                    },
-                },
-                take: 5,
-                select: {
-                    name: true,
-                },
-                orderBy: {
-                    name: "asc",
-                },
-            });
+            // Find post offices using fuzzy matching (pg_trgm)
+            const offices = await prisma.$queryRaw<{ name: string }[]>`
+                SELECT name FROM (
+                    SELECT DISTINCT name, similarity(name, ${q}) as sim
+                    FROM "PostOffice"
+                    WHERE name ILIKE ${q + '%'} OR similarity(name, ${q}) > 0.15
+                ) as subquery
+                ORDER BY sim DESC, name ASC
+                LIMIT 5;
+            `;
             suggestions = offices.map((o) => o.name);
         } else if (mode === "division") {
             // Find distinct area names (Division fields) starting with 'q'
