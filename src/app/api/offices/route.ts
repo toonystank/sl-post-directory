@@ -51,9 +51,26 @@ export async function GET(request: NextRequest) {
                     .replace(/\b(post\s*office|main|branch|sub)\b/gi, "")
                     .trim();
 
-                const terms = cleanQuery ? [cleanQuery] : [query.trim()];
+                const primaryTerm = cleanQuery || query.trim();
+                const terms = [primaryTerm];
                 if (cleanQuery && cleanQuery !== query.trim()) {
                     terms.push(query.trim());
+                }
+
+                // 1) Find fuzzy matched IDs using pg_trgm similarity
+                try {
+                    const matchedOffices = await prisma.$queryRaw<{ id: string }[]>`
+                        SELECT id FROM "PostOffice"
+                        WHERE similarity(name, ${primaryTerm}) > 0.15
+                           OR name ILIKE ${primaryTerm + '%'}
+                    `;
+                    const matchedIds = matchedOffices.map(o => o.id);
+                    
+                    if (matchedIds.length > 0) {
+                        orConditions.push({ id: { in: matchedIds } });
+                    }
+                } catch (e) {
+                    console.error("Fuzzy search error:", e);
                 }
 
                 for (const term of terms) {
