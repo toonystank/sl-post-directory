@@ -48,11 +48,12 @@ export default function PostOfficeCard({ office, index }: PostOfficeCardProps) {
     const phone = fieldMap["Phone"];
     const division = fieldMap["Division"];
     const delivery = fieldMap["Delivery"];
+    const is24Hour = fieldMap["Is24Hour"] === "true";
     const isRealPostcode = office.postalCode && office.postalCode.length > 0;
 
     const locale = useLocale();
     const t = useTranslations("Status");
-    const currentStatus = getPostOfficeStatus(locale);
+    const currentStatus = getPostOfficeStatus(locale, is24Hour);
     const style = statusConfig[currentStatus.status];
 
     // Insert an ad every 6th item (not for the very first item though)

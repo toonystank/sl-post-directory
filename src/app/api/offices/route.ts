@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
                     services: true,
                     fields: {
                         where: {
-                            name: { in: ["Type", "Phone", "Division", "Delivery"] },
+                            name: { in: ["Type", "Phone", "Division", "Delivery", "Is24Hour", "Working Hours"] },
                         },
                         select: { name: true, value: true },
                     },
@@ -174,7 +174,7 @@ export async function GET(request: NextRequest) {
                         services: true,
                         fields: {
                             where: {
-                                name: { in: ["Type", "Phone", "Division", "Delivery"] },
+                                name: { in: ["Type", "Phone", "Division", "Delivery", "Is24Hour", "Working Hours"] },
                             },
                             select: { name: true, value: true },
                         },

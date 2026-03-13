@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { CopyButton } from "@/components/CopyButton";
 import { BackButton } from "@/components/BackButton";
@@ -13,6 +14,34 @@ import PhotoGallery from "@/components/office/PhotoGallery";
 import { PhotoUploadClient } from "./PhotoUploadClient";
 
 export const revalidate = 86400; // Cache the post office page for 24 hours
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+    const { id } = await params;
+    
+    const office = await prisma.postOffice.findUnique({
+        where: { id },
+        include: { fields: true }
+    });
+
+    if (!office) {
+        return {
+            title: "Post Office Not Found",
+        }
+    }
+
+    const typeField = office.fields.find(f => f.name === 'Type')?.value || 'Post Office';
+    const description = `Details, contact information, and operating hours for ${office.name} (${typeField}) - Postal Code ${office.postalCode}, Sri Lanka.`;
+
+    return {
+        title: office.name,
+        description,
+        openGraph: {
+            title: office.name,
+            description,
+            url: `https://postagedirectory.vercel.app/office/${office.id}`,
+        },
+    }
+}
 
 export default async function OfficeDetails({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
@@ -35,8 +64,29 @@ export default async function OfficeDetails({ params }: { params: Promise<{ id: 
     const typeField = office.fields.find(f => f.name === 'Type');
     const type = typeField?.value;
 
+    const is24HourField = office.fields.find(f => f.name === 'Is24Hour');
+    const is24Hour = is24HourField?.value === 'true';
+
+    const jsonLd = {
+        "@context": "https://schema.org",
+        "@type": "GovernmentOffice",
+        "name": office.name,
+        "address": {
+            "@type": "PostalAddress",
+            "postalCode": office.postalCode,
+            "addressCountry": "LK"
+        },
+        "url": `https://postagedirectory.vercel.app/office/${office.id}`,
+        "telephone": office.fields.find(f => f.name === 'Telephone' || f.name === 'Phone')?.value,
+        "openingHours": is24Hour ? "Mo-Su 00:00-23:59" : undefined,
+    };
+
     return (
         <div className="container mx-auto px-4 py-12 max-w-4xl min-h-[calc(100vh-4rem)]">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+            />
             <BackButton />
 
             <Card className="relative overflow-hidden border-border/50 shadow-2xl bg-card/50 backdrop-blur-xl">
@@ -54,9 +104,16 @@ export default async function OfficeDetails({ params }: { params: Promise<{ id: 
                                 )}
                             </div>
                             <div>
-                                <Badge variant="outline" className="mb-3 uppercase tracking-wider text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 px-2 py-0.5 rounded-md font-semibold">
-                                    Official Listing
-                                </Badge>
+                                <div className="flex flex-wrap items-center gap-2 mb-3">
+                                    <Badge variant="outline" className="uppercase tracking-wider text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 px-2 py-0.5 rounded-md font-semibold">
+                                        Official Listing
+                                    </Badge>
+                                    {is24Hour && (
+                                        <Badge variant="outline" className="uppercase tracking-wider text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 px-2 py-0.5 rounded-md font-semibold">
+                                            Open 24 Hours
+                                        </Badge>
+                                    )}
+                                </div>
                                 <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-2">
                                     {office.name}
                                 </h1>
@@ -83,7 +140,7 @@ export default async function OfficeDetails({ params }: { params: Promise<{ id: 
 
 
                         {/* Dynamic Fields */}
-                        {office.fields.filter(f => f.name !== 'Type').map((field) => (
+                        {office.fields.filter(f => f.name !== 'Type' && f.name !== 'Is24Hour').map((field) => (
                             <div key={field.id} className="group bg-background/50 border border-border/50 rounded-2xl p-6 flex flex-col items-start gap-4 hover:border-primary/50 transition-all hover:shadow-md hover:bg-card">
                                 <div className="flex items-center gap-3 text-muted-foreground mb-2">
                                     <div className="px-3 py-1 bg-blue-500/10 rounded-lg text-blue-400 text-xs font-semibold uppercase tracking-wider border border-blue-500/20">
