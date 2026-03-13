@@ -58,7 +58,8 @@ export default async function RootLayout({
 
     return (
         <html lang={locale} suppressHydrationWarning>
-            <head>
+
+            <body className={`${outfit.variable} font-sans min-h-screen flex flex-col antialiased bg-background`} suppressHydrationWarning>
                 <Script
                     src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`}
                     strategy="afterInteractive"
@@ -71,8 +72,6 @@ export default async function RootLayout({
                         gtag('config', '${process.env.NEXT_PUBLIC_GA_ID}');
                     `}
                 </Script>
-            </head>
-            <body className={`${outfit.variable} font-sans min-h-screen flex flex-col antialiased bg-background`} suppressHydrationWarning>
                 <NextTopLoader color="hsl(var(--primary))" showSpinner={false} height={3} />
                 <NextIntlClientProvider messages={messages}>
                     <AuthProvider>
