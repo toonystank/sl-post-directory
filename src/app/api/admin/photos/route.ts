@@ -30,10 +30,38 @@ export async function DELETE(req: Request) {
             return NextResponse.json({ error: "Photo not found" }, { status: 404 });
         }
 
-        // Delete photo
+        // Delete photo from database
         await prisma.communityPhoto.delete({
             where: { id: photoId },
         });
+
+        // Delete file from Uploadcare storage
+        const uploadcareSecretKey = process.env.UPLOADCARE_SECRET_KEY;
+        const uploadcarePubKey = process.env.NEXT_PUBLIC_UPLOADCARE_PUB_KEY || "16423b7c9e1a87e5884e";
+        if (uploadcareSecretKey) {
+            try {
+                // Extract UUID from CDN URL (e.g. https://3q5fhu0dw8.ucarecd.net/UUID/ or https://ucarecdn.com/UUID/)
+                const urlParts = photo.url.replace(/\/$/, '').split('/');
+                const fileUuid = urlParts[urlParts.length - 1];
+
+                if (fileUuid) {
+                    const ucRes = await fetch(`https://api.uploadcare.com/files/${fileUuid}/storage/`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': `Uploadcare.Simple ${uploadcarePubKey}:${uploadcareSecretKey}`,
+                            'Accept': 'application/vnd.uploadcare-v0.7+json',
+                        },
+                    });
+
+                    if (!ucRes.ok) {
+                        console.warn(`Uploadcare deletion failed for ${fileUuid}: ${ucRes.status} ${ucRes.statusText}`);
+                    }
+                }
+            } catch (ucError) {
+                // Log but don't fail — DB record is already deleted
+                console.error("Failed to delete from Uploadcare:", ucError);
+            }
+        }
 
         // Log the action for audit trail
         await prisma.actionLog.create({
