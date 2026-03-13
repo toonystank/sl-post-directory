@@ -11,6 +11,7 @@ interface PhotoUploadProps {
 }
 
 const UPLOADCARE_PUBLIC_KEY = process.env.NEXT_PUBLIC_UPLOADCARE_PUB_KEY || "16423b7c9e1a87e5884e";
+const UPLOADCARE_CDN_BASE = process.env.NEXT_PUBLIC_UPLOADCARE_CDN || "https://3q5fhu0dw8.ucarecd.net";
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 export default function PhotoUpload({ officeId, onUploadComplete }: PhotoUploadProps) {
@@ -49,7 +50,7 @@ export default function PhotoUpload({ officeId, onUploadComplete }: PhotoUploadP
             if (!response.ok) throw new Error("Upload failed");
 
             const data = await response.json();
-            const cdnUrl = `https://ucarecdn.com/${data.file}/`;
+            const cdnUrl = `${UPLOADCARE_CDN_BASE}/${data.file}/`;
             setUploadedUrl(cdnUrl);
             onUploadComplete?.(cdnUrl);
         } catch {
@@ -86,7 +87,7 @@ export default function PhotoUpload({ officeId, onUploadComplete }: PhotoUploadP
                 </div>
                 <div className="relative w-full h-48 mt-3">
                     <Image
-                        src={`${uploadedUrl}-/preview/400x300/`}
+                        src={`${uploadedUrl}-/preview/400x300/-/quality/smart/`}
                         alt="Uploaded"
                         fill
                         className="object-cover rounded-xl"
