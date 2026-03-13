@@ -1,0 +1,22 @@
+<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="primary" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#8b5cf6" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)" />
+  <circle cx="600" cy="315" r="400" fill="url(#primary)" opacity="0.1" filter="blur(50px)" />
+  <g transform="translate(600, 250)" text-anchor="middle">
+    <!-- Icon/Logo Placeholder -->
+    <rect x="-40" y="-80" width="80" height="80" rx="20" fill="none" stroke="url(#primary)" stroke-width="6" />
+    <path d="M-20 -55 L0 -25 L20 -55 Z" fill="url(#primary)" />
+    
+    <text y="50" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="64" font-weight="900" fill="#ffffff" letter-spacing="-1">SL Post Directory</text>
+    <text y="120" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="32" font-weight="500" fill="#94a3b8">The Comprehensive Guide to Sri Lanka Post Offices</text>
+  </g>
+</svg>

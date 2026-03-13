@@ -23,6 +23,9 @@ const outfit = Outfit({
 
 export const metadata: Metadata = {
     metadataBase: new URL("https://postagedirectory.vercel.app"),
+    alternates: {
+        canonical: "/",
+    },
     title: {
         default: "SL Post Directory",
         template: "%s | SL Post Directory",
