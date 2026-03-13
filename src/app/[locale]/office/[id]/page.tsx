@@ -35,6 +35,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     return {
         title: office.name,
         description,
+        alternates: {
+            canonical: `/office/${office.id}`,
+        },
         openGraph: {
             title: office.name,
             description,

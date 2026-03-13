@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { ImageIcon, Expand, X } from "lucide-react";
 
 interface Photo {
@@ -37,11 +38,12 @@ export default function PhotoGallery({ photos, officeName }: PhotoGalleryProps) 
                         onClick={() => setSelectedPhoto(photo)}
                         className="group relative aspect-square rounded-xl overflow-hidden border border-border/30 hover:border-primary/40 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5"
                     >
-                        <img
+                        <Image
                             src={`${photo.url}-/preview/400x400/-/quality/smart/`}
                             alt={photo.caption || `${officeName} photo ${idx + 1}`}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                            loading="lazy"
+                            fill
+                            sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
+                            className="object-cover group-hover:scale-105 transition-transform duration-500"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center p-3">
                             <Expand className="w-5 h-5 text-white" />
@@ -62,12 +64,17 @@ export default function PhotoGallery({ photos, officeName }: PhotoGalleryProps) 
                     >
                         <X className="w-8 h-8" />
                     </button>
-                    <img
-                        src={`${selectedPhoto.url}-/preview/1200x900/-/quality/smart/`}
-                        alt={selectedPhoto.caption || "Community photo"}
-                        className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-300"
-                        onClick={(e) => e.stopPropagation()}
-                    />
+                    <div className="relative w-full h-full max-h-[90vh] flex items-center justify-center">
+                        <Image
+                            src={`${selectedPhoto.url}-/preview/1200x900/-/quality/smart/`}
+                            alt={selectedPhoto.caption || "Community photo"}
+                            fill
+                            className="object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-300"
+                            sizes="100vw"
+                            onClick={(e) => e.stopPropagation()}
+                            priority
+                        />
+                    </div>
                     {selectedPhoto.caption && (
                         <p className="absolute bottom-6 left-1/2 -translate-x-1/2 text-sm text-white/80 bg-black/50 px-4 py-2 rounded-full backdrop-blur-sm">
                             {selectedPhoto.caption}

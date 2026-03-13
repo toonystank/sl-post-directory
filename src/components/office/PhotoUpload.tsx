@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 import { Camera, Upload, X, CheckCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -83,11 +84,14 @@ export default function PhotoUpload({ officeId, onUploadComplete }: PhotoUploadP
                         <X className="w-4 h-4" />
                     </button>
                 </div>
-                <img
-                    src={`${uploadedUrl}-/preview/400x300/`}
-                    alt="Uploaded"
-                    className="w-full h-48 object-cover rounded-xl mt-3"
-                />
+                <div className="relative w-full h-48 mt-3">
+                    <Image
+                        src={`${uploadedUrl}-/preview/400x300/`}
+                        alt="Uploaded"
+                        fill
+                        className="object-cover rounded-xl"
+                    />
+                </div>
             </div>
         );
     }

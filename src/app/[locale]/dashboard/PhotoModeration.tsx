@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Image as ImageIcon, Trash2, CameraOff, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -74,11 +75,12 @@ export default function PhotoModeration({ photos: initialPhotos }: PhotoModerati
                         {photos.map((photo) => (
                             <div key={photo.id} className="group relative rounded-xl border border-border/50 overflow-hidden bg-background/50 flex flex-col hover:border-primary/40 transition-all shadow-sm hover:shadow-md">
                                 <div className="aspect-video relative overflow-hidden bg-muted">
-                                    <img 
+                                    <Image 
                                         src={`${photo.url}-/preview/600x400/-/quality/smart/`} 
                                         alt={photo.caption || "Community photo"}
-                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                        loading="lazy"
+                                        fill
+                                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                                        className="object-cover transition-transform duration-500 group-hover:scale-105"
                                     />
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                                     <button
