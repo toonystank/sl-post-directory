@@ -74,7 +74,7 @@ export function useDirectoryState() {
         const letter = searchParams.get("letter") || null;
         const service = searchParams.get("service") || null;
 
-        const cached = sessionStorage.getItem("directory-cache");
+        const cached = sessionStorage.getItem("directory-cache-v2");
         if (cached) {
             try {
                 const data = JSON.parse(cached);
@@ -107,7 +107,7 @@ export function useDirectoryState() {
 
     useEffect(() => {
         if (offices.length > 0 && !initialLoading) {
-            sessionStorage.setItem("directory-cache", JSON.stringify({
+            sessionStorage.setItem("directory-cache-v2", JSON.stringify({
                 q: query, mode: searchMode, letter: activeLetter, service: activeService, offices, total, nextCursor
             }));
         }
