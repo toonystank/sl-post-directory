@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { Outfit } from "next/font/google";
 import "../globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -57,6 +58,20 @@ export default async function RootLayout({
 
     return (
         <html lang={locale} suppressHydrationWarning>
+            <head>
+                <Script
+                    src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`}
+                    strategy="afterInteractive"
+                />
+                <Script id="google-analytics" strategy="afterInteractive">
+                    {`
+                        window.dataLayer = window.dataLayer || [];
+                        function gtag(){dataLayer.push(arguments);}
+                        gtag('js', new Date());
+                        gtag('config', '${process.env.NEXT_PUBLIC_GA_ID}');
+                    `}
+                </Script>
+            </head>
             <body className={`${outfit.variable} font-sans min-h-screen flex flex-col antialiased bg-background`} suppressHydrationWarning>
                 <NextTopLoader color="hsl(var(--primary))" showSpinner={false} height={3} />
                 <NextIntlClientProvider messages={messages}>
