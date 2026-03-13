@@ -22,7 +22,11 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-    title: "SL Post Directory",
+    metadataBase: new URL("https://postagedirectory.vercel.app"),
+    title: {
+        default: "SL Post Directory",
+        template: "%s | SL Post Directory",
+    },
     description: "A comprehensive, modern directory for Sri Lanka Post Offices.",
     appleWebApp: {
         capable: true,
@@ -31,6 +35,19 @@ export const metadata: Metadata = {
     },
     formatDetection: {
         telephone: false,
+    },
+    openGraph: {
+        title: "SL Post Directory",
+        description: "A comprehensive, modern directory for Sri Lanka Post Offices.",
+        url: "https://postagedirectory.vercel.app",
+        siteName: "SL Post Directory",
+        locale: "en_US",
+        type: "website",
+    },
+    twitter: {
+        card: "summary_large_image",
+        title: "SL Post Directory",
+        description: "A comprehensive, modern directory for Sri Lanka Post Offices.",
     },
     other: {
         "google-adsense-account": "ca-pub-2503310431210239",

@@ -50,9 +50,10 @@ interface StatusResult {
 /**
  * Get the current operating status of a post office.
  * @param locale - Current locale for holiday name display
+ * @param is24Hour - Whether this office is a 24-hour office
  * @returns Status result with label and optional holiday info
  */
-export function getPostOfficeStatus(locale: string = "en"): StatusResult {
+export function getPostOfficeStatus(locale: string = "en", is24Hour: boolean = false): StatusResult {
     const now = new Date();
     const day = now.getDay(); // 0 = Sunday, 6 = Saturday
     const hour = now.getHours();
@@ -69,6 +70,11 @@ export function getPostOfficeStatus(locale: string = "en"): StatusResult {
             label: holiday.name[loc] || holiday.name.en,
             holidayName: holiday.name[loc] || holiday.name.en,
         };
+    }
+
+    // 24 Hour offices are always open, but still respect holidays if they are listed as such
+    if (is24Hour) {
+        return { status: "open", label: "open24h" };
     }
 
     // Sunday — closed by default, some major offices offer counter-only

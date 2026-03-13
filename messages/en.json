@@ -27,6 +27,7 @@
   },
   "Status": {
     "open": "Open",
+    "open24h": "Open 24 Hours",
     "closed": "Closed",
     "counterOnly": "Counter Only",
     "holiday": "Public Holiday"
