@@ -37,7 +37,7 @@ export default function PhotoUpload({ officeId, onUploadComplete }: PhotoUploadP
         try {
             const formData = new FormData();
             formData.append("UPLOADCARE_PUB_KEY", UPLOADCARE_PUBLIC_KEY);
-            formData.append("UPLOADCARE_STORE", "auto");
+            formData.append("UPLOADCARE_STORE", "1");
             formData.append("file", file);
             formData.append("metadata[officeId]", officeId);
 
