@@ -62,7 +62,7 @@ export default function PostOfficeCard({ office, index }: PostOfficeCardProps) {
     return (
         <React.Fragment>
             <Link href={`/office/${office.id}`} className="group h-full">
-                <Card className="h-full flex flex-col bg-card/40 backdrop-blur-sm hover:bg-card hover:border-primary/40 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300">
+                <Card className="h-full flex flex-col bg-card hover:bg-muted/50 border-border/40 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 hover:-translate-y-1">
                     <CardHeader className="px-5 pt-4 pb-2">
                         <div className="flex justify-between items-start mb-2.5">
                             <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground group-hover:scale-105 transition-all duration-300 text-primary shadow-inner">

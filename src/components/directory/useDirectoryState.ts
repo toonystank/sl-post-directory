@@ -98,11 +98,20 @@ export function useDirectoryState() {
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
+        let timeoutId: NodeJS.Timeout | null = null;
         const saveScroll = () => {
-            if (!isRestoringRef.current) sessionStorage.setItem("directory-scroll", window.scrollY.toString());
+            if (!isRestoringRef.current) {
+                if (timeoutId) clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => {
+                    sessionStorage.setItem("directory-scroll", window.scrollY.toString());
+                }, 150);
+            }
         };
         window.addEventListener("scroll", saveScroll, { passive: true });
-        return () => window.removeEventListener("scroll", saveScroll);
+        return () => {
+            window.removeEventListener("scroll", saveScroll);
+            if (timeoutId) clearTimeout(timeoutId);
+        };
     }, []);
 
     useEffect(() => {

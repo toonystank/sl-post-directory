@@ -38,7 +38,7 @@ export default function HeroSection({ children }: HeroSectionProps) {
                             y: ["0%", "15%", "-15%", "0%"],
                         }}
                         transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
-                        className="absolute -top-[100px] -left-[100px] w-[500px] h-[500px] bg-fuchsia-600/10 dark:bg-fuchsia-600/40 rounded-full blur-[120px]"
+                        className="hidden md:block absolute -top-[100px] -left-[100px] w-[500px] h-[500px] bg-fuchsia-600/10 dark:bg-fuchsia-600/40 rounded-full blur-[120px]"
                     />
 
                     {/* Blue/Cyan glow */}
@@ -49,7 +49,7 @@ export default function HeroSection({ children }: HeroSectionProps) {
                             y: ["0%", "-20%", "20%", "0%"],
                         }}
                         transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-                        className="absolute top-0 right-[-100px] w-[600px] h-[600px] bg-blue-600/10 dark:bg-blue-600/40 rounded-full blur-[130px]"
+                        className="hidden md:block absolute top-0 right-[-100px] w-[600px] h-[600px] bg-blue-600/10 dark:bg-blue-600/40 rounded-full blur-[130px]"
                     />
 
                     {/* Teal/Emerald glow in center-bottom */}
@@ -60,7 +60,7 @@ export default function HeroSection({ children }: HeroSectionProps) {
                             y: ["10%", "-15%", "5%", "10%"],
                         }}
                         transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-                        className="absolute bottom-[-100px] left-[30%] w-[500px] h-[500px] bg-teal-500/10 dark:bg-teal-500/30 rounded-full blur-[140px]"
+                        className="hidden md:block absolute bottom-[-100px] left-[30%] w-[500px] h-[500px] bg-teal-500/10 dark:bg-teal-500/30 rounded-full blur-[140px]"
                     />
                 </div>
 
