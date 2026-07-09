@@ -28,7 +28,26 @@ export async function getVariablesMap(): Promise<Record<string, string>> {
 export function replacePlaceholders(text: string, variables: Record<string, string>): string {
     if (!text) return text;
     
-    return text.replace(/\{\{\s*([\w_-]+)\s*\}\}/g, (match, key) => {
-        return variables[key] !== undefined ? variables[key] : match;
+    return text.replace(/\{\{\s*([\w\.\[\]]+)\s*\}\}/g, (match, path) => {
+        const parts = path.split(/[\.\[\]]/).filter(Boolean);
+        const rootKey = parts[0];
+        const current = variables[rootKey];
+        
+        if (current === undefined) return match;
+        
+        if (parts.length === 1) {
+            return current;
+        }
+        
+        try {
+            let obj = JSON.parse(current);
+            for (let i = 1; i < parts.length; i++) {
+                if (obj === undefined || obj === null) return match;
+                obj = obj[parts[i]];
+            }
+            return obj !== undefined ? String(obj) : match;
+        } catch (e) {
+            return match;
+        }
     });
 }

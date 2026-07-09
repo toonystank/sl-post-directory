@@ -101,8 +101,10 @@ Registered mail costs more than ordinary mail because of the additional security
 
 ### Domestic Rates
 
-- **Ordinary letter (up to 20g):** Approximately LKR 15
-- **Registered letter (up to 20g):** Approximately LKR 65 (standard postage plus LKR 50 registration fee)
+Following the postal tariff revision in February 2026, the base weight category for letters increased from 20g to {{rates_domestic_services[0].tiers[0].maxWeight}}g.
+
+- **Ordinary letter (up to {{rates_domestic_services[0].tiers[0].maxWeight}}g):** LKR {{rates_domestic_services[0].tiers[0].price}}
+- **Registered letter (up to {{rates_domestic_services[0].tiers[0].maxWeight}}g):** Standard postage (LKR {{rates_domestic_services[0].tiers[0].price}}) plus a registration fee of LKR {{rates_extra_fees.registeredPost}}
 
 The registration fee is a flat additional charge added on top of the standard postage rate, regardless of the weight of the item. This means even for heavier items, the registration surcharge remains the same.
 

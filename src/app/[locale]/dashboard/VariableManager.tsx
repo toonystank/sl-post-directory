@@ -152,7 +152,7 @@ export default function VariableManager() {
             </CardContent>
 
             <Dialog open={isCreating || !!editingKey} onOpenChange={(open) => !open && handleCancel()}>
-                <DialogContent className="max-w-lg p-0 border-border/50 bg-card">
+                <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-[90vw] lg:max-w-[80vw] p-0 border-border/50 bg-card">
                     <DialogHeader className="p-6 pb-0">
                         <DialogTitle className="text-xl font-bold flex items-center gap-2">
                             {isCreating ? "Add Variable" : "Edit Variable"}

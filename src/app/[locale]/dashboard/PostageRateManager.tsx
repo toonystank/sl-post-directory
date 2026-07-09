@@ -80,7 +80,7 @@ export default function PostageRateManager() {
             </Card>
 
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden p-0 border-border/50 bg-card flex flex-col">
+                <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-[90vw] lg:max-w-[80vw] max-h-[90vh] overflow-hidden p-0 border-border/50 bg-card flex flex-col">
                     <DialogHeader className="p-6 border-b border-border/40 bg-card/80 flex-shrink-0">
                         <DialogTitle className="text-xl font-bold flex items-center gap-2">
                             <Calculator className="w-5 h-5 text-primary" />
