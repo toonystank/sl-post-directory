@@ -150,7 +150,7 @@ export default function TwoFactorAuthManager({ enabled, backupCodes: initialBack
                             <Trash2 className="w-4 h-4 mr-2" /> Disable Two-Factor Auth
                         </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-md">
+                    <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-[90vw] lg:max-w-[50vw]">
                         <DialogHeader>
                             <DialogTitle>Disable 2FA?</DialogTitle>
                             <DialogDescription>

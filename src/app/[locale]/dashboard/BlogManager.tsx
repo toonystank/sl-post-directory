@@ -128,7 +128,7 @@ export default function BlogManager() {
                     setEditingPost(null);
                 }
             }}>
-                <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-0 border-border/50 bg-card">
+                <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-[90vw] lg:max-w-[80vw] max-h-[90vh] overflow-y-auto p-0 border-border/50 bg-card">
                     <div className="p-8">
                         <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 text-foreground">
                             {isCreating ? "Create New Article" : "Edit Article"}

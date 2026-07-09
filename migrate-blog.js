@@ -83,24 +83,31 @@ async function main() {
         const { data, content } = parseFrontmatter(fileContent);
         const htmlContent = markdownToHtml(content);
 
-        const existing = await prisma.blogPost.findUnique({ where: { slug } });
-        
-        if (!existing) {
-            await prisma.blogPost.create({
-                data: {
-                    slug,
-                    title: data.title || slug,
-                    excerpt: data.excerpt || "",
-                    date: data.date ? new Date(data.date) : new Date(),
-                    author: data.author || "Unknown",
-                    tags: Array.isArray(data.tags) ? data.tags : [],
-                    contentHtml: htmlContent,
-                    readingTime: calculateReadingTime(content),
-                    published: true
-                }
-            });
-            migratedCount++;
-        }
+        await prisma.blogPost.upsert({
+            where: { slug },
+            update: {
+                title: data.title || slug,
+                excerpt: data.excerpt || "",
+                date: data.date ? new Date(data.date) : new Date(),
+                author: data.author || "Unknown",
+                tags: Array.isArray(data.tags) ? data.tags : [],
+                contentHtml: htmlContent,
+                readingTime: calculateReadingTime(content),
+                published: true
+            },
+            create: {
+                slug,
+                title: data.title || slug,
+                excerpt: data.excerpt || "",
+                date: data.date ? new Date(data.date) : new Date(),
+                author: data.author || "Unknown",
+                tags: Array.isArray(data.tags) ? data.tags : [],
+                contentHtml: htmlContent,
+                readingTime: calculateReadingTime(content),
+                published: true
+            }
+        });
+        migratedCount++;
     }
     console.log(`Migrated ${migratedCount} posts.`);
 }

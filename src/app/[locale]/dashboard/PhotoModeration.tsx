@@ -124,7 +124,7 @@ export default function PhotoModeration({ photos: initialPhotos }: PhotoModerati
             </CardContent>
 
             <Dialog open={!!selectedPhoto} onOpenChange={(open) => !open && setSelectedPhoto(null)}>
-                <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black/95 border-border/50">
+                <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-[90vw] lg:max-w-[80vw] p-0 overflow-hidden bg-black/95 border-border/50">
                     <DialogHeader className="p-4 absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 to-transparent flex flex-row items-start justify-between">
                         <div className="text-left text-white drop-shadow-md">
                             <DialogTitle className="text-xl font-bold flex items-center gap-2">
