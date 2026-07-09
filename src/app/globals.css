@@ -50,57 +50,57 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    /* Oceanic Theme */
-    --primary: 195 100% 45%; /* Vibrant Cyan/Teal */
-    --primary-foreground: 210 40% 98%;
+    /* Command Center Light Theme */
+    --primary: 0 84% 45%; /* Vibrant Postal Red */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 50% 30%; /* Deep Blue secondary */
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 45 93% 47%; /* Gold Accent */
+    --secondary-foreground: 222 47% 11%;
 
-    --muted: 220 30% 95%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 220 14% 90%;
+    --muted-foreground: 220 10% 40%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 0 84% 95%;
+    --accent-foreground: 0 84% 30%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 195 100% 45%;
+    --border: 220 13% 85%;
+    --input: 220 13% 85%;
+    --ring: 0 84% 45%;
 
-    --radius: 0.75rem;
+    --radius: 0.5rem;
   }
 
   .dark {
-    --background: 222 47% 7%; /* Very dark navy blue */
-    --foreground: 210 40% 98%;
+    --background: 230 15% 5%; /* Deep Command Center Black/Charcoal */
+    --foreground: 0 0% 98%;
 
-    --card: 222 40% 11%;
-    --card-foreground: 210 40% 98%;
+    --card: 230 15% 8%; /* Slightly lighter for cards */
+    --card-foreground: 0 0% 98%;
 
-    --popover: 222 40% 11%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 230 15% 8%;
+    --popover-foreground: 0 0% 98%;
 
-    --primary: 195 100% 45%; /* Vibrant Cyan/Teal */
-    --primary-foreground: 222 47% 7%;
+    --primary: 0 84% 50%; /* Glowing Red */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 215 50% 20%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 45 93% 50%; /* Glowing Gold */
+    --secondary-foreground: 230 15% 5%;
 
-    --muted: 220 30% 15%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 230 15% 15%;
+    --muted-foreground: 230 10% 65%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 0 84% 15%; /* Red-tinted dark accent */
+    --accent-foreground: 0 84% 60%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 220 30% 15%;
-    --input: 220 30% 15%;
-    --ring: 195 100% 45%;
+    --border: 230 15% 15%;
+    --input: 230 15% 15%;
+    --ring: 0 84% 50%;
   }
 
   * {

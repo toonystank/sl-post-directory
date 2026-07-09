@@ -18,9 +18,13 @@ model PostOffice {
   longitude      Float?
   operatingHours String?
   services       String[]          @default([])
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  fields         PostOfficeField[]
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  controllingOfficeId String?
+  controllingOffice   PostOffice?       @relation("ControllingOffice", fields: [controllingOfficeId], references: [id])
+  controlledOffices   PostOffice[]      @relation("ControllingOffice")
+  rmsc                String?
+  fields              PostOfficeField[]
   users          User[]
   edits          EditRequest[]
   photos         CommunityPhoto[]
@@ -47,6 +51,7 @@ model Review {
   rating       Int
   content      String
   authorName   String
+  status       String     @default("PENDING") // PENDING, APPROVED, REJECTED
   postOfficeId String
   postOffice   PostOffice @relation(fields: [postOfficeId], references: [id], onDelete: Cascade)
   createdAt    DateTime   @default(now())

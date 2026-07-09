@@ -3,6 +3,36 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
 
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+    try {
+        const { id } = await params;
+        const session = await getServerSession(authOptions);
+        const user = session?.user as { role?: string } | undefined;
+
+        if (!session || (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN" && user?.role !== "MODERATOR")) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const office = await prisma.postOffice.findUnique({
+            where: { id },
+            include: {
+                fields: true,
+                controllingOffice: { select: { id: true, name: true, postalCode: true } },
+                controlledOffices: { select: { id: true, name: true, postalCode: true } }
+            }
+        });
+
+        if (!office) {
+            return NextResponse.json({ error: "Not Found" }, { status: 404 });
+        }
+
+        return NextResponse.json({ office });
+    } catch (error: any) {
+        console.error("Admin Get Office Error:", error);
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    }
+}
+
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
@@ -14,14 +44,31 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         }
 
         const body = await req.json();
-        const { name, postalCode, newFieldName, newFieldValue, ...fields } = body;
+        const { name, postalCode, newFieldName, newFieldValue, controllingOfficeId, controlledOfficesIds, ...fields } = body;
 
         // Start a transaction to safely update fields
         const result = await prisma.$transaction(async (tx) => {
-            // Update the core office data
+            // Unlink all current sub-offices first if controlledOfficesIds is provided
+            if (controlledOfficesIds !== undefined) {
+                await tx.postOffice.updateMany({
+                    where: { controllingOfficeId: id },
+                    data: { controllingOfficeId: null }
+                });
+            }
+
+            // Update the core office data and relations
             const updatedOffice = await tx.postOffice.update({
                 where: { id },
-                data: { name, postalCode }
+                data: { 
+                    name, 
+                    postalCode,
+                    ...(controllingOfficeId !== undefined && { controllingOfficeId: controllingOfficeId || null }),
+                    ...(controlledOfficesIds !== undefined && Array.isArray(controlledOfficesIds) && {
+                        controlledOffices: {
+                            connect: controlledOfficesIds.map((childId: string) => ({ id: childId }))
+                        }
+                    })
+                }
             });
 
             // Delete all existing fields
