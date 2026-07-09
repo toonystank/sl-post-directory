@@ -113,21 +113,23 @@ export default function PostOfficeCard({ office, index }: PostOfficeCardProps) {
                     </div>
                     
                     {/* RMSC & Hierarchy Indicators */}
-                    <div className="flex flex-col gap-2 mt-auto pt-4 border-t border-border/40">
-                        {office.rmsc && (
-                            <div className="flex items-center justify-between text-xs font-mono">
-                                <span className="text-muted-foreground">RMSC/TPO:</span>
-                                <span className="text-secondary tracking-wider font-semibold">{office.rmsc}</span>
-                            </div>
-                        )}
-                        
-                        {office.controllingOffice && (
-                            <div className="flex items-center justify-between text-xs font-mono">
-                                <span className="text-muted-foreground">Controlled by:</span>
-                                <span className="text-primary tracking-wider truncate max-w-[150px]">{office.controllingOffice.name}</span>
-                            </div>
-                        )}
-                    </div>
+                    {(office.rmsc || office.controllingOffice) && (
+                        <div className="flex flex-col gap-2 mt-auto pt-4 border-t border-border/40">
+                            {office.rmsc && (
+                                <div className="flex items-center justify-between text-xs font-mono">
+                                    <span className="text-muted-foreground">RMSC/TPO:</span>
+                                    <span className="text-secondary tracking-wider font-semibold">{office.rmsc}</span>
+                                </div>
+                            )}
+                            
+                            {office.controllingOffice && (
+                                <div className="flex items-center justify-between text-xs font-mono">
+                                    <span className="text-muted-foreground">Controlled by:</span>
+                                    <span className="text-primary tracking-wider truncate max-w-[150px]">{office.controllingOffice.name}</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </Link>
 
                 {/* Interactive Sub-Offices Accordion */}
