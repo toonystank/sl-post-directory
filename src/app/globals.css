@@ -138,3 +138,55 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Hero section animations — replaces framer-motion */
+@keyframes aurora-1 {
+  0%, 100% { transform: scale(1) translate(0%, 0%); }
+  25% { transform: scale(1.2) translate(20%, 15%); }
+  50% { transform: scale(0.9) translate(-10%, -15%); }
+  75% { transform: scale(1.05) translate(10%, 5%); }
+}
+
+@keyframes aurora-2 {
+  0%, 100% { transform: scale(0.9) translate(0%, 0%); }
+  25% { transform: scale(1.3) translate(-30%, -20%); }
+  50% { transform: scale(1) translate(10%, 20%); }
+  75% { transform: scale(1.1) translate(-15%, 5%); }
+}
+
+@keyframes aurora-3 {
+  0%, 100% { transform: scale(1) translate(-10%, 10%); }
+  25% { transform: scale(1.1) translate(20%, -15%); }
+  50% { transform: scale(0.9) translate(-5%, 5%); }
+  75% { transform: scale(1.05) translate(10%, -5%); }
+}
+
+@keyframes particle-float {
+  0%, 100% { transform: translateY(0) scale(1); opacity: 0.2; }
+  50% { transform: translateY(-30px) scale(1.5); opacity: 0.8; }
+}
+
+@keyframes fade-slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-aurora-1 {
+  animation: aurora-1 15s ease-in-out infinite;
+}
+
+.animate-aurora-2 {
+  animation: aurora-2 12s ease-in-out infinite;
+}
+
+.animate-aurora-3 {
+  animation: aurora-3 18s ease-in-out infinite;
+}
+
+.animate-particle {
+  animation: particle-float 3s ease-in-out infinite;
+}
+
+.animate-fade-slide-up {
+  animation: fade-slide-up 0.5s ease-out both;
+}

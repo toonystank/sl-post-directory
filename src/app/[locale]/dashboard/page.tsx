@@ -18,8 +18,12 @@ interface SessionUser {
     image?: string | null;
     role?: string;
 }
+
 import { Badge } from "@/components/ui/badge";
 import ContributorDashboard from "./ContributorDashboard";
+import BlogManager from "./BlogManager";
+import VariableManager from "./VariableManager";
+import PostageRateManager from "./PostageRateManager";
 
 export default async function AdminDashboard() {
     const session = await getServerSession(authOptions);
@@ -152,6 +156,15 @@ export default async function AdminDashboard() {
             <div className="grid grid-cols-1 gap-8">
                 {/* Active Directory Management */}
                 <AdminOfficeManager />
+
+                {/* Content Management */}
+                {["SUPER_ADMIN", "ADMIN", "MODERATOR"].includes(user?.role || "") && (
+                    <div className="space-y-8">
+                        <BlogManager />
+                        <PostageRateManager />
+                        <VariableManager />
+                    </div>
+                )}
 
                 {/* Moderation Queue */}
                 <ModerationQueue initialPendingEdits={pendingEdits} initialPendingEditItems={pendingEditItems} />

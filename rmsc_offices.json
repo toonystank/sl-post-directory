@@ -1,0 +1,2957 @@
+{
+  "Sheet1": [
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "AKURANA",
+      "CODE": "AKR"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "ALAWATHUGODA",
+      "CODE": "ALG "
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "ALUDENIYA",
+      "CODE": "ALD"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "AMBAGAHAPELESSA",
+      "CODE": "APL"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "AMBANWALA",
+      "CODE": "ABL"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "AMBATENNA",
+      "CODE": "ABT"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "AMPITIYA",
+      "CODE": "AMP"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "AMUNUGAMA",
+      "CODE": "AMM"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "ANKUMBURA",
+      "CODE": "AU"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "BARAWARDANAOYA",
+      "CODE": "BWO"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "DEDUNUPITIYA",
+      "CODE": "DNP"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "DEHIATTAKANDIYA",
+      "CODE": "DHI"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "DELTOTA",
+      "CODE": "DT"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "DIGANA",
+      "CODE": "DIN"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "DORAGAMUWA",
+      "CODE": "DOR"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "ELAMULLA",
+      "CODE": "ELA"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "GALAGEDARA",
+      "CODE": "GG"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "GALAHA",
+      "CODE": "GH"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "GIRADURUKOTTE",
+      "CODE": "GKT"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "GUNNEPANA",
+      "CODE": "GUP"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "HALLOLUWA",
+      "CODE": "HLW"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "HANDESSA",
+      "CODE": "HS"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "HANGURANKETHA",
+      "CODE": "HG"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "HARANKAHAWA",
+      "CODE": "HKA"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "HASALAKA",
+      "CODE": "HSK"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "HATHARALIYADDA",
+      "CODE": "HTL"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "HEWAHETA",
+      "CODE": "HW"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "HUNNASGIRIYA",
+      "CODE": "HNG"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "KAPULIYADDA",
+      "CODE": "KPD"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "KATUGASTOTA",
+      "CODE": "KS"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "KENGALLA",
+      "CODE": "KNG"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "KOLABISSA",
+      "CODE": "KBS"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "KOLONGODA",
+      "CODE": "KLN"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "KUMBUREGAMA",
+      "CODE": "KMG"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "KUNDASALE",
+      "CODE": "KDS"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "MADULKELLE",
+      "CODE": "MKA"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "MAHIYANGANAYA",
+      "CODE": "MYN"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "MAILAPITIYA",
+      "CODE": "MIP"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "MAKULDENIYA",
+      "CODE": "MUD"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "MAPAKADAWEWA",
+      "CODE": "MPK"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "MARASSANA",
+      "CODE": "MRS"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "MEDAMAHANUWARA",
+      "CODE": "MMN"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "MEDAWALA BAZZAR",
+      "CODE": "MWB"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "MENIKDIWELA",
+      "CODE": "MKW"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "MENIKHINNA",
+      "CODE": "MEH"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "MULGAMPOLA",
+      "CODE": "MGP"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "MUNWATTA",
+      "CODE": "MUN"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "MURUTHALAWA",
+      "CODE": "MRL"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "NARANPANAWA",
+      "CODE": "NRP"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "NATTARAMPOTHA",
+      "CODE": "NAT"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "NAWAMEDAGAMA",
+      "CODE": "NMG"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "NUGAWELA",
+      "CODE": "NGW"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "PADIYAPELELLA",
+      "CODE": "PDL"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "PALLEBOWALA",
+      "CODE": "PBL"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "PANVILA",
+      "CODE": "PI"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "PILIMATALAWA",
+      "CODE": "PML"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "POHOLIYADDA",
+      "CODE": "POY"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "POLGOLLA",
+      "CODE": "PGL"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "PUJAPITIYA",
+      "CODE": "PUJ"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "RAJAWELLA",
+      "CODE": "RJW"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "RIKILLAGASKADA",
+      "CODE": "RKL"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "SIRIPURA",
+      "CODE": "SRP"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "TALATUOYA",
+      "CODE": "TY"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "THELDENIYA",
+      "CODE": "TD"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "UDATALAVINNA",
+      "CODE": "UTW"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "UDISPATTUWA",
+      "CODE": "UT"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "UKUWELA",
+      "CODE": "UK"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "ULPOTHAGAMA",
+      "CODE": "UPG"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "UNUVINNA",
+      "CODE": "UNU"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "WATTEGAMA",
+      "CODE": "WH"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "WERAGANTOTA",
+      "CODE": "WGT"
+    },
+    {
+      "RMSC / TPO": "Kandy RMSC",
+      "OFFICE ": "WERELLAGAMA",
+      "CODE": "WR"
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "KURUNEGALA ",
+      "CODE": "KG "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "ALAHITIYAWA ",
+      "CODE": "ALH "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "AMBAKOTTE ",
+      "CODE": "ABK "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "ANAMADUWA",
+      "CODE": "ANA "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "ANUKKANE ",
+      "CODE": "ANK "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "AWULEGAMA ",
+      "CODE": "AWG"
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "BAMUNAKOTUWA ",
+      "CODE": "BMK "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "BINGIRIYA ",
+      "CODE": "BN"
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "BOPITIYA ",
+      "CODE": "BOP "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "BOYAGANE ",
+      "CODE": "BON "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "DAMBADENIYA ",
+      "CODE": "DY "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "DAMBULLA ",
+      "CODE": "DB "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "DELVITA ",
+      "CODE": "DF "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "DEMATALUWA ",
+      "CODE": "DMT "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "DEWAHUWA ",
+      "CODE": "DVH "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "DIDENIYA ",
+      "CODE": "DID "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "DIGALLA ",
+      "CODE": "DIG "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "DODANGASLANDA ",
+      "CODE": "DGL "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "DORATIYAWA ",
+      "CODE": "DTA "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "DUMMALASOORIYA ",
+      "CODE": "DMS "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "GALEWELA ",
+      "CODE": "GLW "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "GALGAMUWA ",
+      "CODE": "GGM "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "GALMURUWA ",
+      "CODE": "GMR "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "GALNEWA ",
+      "CODE": "GLN "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "GIRIULLA ",
+      "CODE": "GU "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "GOKARELLA ",
+      "CODE": "GKR "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "GONAVILA ",
+      "CODE": "GWI "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "HETTIPOLA ",
+      "CODE": "HZ "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "HINDAGOLLA ",
+      "CODE": "HIN "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "HIRUWALPOLA ",
+      "CODE": "HRP "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "HOROMBAWA ",
+      "CODE": "KRB "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "IBBAGAMUWA ",
+      "CODE": "IB "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "ILLUKHENA ",
+      "CODE": "IHA "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "INDULGODAKANDA ",
+      "CODE": "IDA "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "KANADENIYAWA ",
+      "CODE": "KEW "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "KATUNERIYA ",
+      "CODE": "KTR "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "KATUPOTHA ",
+      "CODE": "KTP "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "KEKUNAGOLLA ",
+      "CODE": "KKN "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "KOBEIGANE ",
+      "CODE": "KBJ "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "KOHILAGEDARA ",
+      "CODE": "KHG "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "KULIYAPITIYA ",
+      "CODE": "KLY "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "KUMBUKGETE ",
+      "CODE": "KUJ "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "KUMBUKWEWA ",
+      "CODE": "KKÉ "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "LOKAHETTIYA ",
+      "CODE": "LHK "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "MADAHAPOLA ",
+      "CODE": "MDP "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "MAKULPOTHA ",
+      "CODE": "MKP "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "MAKULWEWA ",
+      "CODE": "MKV "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "MASPOTHA ",
+      "CODE": "MST "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "MAWATHAGAMA ",
+      "CODE": "MW "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "MEEGALEWA ",
+      "CODE": "MAA "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "MELSIRIPURA ",
+      "CODE": "MSP "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "METIYAGANE ",
+      "CODE": "MTG "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "MINUWANGETE ",
+      "CODE": "MVT "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "MORAGANE ",
+      "CODE": "MRG "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "MORATHIHA ",
+      "CODE": "MOT "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "MUNAMALDENIYA ",
+      "CODE": "MNL "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "NAGOLLAGAMA ",
+      "CODE": "NLM "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "NAGOLLAGODA ",
+      "CODE": "NGD "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "NAKKAWATTA ",
+      "CODE": "NKW "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "NARAMMALA ",
+      "CODE": "NC "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "NARANGODA ",
+      "CODE": "NRG "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "NAWAGATTEGAMA ",
+      "CODE": "NGG "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "NIKADALUPOTHA ",
+      "CODE": "NDP "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "NOCHCHIYAGAMA ",
+      "CODE": "NCH "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "PADENIYA ",
+      "CODE": "PGY "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "PANNALA ",
+      "CODE": "PL "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "PIHIMBUWA ",
+      "CODE": "PHB "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "PILESSA ",
+      "CODE": "PLS "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "POLPITIGAMA ",
+      "CODE": "PPG "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "POTHUHERA ",
+      "CODE": "PF "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "RIDEEGAMA ",
+      "CODE": "RGM "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "SANDALANKAWA ",
+      "CODE": "SL "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "THORAYAYA ",
+      "CODE": "TRY "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "UDUBADDAWA ",
+      "CODE": "UDB "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "UHUMIYA ",
+      "CODE": "UH "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "WADUMUNNEGEDARA  ",
+      "CODE": "WDR"
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "WARIYAPOLA ",
+      "CODE": "WP "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "WELIPENNAGAHAMULA  ",
+      "CODE": "WLL"
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "WELPALLA ",
+      "CODE": "WLP "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "WEUDA ",
+      "CODE": "WUD "
+    },
+    {
+      "RMSC / TPO": "Kurunegala RMSC",
+      "OFFICE ": "YAKVILA ",
+      "CODE": "YW"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "AGUNAKOLAPELESSA",
+      "CODE": "AGS"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "AHANGAMA",
+      "CODE": "AH"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "AKURESSA",
+      "CODE": "AK"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "ALAPALADENIYA",
+      "CODE": "ALP"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "AMBALANTOTA",
+      "CODE": "AQ"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "ATHURALIYA",
+      "CODE": "ATR"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "BARAWAKUMBUKA",
+      "CODE": "BRK"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "BELIATTA",
+      "CODE": "BL"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "BERALAPANATHARA",
+      "CODE": "BRP"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "DAMPAHALA",
+      "CODE": "DMP."
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "DEIYANDARA",
+      "CODE": "DYD"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "DENAGAMA",
+      "CODE": "DEN"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "DENIPITIYA",
+      "CODE": "DP"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "DENIYAYA",
+      "CODE": "DN"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "DEVINUWARA",
+      "CODE": "DR"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "DICKWELLA",
+      "CODE": "DW"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "DIGALA-LENAWA"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "DIYAGAHA",
+      "CODE": "DYH"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "GANDARA",
+      "CODE": "GND"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "GETAMANNA",
+      "CODE": "GTN"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "GOMILA-MAWARALA",
+      "CODE": "GI"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "HAKMANA",
+      "CODE": "HA"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "HAKURUWELA",
+      "CODE": "HKR"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "HAMBANTOTA",
+      "CODE": "HB"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "HORAPAVITA",
+      "CODE": "HPW"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "HUNGAMA",
+      "CODE": "HGM"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "JULANPITIYA",
+      "CODE": "JLM"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "KAMBURUGAMUWA",
+      "CODE": "KGM"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "KAMBURUPITIYA",
+      "CODE": "KJ"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "KARAPUTUGALA",
+      "CODE": "KPB"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "KARIYAMADITHTHA",
+      "CODE": "KYT"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "KATUWANA",
+      "CODE": "KTN"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "KEKANADURA",
+      "CODE": "KKU"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "KIRAMA",
+      "CODE": "KIM"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "KIRINDA",
+      "CODE": "KID"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "KOTAPOLA",
+      "CODE": "KOP"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "KOTTEGODA",
+      "CODE": "KDE"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "MAMADALA",
+      "CODE": "MMU"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "MATARA",
+      "CODE": "MH"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "MIELLA",
+      "CODE": "MIE"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "MIRISSA",
+      "CODE": "MSA"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "MODARAWANA",
+      "CODE": "MOD"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "MORAGALA KIRILIPANA",
+      "CODE": "MK"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "MORAWAKA",
+      "CODE": "MWK"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "NADUGALA"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "NAKULUGAMUWA",
+      "CODE": "NKG"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "NAVIMANA",
+      "CODE": "NX"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "NIHILUWA",
+      "CODE": "NHL"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "PALATUWA",
+      "CODE": "PLT"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "PASGODA",
+      "CODE": "PSG"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "PITABEDDARA",
+      "CODE": "PBD"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "RANNA",
+      "CODE": "RNN"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "SOORIYAWEWA TOWN",
+      "CODE": "SWT"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "TANGALLA",
+      "CODE": "TG"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "TELIJJAWILA",
+      "CODE": "TJ"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "THIHAGODA",
+      "CODE": "TH"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "TISSAMAHARAMAYA",
+      "CODE": "TR"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "TUNKAMA",
+      "CODE": "TNK"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "URUBOKKA",
+      "CODE": "US"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "URUGAMUWA",
+      "CODE": "UU"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "USWEWA",
+      "CODE": "USW"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "WALASGALA",
+      "CODE": "WLS"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "WALASMULLA",
+      "CODE": "WU"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "WARALLA",
+      "CODE": "WRL"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "WEERAKETIYA",
+      "CODE": "WY"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "WELIGAMA",
+      "CODE": "WJ"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "WITHARANDENIYA",
+      "CODE": "WT"
+    },
+    {
+      "RMSC / TPO": "Matara RMSC",
+      "OFFICE ": "YATIYANA",
+      "CODE": "YMH"
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "RATHNAPURA",
+      "CODE": "RN "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "ATAKALANPANNA",
+      "CODE": "ATK "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "AYAGAMA ",
+      "CODE": "AYG "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "BALANGODA ",
+      "CODE": "BG "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "BELIHULOYA ",
+      "CODE": "BH "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "BORALUWAGEINA",
+      "CODE": "BOI "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "COLAMBAGEARA",
+      "CODE": "CAR "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "DELA ",
+      "CODE": "DAE "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "DELWALA ",
+      "CODE": "DWL "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "DODAMPE ",
+      "CODE": "DDM "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "EMBILIPITIYA ",
+      "CODE": "EMB "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "GALLELLA ",
+      "CODE": "GK "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "GILIMALE ",
+      "CODE": "GLI "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "GODAKAWELA ",
+      "CODE": "GW "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "HEDELLANA ",
+      "CODE": "HIL "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "HIRAMADAGAMA",
+      "CODE": "HMD "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "IMBULPE ",
+      "CODE": "IE "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "ITHTHAKANDA",
+      "CODE": "IA "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "KAHAWATTA ",
+      "CODE": "KH "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "KALAWANA ",
+      "CODE": "KWN "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "KALTOTA ",
+      "CODE": "KAL "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "KARADANA ",
+      "CODE": "KRD "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "KIRIELLA ",
+      "CODE": "KEK "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "KOLAWENIGAMA "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "KOLONNA ",
+      "CODE": "KNE "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "KURUWITA ",
+      "CODE": "KR "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "MARAPANA ",
+      "CODE": "MRP "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "NIVITHIGALA ",
+      "CODE": "NA "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "OMALPE ",
+      "CODE": "OMP "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "OPANAYAKA ",
+      "CODE": "OP "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "PADALANGALA ",
+      "CODE": "PDN "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "PALLEBEDDA ",
+      "CODE": "PLB "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "PARAKADUWA",
+      "CODE": "PD "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "PELMADULLA ",
+      "CODE": "PE "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "RAKWANA ",
+      "CODE": "RW "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "UDAKARAVITA ",
+      "CODE": "URT "
+    },
+    {
+      "RMSC / TPO": "Rathnapura RMSC",
+      "OFFICE ": "UDAWALAWA CAMP",
+      "CODE": "UC "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "ANURADHAPURA ",
+      "CODE": "AD "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "BOGAHAWEWA ",
+      "CODE": "BGW "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "ELAYAPATTUWA ",
+      "CODE": "EYP "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "EPPAWALA ",
+      "CODE": "EPA "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "GALENBINDUNUWEWA",
+      "CODE": "GLE "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "GALKULAMA ",
+      "CODE": "GKM "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "GAMBIRIGASWEWA",
+      "CODE": "GBH "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "HINDOGAMA ",
+      "CODE": "HDG "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "HOROWPATHANA ",
+      "CODE": "HRP "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "IPOLOGAMA ",
+      "CODE": "IO"
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "JAYAWEWA ",
+      "CODE": "JW "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "KAHATAGASDIGILIYA ",
+      "CODE": "KGD "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "KALAKARAMBEWA ",
+      "CODE": "KKB "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "KAPUGOLLEWA ",
+      "CODE": "KLE "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "KATIYAWA "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "KEBITIGOLLEWA ",
+      "CODE": "KBT "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "MADATUGAMA ",
+      "CODE": "MDT "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "MAHAILLUPPALLAMA",
+      "CODE": "MPP "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "MAHAPOTHANA "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "MARADANKADAWALA",
+      "CODE": "MAK "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "MEGODAWEWA ",
+      "CODE": "MGV "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "MIHINTHALE ",
+      "CODE": "MTE "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "NACHCHADUWA ",
+      "CODE": "NCD "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "NOCHCHIYGAMA ",
+      "CODE": "NCH "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "PADAVI PARACKRAMAPURA ",
+      "CODE": "PPK "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "PADAVI SRIPURA ",
+      "CODE": "PSP"
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "PADAVIYA ",
+      "CODE": "PDY "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "PAHALA MARAGAHAWEWA ",
+      "CODE": "PGW "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "PARASANGASWEWA",
+      "CODE": "PGH "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "PEMADUWA ",
+      "CODE": "PMD"
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "RAMBEWA ",
+      "CODE": "RV "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "SALIYAPURA ",
+      "CODE": "SP"
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "SEEPPUKULAMA ",
+      "CODE": "SU "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "SENAPURA ",
+      "CODE": "SEP "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "THALAWA ",
+      "CODE": "TAL "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "THAMBUTTEGAMA ",
+      "CODE": "TBT "
+    },
+    {
+      "RMSC / TPO": "Anuradhapura RMSC",
+      "OFFICE ": "THIRAPPONE ",
+      "CODE": "TRP"
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "ARAYAMPATHI ",
+      "CODE": "ART "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "KALUTHAVALAI ",
+      "CODE": "KLV "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "AYITHIYAMALAI ",
+      "CODE": "ATM "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "CHENKALADY ",
+      "CODE": "CN "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "ERAVUR ",
+      "CODE": "EV "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "JAYANTHIGAMA ",
+      "CODE": "JG"
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "KALKUDA ",
+      "CODE": "KU "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "KALLAR ",
+      "CODE": "KLR "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "KALUWANCIKUDI",
+      "CODE": "KWD "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "KARADIYANARU ",
+      "CODE": "KAN "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "KATTANKUDY ",
+      "CODE": "KZ "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "KIRAN ",
+      "CODE": "KIR "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "KIRANKULAM ",
+      "CODE": "KKM "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "KODDEI KALLAR ",
+      "CODE": "KDA "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "KOKKADICHOLAI ",
+      "CODE": "KKC "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "KURUKKULAMADAM",
+      "CODE": "KRK "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "MANDUR ",
+      "CODE": "MUR "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "MANKERNI ",
+      "CODE": "MKI "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "VAVUNATHIVE ",
+      "CODE": "VT "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "MEERAVODDAI ",
+      "CODE": "MRD "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "MORAKOTTANCHNAI",
+      "CODE": "MKC "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "NAVATHKADU ",
+      "CODE": "NKD "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "ODDAMAVADI ",
+      "CODE": "OD "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "TIRUPPALAGAMAM",
+      "CODE": "TPG "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "PERIYAPORATHIVE",
+      "CODE": "PPV "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "PUNANI ",
+      "CODE": "PNI "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "PUTHUKUDIYURIPPU",
+      "CODE": "PEP "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "SITHTHANDI ",
+      "CODE": "STY "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "THANNAMUNAI",
+      "CODE": "TNM "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "VAKANERI ",
+      "CODE": "VKI "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "VAKAREI ",
+      "CODE": "VZ "
+    },
+    {
+      "RMSC / TPO": "Batticaloa RMSC",
+      "OFFICE ": "VELLAVELI ",
+      "CODE": "VE "
+    },
+    {
+      "RMSC / TPO": "Badulla RMSC",
+      "OFFICE ": "BADALKUMBURA",
+      "CODE": "BB "
+    },
+    {
+      "RMSC / TPO": "Badulla RMSC",
+      "OFFICE ": "BADULLA ",
+      "CODE": "BD "
+    },
+    {
+      "RMSC / TPO": "Badulla RMSC",
+      "OFFICE ": "BIBILA ",
+      "CODE": "BI "
+    },
+    {
+      "RMSC / TPO": "Badulla RMSC",
+      "OFFICE ": "ETHILIWEWA ",
+      "CODE": "ETD "
+    },
+    {
+      "RMSC / TPO": "Badulla RMSC",
+      "OFFICE ": "ETHIMALEWEWA "
+    },
+    {
+      "RMSC / TPO": "Badulla RMSC",
+      "OFFICE ": "HALIELA ",
+      "CODE": "HE "
+    },
+    {
+      "RMSC / TPO": "Badulla RMSC",
+      "OFFICE ": "KANDEGEDARA",
+      "CODE": "KDG "
+    },
+    {
+      "RMSC / TPO": "Badulla RMSC",
+      "OFFICE ": "KENDAGOLLA "
+    },
+    {
+      "RMSC / TPO": "Badulla RMSC",
+      "OFFICE ": "MAHIYANGANAYA",
+      "CODE": "MYN "
+    },
+    {
+      "RMSC / TPO": "Badulla RMSC",
+      "OFFICE ": "MEDAGAMA ",
+      "CODE": "MDM "
+    },
+    {
+      "RMSC / TPO": "Badulla RMSC",
+      "OFFICE ": "MEEGAHAKIVULA "
+    },
+    {
+      "RMSC / TPO": "Badulla RMSC",
+      "OFFICE ": "MONARAGALA",
+      "CODE": "MJ "
+    },
+    {
+      "RMSC / TPO": "Badulla RMSC",
+      "OFFICE ": "PASSARA ",
+      "CODE": "PJ "
+    },
+    {
+      "RMSC / TPO": "Badulla RMSC",
+      "OFFICE ": "SORANATHOTA "
+    },
+    {
+      "RMSC / TPO": "Badulla RMSC",
+      "OFFICE ": "SPRINGWELI ",
+      "CODE": "SPV "
+    },
+    {
+      "RMSC / TPO": "Badulla RMSC",
+      "OFFICE ": "THALDENA "
+    },
+    {
+      "RMSC / TPO": "Hatton RMSC",
+      "OFFICE ": "BOGAWANTHALAWA",
+      "CODE": "BA "
+    },
+    {
+      "RMSC / TPO": "Hatton RMSC",
+      "OFFICE ": "DIKOYA ",
+      "CODE": "DK "
+    },
+    {
+      "RMSC / TPO": "Hatton RMSC",
+      "OFFICE ": "HATTON ",
+      "CODE": "HT "
+    },
+    {
+      "RMSC / TPO": "Hatton RMSC",
+      "OFFICE ": "HEDUNUWEWA ",
+      "CODE": "HDN "
+    },
+    {
+      "RMSC / TPO": "Hatton RMSC",
+      "OFFICE ": "KOTAGALA ",
+      "CODE": "KC "
+    },
+    {
+      "RMSC / TPO": "Hatton RMSC",
+      "OFFICE ": "LAXAPANA ",
+      "CODE": "LX "
+    },
+    {
+      "RMSC / TPO": "Hatton RMSC",
+      "OFFICE ": "LINDULA ",
+      "CODE": "LD "
+    },
+    {
+      "RMSC / TPO": "Hatton RMSC",
+      "OFFICE ": "MALDENIYA ",
+      "CODE": "MDY "
+    },
+    {
+      "RMSC / TPO": "Hatton RMSC",
+      "OFFICE ": "MASKELIYA ",
+      "CODE": "ME "
+    },
+    {
+      "RMSC / TPO": "Hatton RMSC",
+      "OFFICE ": "NAWALAPITIYA ",
+      "CODE": "NT "
+    },
+    {
+      "RMSC / TPO": "Hatton RMSC",
+      "OFFICE ": "PATHANA ",
+      "CODE": "PAA "
+    },
+    {
+      "RMSC / TPO": "Hatton RMSC",
+      "OFFICE ": "PUSSELLAWA ",
+      "CODE": "PV "
+    },
+    {
+      "RMSC / TPO": "Hatton RMSC",
+      "OFFICE ": "ROZELLA ",
+      "CODE": "ARZ "
+    },
+    {
+      "RMSC / TPO": "Hatton RMSC",
+      "OFFICE ": "THALAWAKELLE ",
+      "CODE": "TK "
+    },
+    {
+      "RMSC / TPO": "Hatton RMSC",
+      "OFFICE ": "UPCOT ",
+      "CODE": "UC "
+    },
+    {
+      "RMSC / TPO": "Hatton RMSC",
+      "OFFICE ": "WATAGODA ",
+      "CODE": "WB "
+    },
+    {
+      "RMSC / TPO": "Hatton RMSC",
+      "OFFICE ": "WATAWALA ",
+      "CODE": "WF "
+    },
+    {
+      "RMSC / TPO": "Jaffna RMSC",
+      "OFFICE ": "ACHCHUVELI ",
+      "CODE": "AV "
+    },
+    {
+      "RMSC / TPO": "Jaffna RMSC",
+      "OFFICE ": "ALAVEDDI ",
+      "CODE": "AF "
+    },
+    {
+      "RMSC / TPO": "Jaffna RMSC",
+      "OFFICE ": "ANNAICODDAI ",
+      "CODE": "ACD "
+    },
+    {
+      "RMSC / TPO": "Jaffna RMSC",
+      "OFFICE ": "ARIYALAI ",
+      "CODE": "ARL "
+    },
+    {
+      "RMSC / TPO": "Jaffna RMSC",
+      "OFFICE ": "CHANKANAI ",
+      "CODE": "CA "
+    },
+    {
+      "RMSC / TPO": "Jaffna RMSC",
+      "OFFICE ": "CHULLIPURAM",
+      "CODE": "CHP "
+    },
+    {
+      "RMSC / TPO": "Jaffna RMSC",
+      "OFFICE ": "CHUNDIKULI",
+      "CODE": "CD "
+    },
+    {
+      "RMSC / TPO": "Jaffna RMSC",
+      "OFFICE ": "CHUNNAKAM",
+      "CODE": "CK "
+    },
+    {
+      "RMSC / TPO": "Jaffna RMSC",
+      "OFFICE ": "DELFT ",
+      "CODE": "DQ "
+    },
+    {
+      "RMSC / TPO": "Jaffna RMSC",
+      "OFFICE ": "JAFFANA ",
+      "CODE": "JA "
+    },
+    {
+      "RMSC / TPO": "Jaffna RMSC",
+      "OFFICE ": "MALLAKAM ",
+      "CODE": "MLM "
+    },
+    {
+      "RMSC / TPO": "Jaffna RMSC",
+      "OFFICE ": "MANDATHIVU",
+      "CODE": "MDV "
+    },
+    {
+      "RMSC / TPO": "Jaffna RMSC",
+      "OFFICE ": "NALLUR ",
+      "CODE": "NLR "
+    },
+    {
+      "RMSC / TPO": "Jaffna RMSC",
+      "OFFICE ": "PUNGUDUTIVE",
+      "CODE": "PUN "
+    },
+    {
+      "RMSC / TPO": "Jaffna RMSC",
+      "OFFICE ": "SANDILIPAY ",
+      "CODE": "SP "
+    },
+    {
+      "RMSC / TPO": "Jaffna RMSC",
+      "OFFICE ": "VADUKKODAI",
+      "CODE": "VK "
+    },
+    {
+      "RMSC / TPO": "Jaffna RMSC",
+      "OFFICE ": "VANNARPONNAL",
+      "CODE": "VN "
+    },
+    {
+      "RMSC / TPO": "Jaffna RMSC",
+      "OFFICE ": "VASAVILAN ",
+      "CODE": "VS "
+    },
+    {
+      "RMSC / TPO": "UP KANDY TPO ",
+      "OFFICE ": "KEGALLE "
+    },
+    {
+      "RMSC / TPO": "UP KANDY TPO ",
+      "OFFICE ": "KEGALLE FWD "
+    },
+    {
+      "RMSC / TPO": "UP KANDY TPO ",
+      "OFFICE ": "POLGAHAWELA "
+    },
+    {
+      "RMSC / TPO": "UP KANDY TPO ",
+      "OFFICE ": "KADUGANNAWA "
+    },
+    {
+      "RMSC / TPO": "UP KANDY TPO ",
+      "OFFICE ": "GAMPOLA "
+    },
+    {
+      "RMSC / TPO": "UP KANDY TPO ",
+      "OFFICE ": "NAWALAPITIYA "
+    },
+    {
+      "RMSC / TPO": "UP KANDY TPO ",
+      "OFFICE ": "KITULGALA "
+    },
+    {
+      "RMSC / TPO": "UP KANDY TPO ",
+      "OFFICE ": "YATIYANTOTA "
+    },
+    {
+      "RMSC / TPO": "UP KANDY TPO ",
+      "OFFICE ": "KANDY "
+    },
+    {
+      "RMSC / TPO": "UP KANDY TPO ",
+      "OFFICE ": "KANDY RMSC "
+    },
+    {
+      "RMSC / TPO": "UP KANDY TPO ",
+      "OFFICE ": "PERADENIYA KATUGASTOTA "
+    },
+    {
+      "RMSC / TPO": "UP KANDY TPO ",
+      "OFFICE ": "MATALE "
+    },
+    {
+      "RMSC / TPO": "UP KANDY TPO ",
+      "OFFICE ": "WATTEGAMA "
+    },
+    {
+      "RMSC / TPO": "DOWN GALLE TPO ",
+      "OFFICE ": "BANDARAGAMA "
+    },
+    {
+      "RMSC / TPO": "DOWN GALLE TPO ",
+      "OFFICE ": "INGIRIYA "
+    },
+    {
+      "RMSC / TPO": "DOWN GALLE TPO ",
+      "OFFICE ": "PANADURA "
+    },
+    {
+      "RMSC / TPO": "DOWN GALLE TPO ",
+      "OFFICE ": "NEBODA "
+    },
+    {
+      "RMSC / TPO": "DOWN GALLE TPO ",
+      "OFFICE ": "AGALAWATTA "
+    },
+    {
+      "RMSC / TPO": "DOWN GALLE TPO ",
+      "OFFICE ": "MATUGAMA "
+    },
+    {
+      "RMSC / TPO": "DOWN GALLE TPO ",
+      "OFFICE ": "MEEGAHATENNA "
+    },
+    {
+      "RMSC / TPO": "DOWN GALLE TPO ",
+      "OFFICE ": "MAHAGAMA "
+    },
+    {
+      "RMSC / TPO": "DOWN GALLE TPO ",
+      "OFFICE ": "KALUTARA "
+    },
+    {
+      "RMSC / TPO": "DOWN GALLE TPO ",
+      "OFFICE ": "ELPITIYA "
+    },
+    {
+      "RMSC / TPO": "DOWN GALLE TPO ",
+      "OFFICE ": "AMBALANGODA "
+    },
+    {
+      "RMSC / TPO": "DOWN GALLE TPO ",
+      "OFFICE ": "YAKKALAMULLA "
+    },
+    {
+      "RMSC / TPO": "DOWN GALLE TPO ",
+      "OFFICE ": "PODDALA "
+    },
+    {
+      "RMSC / TPO": "DOWN GALLE TPO ",
+      "OFFICE ": "GALLE "
+    },
+    {
+      "RMSC / TPO": "DOWN GALLE TPO ",
+      "OFFICE ": "GALLE FWD "
+    },
+    {
+      "RMSC / TPO": "DOWN GALLE TPO ",
+      "OFFICE ": "MATARA "
+    },
+    {
+      "RMSC / TPO": "DOWN GALLE TPO ",
+      "OFFICE ": "MATARA RMSC "
+    },
+    {
+      "RMSC / TPO": "DOWN GALLE TPO ",
+      "OFFICE ": "TANGALLA "
+    },
+    {
+      "RMSC / TPO": "DOWN GALLE TPO ",
+      "OFFICE ": "WELIGAMA"
+    },
+    {
+      "RMSC / TPO": "DOWN GALLE TPO ",
+      "OFFICE ": "HAMBANTOTA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "KEGALLE "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "KEGALLE FWD "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "POLGAHAWELA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "KADUGANNAWA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "KANDY RAMSC "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "KANDY "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "PERADENIYA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "GAMPOLA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "NAWALAPITIYA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "KITULGALA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "HATTON RMSC "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "DICKOYA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "MASKELIYA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "TALAWAKELLE "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "LINDULA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "PUNDALUOYA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "HATTON "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "AMBEWELA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "NANUOYA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "GURUTALAWA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "NUWARAELIYA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "HAGGALA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "BORAGAS "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "KEPPETIPOLA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "LUNUWATTA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "UVAPARANAGAMA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "MEDAWALA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "UDUKINDA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "BAMBARAPANA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "KANDAPOLA"
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "HALGRUNOYA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "UDAPUSSELLAWA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "UDUHAVARA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "BORALANDA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "NILDANDAHINNA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "BOGAHAKUMBURA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "SILMIYAPURA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "HANGUNNAWA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "OHIYA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "IDALGASHINNA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "HAPUTALE "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "BUTTALA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "DOMBAGAHAWELA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "KUMBUKKANA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "HALPE "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "HAPUTALE "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "HALDUMMULLA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "KALUPAHANA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "UVA MAWELAGAMA"
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "KOSLANDA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "NIKAPOTHA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "MAIL GUIDE "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "OKKAMPITIYA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "ETILIWEWA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "DIYATALAWA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "BANDARAWELA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "HELAHALPE "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "MIRAHAWATTA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "PATTIYAGEDARA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "ETAMPITIYA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "PITAMARUWA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "NAMUNUKULA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "BALLAKETUWA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "METIGAHATENNA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "MADULSIMA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "MAUSSAGOLLA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "ELLA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "PASSARA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "BADALKUMBURA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "GAWARAWELA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "RILPOLA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "DEMODARA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "LANDEWELA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "TENNAPANGUWA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "KANDEGEDARA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "HALIELA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "BADULLA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "BADULLA RMSC "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "DEBEDDA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "HOPTON "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "LUNUGALA "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "SPRINGVELLY "
+    },
+    {
+      "RMSC / TPO": "UP BADULLA TPO ",
+      "OFFICE ": "BIBILA "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "POLGAHAWELA "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "KURUNEGALA "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "KURUNEGALA RMSC "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "MAHO "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "GALGAMUWA "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "MEEGALEWA "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "ANURADHAPURA "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "ANURADHAPURA RMSC  "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "MEDAWACHCHIYA "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "KEBITIGOLLEWA "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "PADAVIYA "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "PADAVI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "PARAKRAMAPURA "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "PADAVI SRIPURA "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "CHEDDIKULAM "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "MADU ROAD "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "MADU CHURCH "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "MURUNKAN "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "MANNAR "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "IRUKKULAMPIDDI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "THARAPURAM "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "PESALAI"
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "TALAIMANNAR "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "VAVUNIYA ",
+      "CODE": "VA"
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "MANKULAM "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "MULATIVU "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "NEDUNKERNI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "ODDUSUDAN "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "MULLIYAWALI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "KOKILAI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "ALMPIL "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "THUNUKKAI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "YOGAPURAM "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "KILINOCHCHI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "PUNAKARI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "PARANTHAN "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "PALAI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "ELEPHANTPASS "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "AYYAKACHCHI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "ELUTHUMADUWAL "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "MIRUSUVIL "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "KODIKAMAM "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "VARANI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "KARAVEDDI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "ALVAI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "POINTPEDRO "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "PULOLY "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "VALACHCHANAI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "THONDAMANARU "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "MEESALAI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "CHAVAKACHCHERI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "KAITHADI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "JAFFNA "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "ANNAICODDAI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "MANIPAY "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "PANDETERUPPU "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "MATHAGAL "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "ILLAVALAI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "MANDAITIVU "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "ALLAIPIDDI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "VELANAI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "PUNGUDUTHIVU "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "KYTS "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "DELFT "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "ELUVATIVE "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "ANALAITIVU "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "NAINATHIVU "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "VADDUKKODAI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "SITHANKERNI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "VANKANAI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "CHULIPURAM "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "KARAINAGAR "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "KOPAY "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "NEERVELY "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "PUTUR "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "ACHCHUVELY "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "VASAVILAN "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "URUMPIRAI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "ALAVEDDI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "KOKUVIL "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "KONDAVIL "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "CHUNNAKAM "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "SANDILIPAY "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "MALLAKAM "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "TELLIPPALAI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "KANKASANTHURAI "
+    },
+    {
+      "RMSC / TPO": "JAFFNA TPO ",
+      "OFFICE ": "KANKASANTHURAI "
+    }
+  ],
+  "Sheet2": [
+    {
+      "JAFFNA TPO ": "POLGAHAWELA "
+    },
+    {
+      "JAFFNA TPO ": "KURUNEGALA "
+    },
+    {
+      "JAFFNA TPO ": "KURUNEGALA RMSC "
+    },
+    {
+      "JAFFNA TPO ": "MAHO "
+    },
+    {
+      "JAFFNA TPO ": "GALGAMUWA "
+    },
+    {
+      "JAFFNA TPO ": "MEEGALEWA "
+    },
+    {
+      "JAFFNA TPO ": "ANURADHAPURA "
+    },
+    {
+      "JAFFNA TPO ": "ANURADHAPURA RMSC  "
+    },
+    {
+      "JAFFNA TPO ": "MEDAWACHCHIYA "
+    },
+    {
+      "JAFFNA TPO ": "KEBITIGOLLEWA "
+    },
+    {
+      "JAFFNA TPO ": "PADAVIYA "
+    },
+    {
+      "JAFFNA TPO ": "PADAVI "
+    },
+    {
+      "JAFFNA TPO ": "PARAKRAMAPURA "
+    },
+    {
+      "JAFFNA TPO ": "PADAVI SRIPURA "
+    },
+    {
+      "JAFFNA TPO ": "CHEDDIKULAM "
+    },
+    {
+      "JAFFNA TPO ": "MADU ROAD "
+    },
+    {
+      "JAFFNA TPO ": "MADU CHURCH "
+    },
+    {
+      "JAFFNA TPO ": "MURUNKAN "
+    },
+    {
+      "JAFFNA TPO ": "MANNAR "
+    },
+    {
+      "JAFFNA TPO ": "IRUKKULAMPIDDI "
+    },
+    {
+      "JAFFNA TPO ": "THARAPURAM "
+    },
+    {
+      "JAFFNA TPO ": "PESALAI"
+    },
+    {
+      "JAFFNA TPO ": "TALAIMANNAR "
+    },
+    {
+      "JAFFNA TPO ": "VAVUNIYA "
+    },
+    {
+      "JAFFNA TPO ": "MANKULAM "
+    },
+    {
+      "JAFFNA TPO ": "MULATIVU "
+    },
+    {
+      "JAFFNA TPO ": "NEDUNKERNI "
+    },
+    {
+      "JAFFNA TPO ": "ODDUSUDAN "
+    },
+    {
+      "JAFFNA TPO ": "MULLIYAWALI "
+    },
+    {
+      "JAFFNA TPO ": "KOKILAI "
+    },
+    {
+      "JAFFNA TPO ": "ALMPIL "
+    },
+    {
+      "JAFFNA TPO ": "THUNUKKAI "
+    },
+    {
+      "JAFFNA TPO ": "YOGAPURAM "
+    },
+    {
+      "JAFFNA TPO ": "KILINOCHCHI "
+    },
+    {
+      "JAFFNA TPO ": "PUNAKARI "
+    },
+    {
+      "JAFFNA TPO ": "PARANTHAN "
+    },
+    {
+      "JAFFNA TPO ": "PALAI "
+    },
+    {
+      "JAFFNA TPO ": "ELEPHANTPASS "
+    },
+    {
+      "JAFFNA TPO ": "AYYAKACHCHI "
+    },
+    {
+      "JAFFNA TPO ": "ELUTHUMADUWAL "
+    },
+    {
+      "JAFFNA TPO ": "MIRUSUVIL "
+    },
+    {
+      "JAFFNA TPO ": "KODIKAMAM "
+    },
+    {
+      "JAFFNA TPO ": "VARANI "
+    },
+    {
+      "JAFFNA TPO ": "KARAVEDDI "
+    },
+    {
+      "JAFFNA TPO ": "ALVAI "
+    },
+    {
+      "JAFFNA TPO ": "POINTPEDRO "
+    },
+    {
+      "JAFFNA TPO ": "PULOLY "
+    },
+    {
+      "JAFFNA TPO ": "VALACHCHANAI "
+    },
+    {
+      "JAFFNA TPO ": "THONDAMANARU "
+    },
+    {
+      "JAFFNA TPO ": "MEESALAI "
+    },
+    {
+      "JAFFNA TPO ": "CHAVAKACHCHERI "
+    },
+    {
+      "JAFFNA TPO ": "KAITHADI "
+    },
+    {
+      "JAFFNA TPO ": "JAFFNA "
+    },
+    {
+      "JAFFNA TPO ": "ANNAICODDAI "
+    },
+    {
+      "JAFFNA TPO ": "MANIPAY "
+    },
+    {
+      "JAFFNA TPO ": "PANDETERUPPU "
+    },
+    {
+      "JAFFNA TPO ": "MATHAGAL "
+    },
+    {
+      "JAFFNA TPO ": "ILLAVALAI "
+    },
+    {
+      "JAFFNA TPO ": "MANDAITIVU "
+    },
+    {
+      "JAFFNA TPO ": "ALLAIPIDDI "
+    },
+    {
+      "JAFFNA TPO ": "VELANAI "
+    },
+    {
+      "JAFFNA TPO ": "PUNGUDUTHIVU "
+    },
+    {
+      "JAFFNA TPO ": "KYTS "
+    },
+    {
+      "JAFFNA TPO ": "DELFT "
+    },
+    {
+      "JAFFNA TPO ": "ELUVATIVE "
+    },
+    {
+      "JAFFNA TPO ": "ANALAITIVU "
+    },
+    {
+      "JAFFNA TPO ": "NAINATHIVU "
+    },
+    {
+      "JAFFNA TPO ": "VADDUKKODAI "
+    },
+    {
+      "JAFFNA TPO ": "SITHANKERNI "
+    },
+    {
+      "JAFFNA TPO ": "VANKANAI "
+    },
+    {
+      "JAFFNA TPO ": "CHULIPURAM "
+    },
+    {
+      "JAFFNA TPO ": "KARAINAGAR "
+    },
+    {
+      "JAFFNA TPO ": "KOPAY "
+    },
+    {
+      "JAFFNA TPO ": "NEERVELY "
+    },
+    {
+      "JAFFNA TPO ": "PUTUR "
+    },
+    {
+      "JAFFNA TPO ": "ACHCHUVELY "
+    },
+    {
+      "JAFFNA TPO ": "VASAVILAN "
+    },
+    {
+      "JAFFNA TPO ": "URUMPIRAI "
+    },
+    {
+      "JAFFNA TPO ": "ALAVEDDI "
+    },
+    {
+      "JAFFNA TPO ": "KOKUVIL "
+    },
+    {
+      "JAFFNA TPO ": "KONDAVIL "
+    },
+    {
+      "JAFFNA TPO ": "CHUNNAKAM "
+    },
+    {
+      "JAFFNA TPO ": "SANDILIPAY "
+    },
+    {
+      "JAFFNA TPO ": "MALLAKAM "
+    },
+    {
+      "JAFFNA TPO ": "TELLIPPALAI "
+    },
+    {
+      "JAFFNA TPO ": "KANKASANTHURAI "
+    }
+  ]
+}

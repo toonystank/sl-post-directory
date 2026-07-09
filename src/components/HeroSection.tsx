@@ -1,7 +1,3 @@
-"use client";
-
-import { useMemo } from "react";
-import { motion } from "framer-motion";
 import { Landmark } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
@@ -28,63 +24,37 @@ export default function HeroSection({ children }: HeroSectionProps) {
                 {/* Subtle grid base */}
                 <div className="absolute inset-0 w-full h-full bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:3rem_3rem]" />
 
-                {/* Floating glow effects */}
+                {/* Floating glow effects — CSS animations instead of framer-motion */}
                 <div className="absolute top-0 left-0 w-full h-full overflow-hidden">
                     {/* Pink/Magenta glow */}
-                    <motion.div
-                        animate={{
-                            scale: [1, 1.2, 0.9, 1],
-                            x: ["0%", "20%", "-10%", "0%"],
-                            y: ["0%", "15%", "-15%", "0%"],
-                        }}
-                        transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
-                        className="hidden md:block absolute -top-[100px] -left-[100px] w-[500px] h-[500px] bg-fuchsia-600/10 dark:bg-fuchsia-600/40 rounded-full blur-[120px]"
+                    <div
+                        className="hidden md:block absolute -top-[100px] -left-[100px] w-[500px] h-[500px] bg-fuchsia-600/10 dark:bg-fuchsia-600/40 rounded-full blur-[120px] animate-aurora-1"
                     />
 
                     {/* Blue/Cyan glow */}
-                    <motion.div
-                        animate={{
-                            scale: [0.9, 1.3, 1, 0.9],
-                            x: ["0%", "-30%", "10%", "0%"],
-                            y: ["0%", "-20%", "20%", "0%"],
-                        }}
-                        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-                        className="hidden md:block absolute top-0 right-[-100px] w-[600px] h-[600px] bg-blue-600/10 dark:bg-blue-600/40 rounded-full blur-[130px]"
+                    <div
+                        className="hidden md:block absolute top-0 right-[-100px] w-[600px] h-[600px] bg-blue-600/10 dark:bg-blue-600/40 rounded-full blur-[130px] animate-aurora-2"
                     />
 
                     {/* Teal/Emerald glow in center-bottom */}
-                    <motion.div
-                        animate={{
-                            scale: [1, 1.1, 0.9, 1],
-                            x: ["-10%", "20%", "-5%", "-10%"],
-                            y: ["10%", "-15%", "5%", "10%"],
-                        }}
-                        transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-                        className="hidden md:block absolute bottom-[-100px] left-[30%] w-[500px] h-[500px] bg-teal-500/10 dark:bg-teal-500/30 rounded-full blur-[140px]"
+                    <div
+                        className="hidden md:block absolute bottom-[-100px] left-[30%] w-[500px] h-[500px] bg-teal-500/10 dark:bg-teal-500/30 rounded-full blur-[140px] animate-aurora-3"
                     />
                 </div>
 
-                {/* Stars/Particles overlay */}
+                {/* Stars/Particles overlay — CSS animations */}
                 <div className="absolute inset-0 w-full h-full opacity-60">
                     {PARTICLES.map((p) => (
-                        <motion.div
+                        <div
                             key={p.id}
-                            animate={{
-                                y: [0, -30, 0],
-                                opacity: [0.2, 0.8, 0.2],
-                                scale: [1, 1.5, 1],
-                            }}
-                            transition={{
-                                duration: p.duration,
-                                repeat: Infinity,
-                                delay: p.delay,
-                            }}
-                            className="absolute rounded-full bg-slate-300 dark:bg-white"
+                            className="absolute rounded-full bg-slate-300 dark:bg-white animate-particle"
                             style={{
                                 width: p.size + "px",
                                 height: p.size + "px",
                                 top: p.top + "%",
                                 left: p.left + "%",
+                                animationDuration: p.duration + "s",
+                                animationDelay: p.delay + "s",
                             }}
                         />
                     ))}
@@ -95,35 +65,28 @@ export default function HeroSection({ children }: HeroSectionProps) {
             </div>
 
             <div className="relative z-10 container px-4 md:px-6 text-center">
-                <motion.h1
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.1 }}
-                    className="text-4xl md:text-5xl lg:text-5xl font-extrabold tracking-tight mb-6 md:mb-4 text-foreground dark:text-white"
+                <h1
+                    className="text-4xl md:text-5xl lg:text-5xl font-extrabold tracking-tight mb-6 md:mb-4 text-foreground dark:text-white animate-fade-slide-up"
                 >
                     Navigate the Island&apos;s <br className="hidden md:block" />
                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-indigo-600 dark:from-primary dark:to-blue-400">
                         Postal Network
                     </span>
-                </motion.h1>
+                </h1>
 
-                <motion.p
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.2 }}
-                    className="hidden md:block mx-auto max-w-2xl text-base md:text-lg text-muted-foreground dark:text-white/80 mb-8"
+                <p
+                    className="hidden md:block mx-auto max-w-2xl text-base md:text-lg text-muted-foreground dark:text-white/80 mb-8 animate-fade-slide-up"
+                    style={{ animationDelay: "0.1s" }}
                 >
                     The most comprehensive directory for finding every post office, contact detail, and location across Sri Lanka.
-                </motion.p>
+                </p>
                 {children && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5, delay: 0.3 }}
-                        className="mx-auto max-w-3xl w-full"
+                    <div
+                        className="mx-auto max-w-3xl w-full animate-fade-slide-up"
+                        style={{ animationDelay: "0.2s" }}
                     >
                         {children}
-                    </motion.div>
+                    </div>
                 )}
             </div>
         </section>

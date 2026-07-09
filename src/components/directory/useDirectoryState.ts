@@ -42,7 +42,6 @@ export function useDirectoryState() {
             params.set("mode", mode);
             params.set("cursor", cursor.toString());
             params.set("limit", "24");
-            params.set("_t", Date.now().toString());
 
             const res = await fetch(`/api/offices?${params.toString()}`);
             if (!res.ok) throw new Error(`API Error: ${res.status}`);

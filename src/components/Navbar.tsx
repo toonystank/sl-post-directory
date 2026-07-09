@@ -4,7 +4,7 @@ import { Link, usePathname } from "@/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { ThemeToggle } from "./theme-toggle";
-import { PackageSearch, LayoutDashboard, Building2, LogOut, User } from "lucide-react";
+import { PackageSearch, LayoutDashboard, Building2, LogOut, User, BookOpen, Calculator } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import LanguageSwitcher from "./LanguageSwitcher";
@@ -28,7 +28,7 @@ export default function Navbar() {
                     </span>
                 </Link>
 
-                <nav className="flex items-center gap-6 text-sm font-medium">
+                <nav className="flex items-center gap-4 md:gap-6 text-sm font-medium">
                     <Link
                         href="/"
                         className={cn(
@@ -37,6 +37,24 @@ export default function Navbar() {
                         )}
                     >
                         <Building2 className="w-4 h-4 hidden sm:block" /> {t("directory")}
+                    </Link>
+                    <Link
+                        href="/blog"
+                        className={cn(
+                            "transition-colors hover:text-foreground/80 flex items-center gap-2",
+                            pathname?.startsWith("/blog") ? "text-foreground" : "text-foreground/60"
+                        )}
+                    >
+                        <BookOpen className="w-4 h-4 hidden sm:block" /> {t("blog")}
+                    </Link>
+                    <Link
+                        href="/calculator"
+                        className={cn(
+                            "transition-colors hover:text-foreground/80 flex items-center gap-2 hidden md:flex",
+                            pathname?.startsWith("/calculator") ? "text-foreground" : "text-foreground/60"
+                        )}
+                    >
+                        <Calculator className="w-4 h-4 hidden sm:block" /> {t("calculator")}
                     </Link>
                     {isAdmin && (
                         <Link

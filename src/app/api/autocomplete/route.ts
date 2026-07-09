@@ -76,6 +76,14 @@ export async function GET(request: NextRequest) {
         );
     } catch (error) {
         console.error("Error in /api/autocomplete:", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+        return NextResponse.json(
+            { error: "Internal Server Error" },
+            {
+                status: 500,
+                headers: {
+                    'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+                },
+            }
+        );
     }
 }

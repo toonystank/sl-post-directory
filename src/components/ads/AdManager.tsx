@@ -2,8 +2,6 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import Script from "next/script";
-import { Capacitor } from "@capacitor/core";
-import { AdMob } from "@capacitor-community/admob";
 
 interface AdContextType {
     adsEnabled: boolean;
@@ -16,12 +14,19 @@ export function useAds() {
     return useContext(AdContext);
 }
 
+function isNativePlatform(): boolean {
+    return typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.();
+}
+
 export default function AdManager({ children }: { children: React.ReactNode }) {
     const [adsEnabled, setAdsEnabled] = useState(true);
     const [loading, setLoading] = useState(true);
+    const [isNative, setIsNative] = useState(false);
 
     useEffect(() => {
         let isMounted = true;
+        const native = isNativePlatform();
+        setIsNative(native);
 
         const init = async () => {
             // Fetch ad settings
@@ -35,9 +40,10 @@ export default function AdManager({ children }: { children: React.ReactNode }) {
                 // Default to true on error
             }
 
-            // Initialize AdMob for native
-            if (Capacitor.isNativePlatform()) {
+            // Initialize AdMob for native — dynamically imported
+            if (native) {
                 try {
+                    const { AdMob } = await import("@capacitor-community/admob");
                     await AdMob.initialize({
                         testingDevices: [],
                     });
@@ -50,7 +56,11 @@ export default function AdManager({ children }: { children: React.ReactNode }) {
             if (isMounted) setLoading(false);
         };
 
-        setTimeout(init, 500);
+        // Use requestIdleCallback when available, fallback to setTimeout
+        const scheduleInit = typeof window !== 'undefined' && 'requestIdleCallback' in window
+            ? (cb: () => void) => (window as any).requestIdleCallback(cb)
+            : (cb: () => void) => setTimeout(cb, 1000);
+        scheduleInit(init);
 
         return () => {
             isMounted = false;
@@ -60,7 +70,7 @@ export default function AdManager({ children }: { children: React.ReactNode }) {
     return (
         <AdContext.Provider value={{ adsEnabled, loading }}>
             {/* Conditionally load AdSense script only when ads are enabled */}
-            {adsEnabled && !Capacitor.isNativePlatform() && (
+            {adsEnabled && !isNative && (
                 <Script
                     async
                     src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2503310431210239"

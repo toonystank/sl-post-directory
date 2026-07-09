@@ -4,6 +4,21 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = 'force-dynamic';
 
+const FIELD_SELECT = {
+    where: {
+        name: { in: ["Type", "Phone", "Division", "Delivery", "Is24Hour", "Working Hours"] },
+    },
+    select: { name: true, value: true },
+};
+
+const OFFICE_SELECT = {
+    id: true,
+    name: true,
+    postalCode: true,
+    services: true,
+    fields: FIELD_SELECT,
+};
+
 export async function GET(request: NextRequest) {
     try {
         const searchParams = request.nextUrl.searchParams;
@@ -19,166 +34,150 @@ export async function GET(request: NextRequest) {
         if (isNaN(limit)) limit = 12;
         limit = Math.min(Math.max(limit, 1), 100); // Clamp between 1 and 100
 
-        const conditions: Prisma.PostOfficeWhereInput[] = [];
+        let offices = [];
+        let total = 0;
 
-        // Service filter
-        if (service) {
-            conditions.push({ services: { has: service } });
-        }
+        if (query && mode === "name") {
+            // === SQL-level ranked search with pagination ===
+            const cleanQuery = query
+                .replace(/\b(post\s*office|main|branch|sub)\b/gi, "")
+                .trim();
+            const primaryTerm = cleanQuery || query.trim();
 
-        // Letter filter: offices starting with a specific letter
-        if (letter) {
-            conditions.push({ name: { startsWith: letter, mode: "insensitive" as const } });
-        }
+            // Build WHERE clause fragments for letter and service filters
+            const whereClauses: string[] = [
+                `(similarity(p.name, $1) > 0.15 OR p.name ILIKE $1 || '%' OR p.name ILIKE '%' || $1 || '%' OR p."postalCode" ILIKE '%' || $1 || '%')`,
+            ];
+            const countWhereClauses: string[] = [...whereClauses];
+            // $1 = primaryTerm, $2 = limit, $3 = cursor
+            // Additional params start from $4
+            let paramIndex = 4;
+            const extraParams: any[] = [];
 
-        // Map to store similarity scores for tie-breaking ranked results
-        let simMap = new Map<string, number>();
+            if (letter) {
+                whereClauses.push(`p.name ILIKE $${paramIndex} || '%'`);
+                countWhereClauses.push(`p.name ILIKE $${paramIndex} || '%'`);
+                extraParams.push(letter);
+                paramIndex++;
+            }
 
-        // Search query
-        if (query) {
-            const orConditions: Prisma.PostOfficeWhereInput[] = [];
+            if (service) {
+                whereClauses.push(`$${paramIndex} = ANY(p.services)`);
+                countWhereClauses.push(`$${paramIndex} = ANY(p.services)`);
+                extraParams.push(service);
+                paramIndex++;
+            }
 
-            if (mode === "division") {
-                // Division mode: search only in Division field
-                orConditions.push({
+            const whereSQL = whereClauses.join(" AND ");
+            const countWhereSQL = countWhereClauses.join(" AND ");
+
+            // Ranked query with pagination at the SQL level
+            const rankedQuery = `
+                SELECT p.id, similarity(p.name, $1) as sim,
+                    CASE
+                        WHEN LOWER(p.name) = LOWER($1) THEN 0
+                        WHEN LOWER(p.name) LIKE LOWER($1) || '%' THEN 1
+                        WHEN LOWER(p.name) LIKE '%' || LOWER($1) || '%' THEN 2
+                        ELSE 3
+                    END as rank
+                FROM "PostOffice" p
+                WHERE ${whereSQL}
+                ORDER BY rank ASC, sim DESC, p.name ASC
+                LIMIT $2 OFFSET $3
+            `;
+
+            const countQuery = `
+                SELECT COUNT(*)::int as total
+                FROM "PostOffice" p
+                WHERE ${countWhereSQL}
+            `;
+
+            try {
+                const allParams = [primaryTerm, limit, cursor, ...extraParams];
+
+                const [rankedResults, countResult] = await Promise.all([
+                    prisma.$queryRawUnsafe<{ id: string; sim: number; rank: number }[]>(
+                        rankedQuery, ...allParams
+                    ),
+                    prisma.$queryRawUnsafe<{ total: number }[]>(
+                        countQuery, primaryTerm, ...extraParams
+                    ),
+                ]);
+
+                total = countResult[0]?.total || 0;
+
+                if (rankedResults.length > 0) {
+                    const orderedIds = rankedResults.map(r => r.id);
+
+                    const fetchedOffices = await prisma.postOffice.findMany({
+                        where: { id: { in: orderedIds } },
+                        select: OFFICE_SELECT,
+                    });
+
+                    // Preserve the SQL ranking order
+                    const officeMap = new Map(fetchedOffices.map(o => [o.id, o]));
+                    offices = orderedIds.map(id => officeMap.get(id)).filter(Boolean);
+                }
+            } catch (e) {
+                console.error("Ranked search error, falling back:", e);
+                // Fallback to simple Prisma query
+                const conditions: Prisma.PostOfficeWhereInput[] = [
+                    { name: { contains: query, mode: "insensitive" as const } },
+                ];
+                if (letter) conditions.push({ name: { startsWith: letter, mode: "insensitive" as const } });
+                if (service) conditions.push({ services: { has: service } });
+
+                const where = { AND: conditions };
+                const [fallbackOffices, fallbackCount] = await Promise.all([
+                    prisma.postOffice.findMany({ where, skip: cursor, take: limit, orderBy: { name: "asc" }, select: OFFICE_SELECT }),
+                    prisma.postOffice.count({ where }),
+                ]);
+                offices = fallbackOffices;
+                total = fallbackCount;
+            }
+        } else if (query && mode === "division") {
+            // Division mode: search in Division field with proper pagination
+            const conditions: Prisma.PostOfficeWhereInput[] = [
+                {
                     fields: {
                         some: {
                             name: "Division",
                             value: { contains: query, mode: "insensitive" as const },
                         },
                     },
-                });
-            } else {
-                // Name mode (default): search name, postal code, short code
-                const cleanQuery = query
-                    .replace(/\b(post\s*office|main|branch|sub)\b/gi, "")
-                    .trim();
-
-                const primaryTerm = cleanQuery || query.trim();
-                const terms = [primaryTerm];
-                if (cleanQuery && cleanQuery !== query.trim()) {
-                    terms.push(query.trim());
-                }
-
-                // 1) Find fuzzy matched IDs using pg_trgm similarity
-                try {
-                    const matchedOffices = await prisma.$queryRaw<{ id: string, sim: number }[]>`
-                        SELECT id, similarity(name, ${primaryTerm}) as sim FROM "PostOffice"
-                        WHERE similarity(name, ${primaryTerm}) > 0.15
-                           OR name ILIKE ${primaryTerm + '%'}
-                    `;
-                    const matchedIds = matchedOffices.map(o => {
-                        simMap.set(o.id, o.sim);
-                        return o.id;
-                    });
-                    
-                    if (matchedIds.length > 0) {
-                        orConditions.push({ id: { in: matchedIds } });
-                    }
-                } catch (e) {
-                    console.error("Fuzzy search error:", e);
-                }
-
-                // Add to where clause...
-
-                for (const term of terms) {
-                    orConditions.push({ name: { startsWith: term, mode: "insensitive" as const } });
-                    orConditions.push({ name: { contains: term, mode: "insensitive" as const } });
-                    orConditions.push({ postalCode: { contains: term, mode: "insensitive" as const } });
-                    // Short code / Code field
-                    orConditions.push({
-                        fields: {
-                            some: {
-                                name: "Code",
-                                value: { contains: term, mode: "insensitive" as const },
-                            },
-                        },
-                    });
-                }
-            }
-
-            conditions.push({ OR: orConditions });
-        }
-
-        const where = conditions.length > 0 ? { AND: conditions } : {};
-
-        let offices = [];
-        let total = 0;
-
-        // If performing a text query, we fetch all matches to rank them properly in memory
-        if (query) {
-            const allOffices = await prisma.postOffice.findMany({
-                where,
-                select: {
-                    id: true,
-                    name: true,
-                    postalCode: true,
-                    services: true,
-                    fields: {
-                        where: {
-                            name: { in: ["Type", "Phone", "Division", "Delivery", "Is24Hour", "Working Hours"] },
-                        },
-                        select: { name: true, value: true },
-                    },
                 },
-            });
+            ];
+            if (letter) conditions.push({ name: { startsWith: letter, mode: "insensitive" as const } });
+            if (service) conditions.push({ services: { has: service } });
 
-            const qLower = query.toLowerCase();
-            const cleanQuery = query.replace(/\b(post\s*office|main|branch|sub)\b/gi, "").trim().toLowerCase();
-            const primaryTerm = cleanQuery || qLower;
-
-            allOffices.sort((a, b) => {
-                const aName = a.name.toLowerCase();
-                const bName = b.name.toLowerCase();
-
-                const getRank = (name: string) => {
-                    if (name === primaryTerm) return 0; // Exact match 
-                    if (name.startsWith(primaryTerm)) return 1; // Prefix match
-                    if (name.includes(primaryTerm)) return 2; // Contains match
-                    return 3; // Fuzzy or field match
-                };
-
-                const rankA = getRank(aName);
-                const rankB = getRank(bName);
-
-                if (rankA !== rankB) {
-                    return rankA - rankB;
-                }
-
-                // If tied (especially rank 3), use similarity score if available
-                if (mode === "name") {
-                    const simA = simMap?.get(a.id) || 0;
-                    const simB = simMap?.get(b.id) || 0;
-                    if (simA !== simB) {
-                        return simB - simA; // High similarity first
-                    }
-                }
-
-                return a.name.localeCompare(b.name);
-            });
-
-            total = allOffices.length;
-            offices = allOffices.slice(cursor, cursor + limit);
-        } else {
-            // Standard db-level pagination for no-query (browsing)
+            const where = { AND: conditions };
             const [fetchedOffices, count] = await Promise.all([
                 prisma.postOffice.findMany({
                     where,
                     skip: cursor,
                     take: limit,
                     orderBy: { name: "asc" },
-                    select: {
-                        id: true,
-                        name: true,
-                        postalCode: true,
-                        services: true,
-                        fields: {
-                            where: {
-                                name: { in: ["Type", "Phone", "Division", "Delivery", "Is24Hour", "Working Hours"] },
-                            },
-                            select: { name: true, value: true },
-                        },
-                    },
+                    select: OFFICE_SELECT,
+                }),
+                prisma.postOffice.count({ where }),
+            ]);
+            offices = fetchedOffices;
+            total = count;
+        } else {
+            // No search query — standard browsing with db-level pagination
+            const conditions: Prisma.PostOfficeWhereInput[] = [];
+            if (letter) conditions.push({ name: { startsWith: letter, mode: "insensitive" as const } });
+            if (service) conditions.push({ services: { has: service } });
+
+            const where = conditions.length > 0 ? { AND: conditions } : {};
+
+            const [fetchedOffices, count] = await Promise.all([
+                prisma.postOffice.findMany({
+                    where,
+                    skip: cursor,
+                    take: limit,
+                    orderBy: { name: "asc" },
+                    select: OFFICE_SELECT,
                 }),
                 prisma.postOffice.count({ where }),
             ]);
