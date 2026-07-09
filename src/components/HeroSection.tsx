@@ -66,7 +66,7 @@ export default function HeroSection({ children }: HeroSectionProps) {
 
             <div className="relative z-10 container px-4 md:px-6 text-center">
                 <h1
-                    className="text-4xl md:text-5xl lg:text-5xl font-extrabold tracking-tight mb-6 md:mb-4 text-foreground dark:text-white animate-fade-slide-up"
+                    className="text-4xl md:text-5xl lg:text-5xl font-extrabold tracking-tight mb-6 md:mb-4 text-foreground dark:text-white"
                 >
                     Navigate the Island&apos;s <br className="hidden md:block" />
                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-amber-500 dark:from-red-500 dark:to-amber-400">
@@ -75,15 +75,13 @@ export default function HeroSection({ children }: HeroSectionProps) {
                 </h1>
 
                 <p
-                    className="hidden md:block mx-auto max-w-2xl text-base md:text-lg text-muted-foreground dark:text-white/80 mb-8 animate-fade-slide-up"
-                    style={{ animationDelay: "0.1s" }}
+                    className="hidden md:block mx-auto max-w-2xl text-base md:text-lg text-muted-foreground dark:text-white/80 mb-8"
                 >
                     The most comprehensive directory for finding every post office, contact detail, and location across Sri Lanka.
                 </p>
                 {children && (
                     <div
-                        className="mx-auto max-w-3xl w-full animate-fade-slide-up"
-                        style={{ animationDelay: "0.2s" }}
+                        className="mx-auto max-w-3xl w-full"
                     >
                         {children}
                     </div>
