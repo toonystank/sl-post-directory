@@ -8,7 +8,6 @@ import AdBanner from "@/components/ads/AdBanner";
 import { useTranslations } from "next-intl";
 import { getPostOfficeStatus } from "@/lib/holidays";
 import { useLocale } from "next-intl";
-import { motion, AnimatePresence } from "framer-motion";
 
 const statusConfig: Record<string, { color: string; bgColor: string; borderColor: string; dotClass: string }> = {
     open: {
@@ -145,34 +144,28 @@ export default function PostOfficeCard({ office, index }: PostOfficeCardProps) {
                             </span>
                             {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                         </button>
-                        
-                        <AnimatePresence>
-                            {isExpanded && (
-                                <motion.div 
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: "auto", opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    className="overflow-hidden"
-                                >
-                                    <div className="p-3 pt-0 max-h-[200px] overflow-y-auto scrollbar-hide flex flex-col gap-1.5">
-                                        {office.controlledOffices!.map(sub => (
-                                            <Link 
-                                                key={sub.id} 
-                                                href={`/office/${sub.slug}`}
-                                                className="flex items-center justify-between p-2 rounded bg-background/50 border border-border/40 hover:border-primary/40 hover:bg-primary/10 transition-colors group/sub"
-                                            >
-                                                <span className="text-xs font-medium text-foreground group-hover/sub:text-primary transition-colors truncate">
-                                                    {sub.name}
-                                                </span>
-                                                <span className="text-[10px] font-mono text-muted-foreground">
-                                                    {sub.postalCode}
-                                                </span>
-                                            </Link>
-                                        ))}
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
+                        <div 
+                            className={`grid transition-all duration-300 ease-in-out ${isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
+                        >
+                            <div className="overflow-hidden">
+                                <div className="p-3 pt-0 max-h-[200px] overflow-y-auto scrollbar-hide flex flex-col gap-1.5">
+                                    {office.controlledOffices!.map(sub => (
+                                        <Link 
+                                            key={sub.id} 
+                                            href={`/office/${sub.slug}`}
+                                            className="flex items-center justify-between p-2 rounded bg-background/50 border border-border/40 hover:border-primary/40 hover:bg-primary/10 transition-colors group/sub"
+                                        >
+                                            <span className="text-xs font-medium text-foreground group-hover/sub:text-primary transition-colors truncate">
+                                                {sub.name}
+                                            </span>
+                                            <span className="text-[10px] font-mono text-muted-foreground">
+                                                {sub.postalCode}
+                                            </span>
+                                        </Link>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>

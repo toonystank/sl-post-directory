@@ -75,7 +75,7 @@ export default function AdManager({ children }: { children: React.ReactNode }) {
                     async
                     src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2503310431210239"
                     crossOrigin="anonymous"
-                    strategy="afterInteractive"
+                    strategy="lazyOnload"
                 />
             )}
             {children}
