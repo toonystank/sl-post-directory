@@ -81,7 +81,7 @@ export default function AdBanner({ position = "in-feed", className = "", style, 
     return (
         <div 
             className={`ad-container flex justify-center items-center overflow-hidden 
-                ${position === 'sticky-bottom' ? 'fixed bottom-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-md border-t border-border/50 py-2' : 'w-full my-4 rounded-xl'} 
+                ${position === 'sticky-bottom' ? 'fixed bottom-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-md border-t border-border/50 py-2 min-h-[50px]' : 'w-full my-4 rounded-xl min-h-[250px] bg-primary/5'} 
                 ${className}`}
             style={style}
         >
