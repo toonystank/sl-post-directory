@@ -194,7 +194,7 @@ export default function OfficeEditModal({ officeId, onClose, onSaved }: OfficeEd
 
     return (
         <Dialog open={!!officeId} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-card border-border/50 shadow-2xl p-0">
+            <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-[90vw] lg:max-w-[80vw] max-h-[90vh] overflow-y-auto bg-card border-border/50 shadow-2xl p-0">
                 <DialogHeader className="p-6 md:p-8 bg-card/80 border-b border-border/40 sticky top-0 z-20 backdrop-blur-xl">
                     <div className="flex items-center gap-4">
                         <div className="p-3 bg-primary/10 text-primary rounded-xl ring-1 ring-primary/20">
@@ -225,6 +225,13 @@ export default function OfficeEditModal({ officeId, onClose, onSaved }: OfficeEd
                                     {message}
                                 </div>
                             )}
+                            
+                            <div className="bg-destructive/5 border border-destructive/10 rounded-2xl p-4 flex gap-3 text-sm text-muted-foreground">
+                                <AlertCircle className="w-5 h-5 flex-shrink-0 text-destructive mt-0.5" />
+                                <p>
+                                    Warning: You are directly editing the live database entry. These changes will be public immediately upon saving.
+                                </p>
+                            </div>
 
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                 {/* Left Column: Basic & Dynamic Fields */}
@@ -406,14 +413,6 @@ export default function OfficeEditModal({ officeId, onClose, onSaved }: OfficeEd
                                                 )}
                                             </div>
                                         </div>
-
-                                    </div>
-                                    
-                                    <div className="bg-destructive/5 border border-destructive/10 rounded-2xl p-4 flex gap-3 text-sm text-muted-foreground mt-4">
-                                        <AlertCircle className="w-5 h-5 flex-shrink-0 text-destructive mt-0.5" />
-                                        <p>
-                                            Warning: You are directly editing the live database entry. These changes will be public immediately upon saving.
-                                        </p>
                                     </div>
                                 </div>
                             </div>
