@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
+import { generateSlug } from "@/lib/utils";
 import { sendEditRequestApprovedEmail, sendEditRequestRejectedEmail, sendEditRequestMoreInfoEmail } from "@/lib/email";
 
 export async function POST(req: Request) {
@@ -101,6 +102,7 @@ export async function POST(req: Request) {
                     const newOffice = await tx.postOffice.create({
                         data: {
                             name: changes.name,
+                            slug: generateSlug(changes.name),
                             postalCode: changes.postalCode,
                             fields: {
                                 create: changes.fields?.map((field: any) => ({

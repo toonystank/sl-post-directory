@@ -25,7 +25,7 @@ export default async function SuggestEditPage({ params }: { params: Promise<{ of
     return (
         <div className="container mx-auto px-4 py-12 max-w-3xl min-h-[calc(100vh-4rem)]">
             <Button variant="ghost" asChild className="mb-8 hover:bg-primary/10 hover:text-primary transition-colors -ml-4">
-                <Link href={`/office/${office.id}`}>
+                <Link href={`/office/${office.slug}`}>
                     <ArrowLeft className="w-4 h-4 mr-2" /> Back to {office.name}
                 </Link>
             </Button>

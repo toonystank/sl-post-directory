@@ -22,15 +22,16 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-    metadataBase: new URL("https://postagedirectory.vercel.app"),
+    metadataBase: new URL("https://lankapost.vercel.app"),
     alternates: {
         canonical: "/",
     },
     title: {
-        default: "SL Post Directory",
-        template: "%s | SL Post Directory",
+        default: "Sri Lanka Postal Directory | Find Post Offices & Codes",
+        template: "%s | SL Postal Directory",
     },
-    description: "A comprehensive, modern directory for Sri Lanka Post Offices.",
+    description: "Search the comprehensive Sri Lanka Postal Directory to find post offices, zip codes, operating hours, contact numbers, and locations across Sri Lanka.",
+    keywords: ["Sri Lanka Post Office", "Postal Codes Sri Lanka", "Zip Codes Sri Lanka", "SL Post Directory", "Post Office Opening Hours"],
     appleWebApp: {
         capable: true,
         statusBarStyle: "default",
@@ -40,17 +41,17 @@ export const metadata: Metadata = {
         telephone: false,
     },
     openGraph: {
-        title: "SL Post Directory",
-        description: "A comprehensive, modern directory for Sri Lanka Post Offices.",
-        url: "https://postagedirectory.vercel.app",
+        title: "Sri Lanka Postal Directory | Find Post Offices & Codes",
+        description: "Search the comprehensive Sri Lanka Postal Directory to find post offices, zip codes, operating hours, contact numbers, and locations across Sri Lanka.",
+        url: "https://lankapost.vercel.app",
         siteName: "SL Post Directory",
         locale: "en_US",
         type: "website",
     },
     twitter: {
         card: "summary_large_image",
-        title: "SL Post Directory",
-        description: "A comprehensive, modern directory for Sri Lanka Post Offices.",
+        title: "Sri Lanka Postal Directory",
+        description: "Search the comprehensive Sri Lanka Postal Directory to find post offices, zip codes, operating hours, contact numbers, and locations across Sri Lanka.",
     },
     other: {
         "google-adsense-account": "ca-pub-2503310431210239",

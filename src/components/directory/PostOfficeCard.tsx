@@ -68,7 +68,7 @@ export default function PostOfficeCard({ office, index }: PostOfficeCardProps) {
                 {/* Techy top border accent */}
                 <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary/50 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-700 origin-left" />
                 
-                <Link href={`/office/${office.id}`} className="flex-1 flex flex-col p-5 relative z-10">
+                <Link href={`/office/${office.slug}`} className="flex-1 flex flex-col p-5 relative z-10">
                     {/* Header Row */}
                     <div className="flex justify-between items-start mb-4">
                         <div className="flex gap-3 items-center">
@@ -158,7 +158,7 @@ export default function PostOfficeCard({ office, index }: PostOfficeCardProps) {
                                         {office.controlledOffices!.map(sub => (
                                             <Link 
                                                 key={sub.id} 
-                                                href={`/office/${sub.id}`}
+                                                href={`/office/${sub.slug}`}
                                                 className="flex items-center justify-between p-2 rounded bg-background/50 border border-border/40 hover:border-primary/40 hover:bg-primary/10 transition-colors group/sub"
                                             >
                                                 <span className="text-xs font-medium text-foreground group-hover/sub:text-primary transition-colors truncate">

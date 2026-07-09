@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
 import { createOfficeSchema } from "@/lib/validations";
+import { generateSlug } from "@/lib/utils";
 
 export async function POST(req: Request) {
     try {
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
         const newOffice = await prisma.postOffice.create({
             data: {
                 name,
+                slug: generateSlug(name),
                 postalCode,
                 fields: {
                     create: dynamicFields

@@ -8,10 +8,10 @@ export default function Home() {
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": "SL Post Directory",
-    "url": "https://postagedirectory.vercel.app/",
+    "url": "https://lankapost.vercel.app/",
     "potentialAction": {
       "@type": "SearchAction",
-      "target": "https://postagedirectory.vercel.app/?q={search_term_string}",
+      "target": "https://lankapost.vercel.app/?q={search_term_string}",
       "query-input": "required name=search_term_string"
     }
   };
@@ -28,7 +28,7 @@ export default function Home() {
           <Loader2 className="w-10 h-10 animate-spin text-primary" />
         </div>
       }>
-        <div className="flex-1 w-full bg-background relative z-20">
+        <div suppressHydrationWarning className="flex-1 w-full bg-background relative z-20">
           <SearchDirectory />
         </div>
       </Suspense>

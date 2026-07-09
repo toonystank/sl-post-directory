@@ -5,13 +5,14 @@ export interface OfficeField {
 
 export interface PostOffice {
     id: string;
+    slug: string;
     name: string;
     postalCode: string;
     services: string[];
     fields: OfficeField[];
     rmsc?: string | null;
-    controllingOffice?: { id: string; name: string } | null;
-    controlledOffices?: { id: string; name: string; postalCode: string }[];
+    controllingOffice?: { id: string; slug: string; name: string } | null;
+    controlledOffices?: { id: string; slug: string; name: string; postalCode: string }[];
 }
 
 export interface SearchResponse {

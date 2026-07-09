@@ -58,7 +58,7 @@ export default async function BlogArticlePage({ params }: { params: Promise<{ sl
         "publisher": {
             "@type": "Organization",
             "name": "SL Post Directory",
-            "url": "https://postagedirectory.vercel.app",
+            "url": "https://lankapost.vercel.app",
         },
     };
 

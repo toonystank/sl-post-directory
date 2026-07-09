@@ -19,6 +19,7 @@ interface PhotoModerationProps {
         postOffice: {
             name: string;
             postalCode: string;
+            slug: string;
         };
     }>;
 }
@@ -97,7 +98,7 @@ export default function PhotoModeration({ photos: initialPhotos }: PhotoModerati
                                     <div>
                                         <div className="flex items-start justify-between gap-2 mb-2">
                                             <div>
-                                                <Link href={`/office/${photo.postOfficeId}`} target="_blank" className="font-semibold text-sm hover:text-primary transition-colors flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-sm">
+                                                <Link href={`/office/${photo.postOffice.slug}`} target="_blank" className="font-semibold text-sm hover:text-primary transition-colors flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-sm">
                                                     {photo.postOffice.name}
                                                     <ExternalLink className="w-3 h-3 text-muted-foreground" />
                                                 </Link>

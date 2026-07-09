@@ -21,6 +21,7 @@ interface Field {
 interface Office {
     id: string;
     name: string;
+    slug: string;
     postalCode: string;
     fields: Field[];
 }
@@ -82,7 +83,7 @@ export default function SuggestForm({ office }: { office: Office }) {
             if (res.ok) {
                 setMessage("Your suggested edits have been submitted for review. Thank you!");
                 setTimeout(() => {
-                    router.push(`/office/${office.id}`);
+                    router.push(`/office/${office.slug}`);
                     router.refresh();
                 }, 3000);
             } else {

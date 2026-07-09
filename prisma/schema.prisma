@@ -12,6 +12,7 @@ datasource db {
 
 model PostOffice {
   id             String            @id @default(cuid())
+  slug           String            @unique
   name           String
   postalCode     String
   latitude       Float?
