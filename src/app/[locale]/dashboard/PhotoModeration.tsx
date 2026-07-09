@@ -79,6 +79,7 @@ export default function PhotoModeration({ photos: initialPhotos }: PhotoModerati
                                         src={`${photo.url}-/preview/600x400/-/quality/smart/`} 
                                         alt={photo.caption || "Community photo"}
                                         fill
+                                        unoptimized={true}
                                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                                         className="object-cover transition-transform duration-500 group-hover:scale-105"
                                     />

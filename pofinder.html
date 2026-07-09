@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PO Finder - Sri Lanka Postal Code & Village Search Portal</title>
+
+<script>
+if (window.top !== window.self) {
+  window.top.location = window.self.location;
+}
+</script>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdn.tailwindcss.com"></script>
+
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5319251793828504"
+     crossorigin="anonymous"></script>
+     
+<style>
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: #f0f2f5;
+  overflow: hidden;
+  font-family: 'Inter', sans-serif;
+}
+
+.menu-toggle {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 9999;
+  background: #667eea;
+  color: white;
+  border: none;
+  padding: 0.6rem 0.9rem;
+  border-radius: 0.3rem;
+  font-size: 1.5em;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+.tabs {
+  position: fixed;
+  top: 0;
+  left: -18.5rem;
+  width: 18rem;
+  height: 100%;
+  background: linear-gradient(180deg, #667eea, #764ba2);
+  padding-top: 60px;
+  transition: left 0.4s ease;
+  display: flex;
+  flex-direction: column;
+  z-index: 9998;
+  overflow-y: auto;
+}
+
+.tabs.open { left: 0; }
+
+.tab {
+  padding: 0.9rem 1.4rem;
+  cursor: pointer;
+  display: flex;
+  gap: 0.6rem;
+  color: white;
+  font-size: 1.05rem;
+  border-bottom: 1px solid rgba(255,255,255,0.15);
+  flex-shrink: 0;
+}
+
+.tab.active { background: rgba(255,255,255,0.35); font-weight: bold; }
+
+.sidebar-ad { margin-top: 20px; padding: 10px; min-height: 250px; }
+
+.tab-content {
+  display: none;
+  height: 100%;
+  width: 100%;
+  overflow-y: auto;
+  padding-top: 0; 
+}
+
+.tab-content.active { display: block; }
+
+iframe { width: 100%; height: 100%; border: none; }
+
+.popup-button-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+  padding: 70px 1.5rem 1.5rem 1.5rem; 
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.grid-ad-box {
+  grid-column: 1 / -1; 
+  background: white;
+  border-radius: 1rem;
+  padding: 15px;
+  text-align: center;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  min-height: 100px;
+}
+
+.popup-button {
+  background: linear-gradient(135deg, #ff6b6b, #ffa726);
+  color: white;
+  border: none;
+  border-radius: 1.8rem;
+  padding: 2.2rem 1.5rem;
+  font-size: 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+  transition: transform 0.2s;
+}
+
+.popup-button span { display: block; font-size: 0.85rem; margin-top: 0.6rem; opacity: 0.9; }
+
+.postage-slider-toggle {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 10002;
+  width: 64px;
+  min-height: 154px;
+  border: none;
+  border-radius: 16px 0 0 16px;
+  background: linear-gradient(180deg, #0284c7, #800020);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  overflow: hidden;
+  transition: right 0.35s ease, width 0.25s ease, min-height 0.25s ease, border-radius 0.25s ease, box-shadow 0.2s ease;
+}
+
+.postage-slider-toggle:hover {
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.38);
+}
+
+.postage-slider-toggle span {
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.16;
+  text-align: center;
+}
+
+.postage-slider-toggle i {
+  font-size: 1.05rem;
+  transition: transform 0.35s ease;
+}
+
+.slider-buttons-minimized .postage-slider-toggle:not(.open),
+.slider-buttons-temporarily-minimized .postage-slider-toggle:not(.open),
+.minimize-postage-side-button .postage-slider-toggle:not(.open) {
+  width: 44px;
+  min-height: 54px;
+  border-radius: 14px 0 0 14px;
+  gap: 0;
+}
+
+.slider-buttons-minimized .postage-slider-toggle:not(.open) span,
+.slider-buttons-temporarily-minimized .postage-slider-toggle:not(.open) span,
+.minimize-postage-side-button .postage-slider-toggle:not(.open) span {
+  display: none;
+}
+
+.slider-buttons-minimized .foreign-slider-toggle:not(.open),
+.slider-buttons-temporarily-minimized .foreign-slider-toggle:not(.open) {
+  top: calc(50% + 70px);
+}
+
+.minimize-foreign-side-button .foreign-slider-toggle:not(.open) {
+  width: 44px;
+  min-height: 54px;
+  border-radius: 14px 0 0 14px;
+  gap: 0;
+}
+
+.minimize-foreign-side-button .foreign-slider-toggle:not(.open) span {
+  display: none;
+}
+
+.postage-slider-active #foreignSliderToggle,
+.foreign-slider-active #postageSliderToggle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.postage-slider-toggle.open {
+  right: min(92vw, 520px);
+}
+
+.postage-slider-toggle.open i {
+  transform: rotate(180deg);
+}
+
+.foreign-slider-toggle {
+  top: calc(50% + 185px);
+  background: linear-gradient(180deg, #27ae60, #3498db);
+}
+
+.foreign-slider .postage-slider-header {
+  background: linear-gradient(135deg, #0f172a, #27ae60);
+}
+
+.postage-slider-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(15, 23, 42, 0.36);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.postage-slider-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.postage-slider {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 10001;
+  width: min(92vw, 520px);
+  height: 100%;
+  background: #f8fafc;
+  box-shadow: -22px 0 45px rgba(15, 23, 42, 0.28);
+  transform: translateX(100%);
+  transition: transform 0.35s ease;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.postage-slider.open {
+  transform: translateX(0);
+}
+
+.postage-slider-header {
+  flex: 0 0 auto;
+  min-height: 58px;
+  padding: 0 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  color: #fff;
+  background: linear-gradient(135deg, #0f172a, #800020);
+}
+
+.postage-slider-title {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  font-weight: 800;
+  font-size: 0.98rem;
+}
+
+.postage-slider-title span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.postage-slider-close {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.postage-slider-close:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.postage-slider-frame {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  background: #f1f5f9;
+}
+
+@media (max-width: 768px) {
+  .tabs { width: 16rem; left: -16.5rem; }
+  .popup-button-container { grid-template-columns: 1fr; }
+  .postage-slider-toggle {
+    width: 58px;
+    min-height: 144px;
+    transition: none;
+  }
+  .postage-slider-toggle span {
+    font-size: 0.7rem;
+  }
+  .postage-slider-toggle i {
+    transition: none;
+  }
+  .postage-slider-toggle:hover {
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.3);
+  }
+  .foreign-slider-toggle {
+    top: calc(50% + 165px);
+  }
+  .slider-buttons-minimized .postage-slider-toggle:not(.open),
+  .slider-buttons-temporarily-minimized .postage-slider-toggle:not(.open),
+  .minimize-postage-side-button .postage-slider-toggle:not(.open),
+  .minimize-foreign-side-button .foreign-slider-toggle:not(.open) {
+    width: 42px;
+    min-height: 50px;
+  }
+  .slider-buttons-minimized .foreign-slider-toggle:not(.open),
+  .slider-buttons-temporarily-minimized .foreign-slider-toggle:not(.open) {
+    top: calc(50% + 64px);
+  }
+}
+</style>
+</head>
+
+<body>
+
+<button id="menuBtn" class="menu-toggle" onclick="toggleSidebar()">
+  <i class="fas fa-bars"></i>
+</button>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('tab1')"><i class="fas fa-mail-bulk"></i>Post Office Details</div>
+  <div class="tab" onclick="switchTab('tab2')"><i class="fas fa-map"></i>Village Search</div>
+  <div class="tab" onclick="switchTab('tab6')"><i class="fas fa-school"></i>School Finder</div>
+  <div class="tab" onclick="switchTab('tab8')"><i class="fas fa-building"></i>RMSC Finder</div>
+  <div class="tab" onclick="switchTab('tab7')"><i class="fas fa-globe"></i>Foreign services and Rates</div>
+  <div class="tab" onclick="switchTab('tab10')"><i class="fas fa-calculator"></i>Local Postage 2026</div>
+  <div class="tab" onclick="switchTab('tab4')"><i class="fas fa-phone"></i>Administrative Offices</div>
+  <div class="tab" onclick="switchTab('tab3')"><i class="fas fa-table"></i>Tools & Info</div>
+  <div class="tab" onclick="switchTab('tab11')"><i class="fas fa-graduation-cap"></i>Tutorials</div>
+  <div class="tab" onclick="switchTab('tab9')"><i class="fas fa-download"></i>Downloads</div> 
+  <div class="tab" onclick="switchTab('tab5')"><i class="fas fa-info-circle"></i>About</div>
+
+  <div class="sidebar-ad">
+    <ins class="adsbygoogle"
+         style="display:block"
+         data-ad-format="autorelaxed"
+         data-ad-client="ca-pub-5319251793828504"
+         data-ad-slot="7285747314"></ins>
+    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+  </div>
+</div>
+
+<div id="tab1" class="tab-content active"><iframe src="index-pof.html"></iframe></div>
+<div id="tab2" class="tab-content"><iframe src="index-vf.html"></iframe></div>
+<div id="tab6" class="tab-content"><iframe src="school_search_webpage.html"></iframe></div>
+<div id="tab8" class="tab-content"><iframe src="rmsc finder/index.html"></iframe></div>
+<div id="tab7" class="tab-content"><iframe src="foreign services and rates/index.html"></iframe></div>
+<div id="tab10" class="tab-content"><iframe src="new local rate calculator/postage_calculator.html"></iframe></div>
+<div id="tab11" class="tab-content"><iframe src="Tutorials.html"></iframe></div>
+
+<div id="tab3" class="tab-content">
+  <div class="popup-button-container">
+    <button class="popup-button" onclick="openPopup()">Colombo Areas</button>
+    <button class="popup-button" onclick="window.open('nopay.html','_self')">(No Pay) Daily Rate Calculator</button>
+    <button class="popup-button" onclick="window.open('https://2026rao.infinityfree.me/','_self')">2026 / 2027 Salary Search<span>by RAO-Office Galle</span></button>
+    <button class="popup-button" onclick="window.open('https://bepost.lk/care/','_blank')">Official Track & Rate<span>bepost.lk</span></button>
+    <button class="popup-button" onclick="window.open('Stamp Check.html','_self')">Stamp Album Checker</button>
+    <button class="popup-button" onclick="window.open('Stamp bill.html','_self')">Stamp Receipt Genarator</button>
+    <button class="popup-button" onclick="window.open('duplicate_Finder.html','_self')">Duplicate Value Finder</button>
+    <button class="popup-button" onclick="window.open('Ordinary MO Com Calc.html','_self')">Ordinary MO Com Calc</button>
+    <button class="popup-button" onclick="window.open('ad mail calculator.html','_self')">AD Mail Calculator</button>
+    <button class="popup-button" onclick="window.open('Numbers to Text.html','_self')">Amount to Text</button>
+    <div class="grid-ad-box">
+        <ins class="adsbygoogle"
+             style="display:block"
+             data-ad-client="ca-pub-5319251793828504"
+             data-ad-slot="3259722453"
+             data-ad-format="auto"
+             data-full-width-responsive="true"></ins>
+  </div>
+  
+  </div>
+</div>
+
+<div id="tab9" class="tab-content">
+  <div class="popup-button-container">
+   
+    <button class="popup-button" onclick="window.open('https://drive.google.com/file/d/18vQsLHnvsD0GQl0cSF1Xg6AMAoy2WRv3/view?usp=sharing','_blank')"><i class="fas fa-user-tie"></i><br>Postmaster Manual</button>
+    <button class="popup-button" onclick="window.open('https://drive.google.com/file/d/1OyUHQT3Rqc0dACepRpDHo7wj4qMeDk3O/view?usp=sharing','_blank')"><i class="fas fa-users-cog"></i><br>Minor Staff Manual</button>
+    <button class="popup-button" onclick="window.open('https://drive.google.com/file/d/1p9dXtgcCY3VToluJqqcJoZYc8ar4Kzkg/view?usp=sharing','_blank')"><i class="fas fa-user-edit"></i><br>Sub PM Manual</button>
+    <button class="popup-button" onclick="window.open('https://drive.google.com/file/d/1MwpOkDtoON956ZZ0-2eAN17xFfdTw7V6/view?usp=sharing','_blank')"><i class="fas fa-pen-nib"></i><br>Application for personalize Stamps</button>
+    <button class="popup-button" onclick="window.open('https://drive.google.com/file/d/1RdGxCyyuE-gfSKDMT_xrutTG6RPyrS5u/view?usp=sharing','_blank')"><i class="fas fa-file-pdf"></i><br>PO Guide</button>
+    <button class="popup-button" onclick="window.open('https://drive.google.com/file/d/1D6n3nNXN9uUS3fGQZUpryeZRt66qeIt5/view?usp=sharing','_blank')"><i class="fas fa-file-pdf"></i><br>EMS Guide in sinhala</button>
+    <button class="popup-button" onclick="window.open('https://drive.google.com/file/d/1A5WiSRekK-Z6Pp4d7Ttga5gL6foYh4Mt/view?usp=sharing','_blank')"><i class="fas fa-file-pdf"></i><br>IPS Guide in sinhala</button>
+    <button class="popup-button" onclick="window.open('https://drive.google.com/file/d/1kcgWVAN8enxsQkVdz9b2kSwn66pLAt4B/view?usp=sharing','_blank')"><i class="fas fa-file-pdf"></i><br>leave handbook sinhala</button>
+<button class="popup-button" onclick="window.open('https://drive.google.com/file/d/12dp6RISOsS79LDtmTX4vVP-4pFKDaW1H/view?usp=sharing','_blank')"><i class="fas fa-file-pdf"></i><br>salaries handbook sinhala</button>
+<button class="popup-button" onclick="window.open('https://drive.google.com/file/d/1BSUHabhS5W3c0DvyqDYjAqGeUXiAtF8g/view?usp=sharing','_blank')"><i class="fas fa-file-pdf"></i><br>Interim Digital Guidelines for Remote Government Work</button>
+<button class="popup-button" onclick="window.open('https://drive.google.com/file/d/1fW2F1mB2l_6dOqJj-kADvCNYPxkxNfdX/view?usp=sharing','_blank')"><i class="fas fa-file-pdf"></i><br>Pensions Minute</button>
+
+     
+  </div>
+  
+  <div class="grid-ad-box">
+        <ins class="adsbygoogle"
+             style="display:block"
+             data-ad-client="ca-pub-5319251793828504"
+             data-ad-slot="3259722453"
+             data-ad-format="auto"
+             data-full-width-responsive="true"></ins>
+  </div>
+</div>
+
+<div id="tab4" class="tab-content"><iframe src="Contact Numbers Administrative Office and Others.html"></iframe></div>
+<div id="tab5" class="tab-content"><iframe src="About.html"></iframe></div>
+
+<button id="postageSliderToggle" class="postage-slider-toggle" onclick="togglePostageSlider()" aria-controls="postageSlider" aria-expanded="false" title="Open postage calculator">
+  <i class="fas fa-chevron-left" aria-hidden="true"></i>
+  <span>Local<br>Rate<br>calculation</span>
+</button>
+
+<button id="foreignSliderToggle" class="postage-slider-toggle foreign-slider-toggle" onclick="toggleForeignSlider()" aria-controls="foreignSlider" aria-expanded="false" title="Open foreign rates">
+  <i class="fas fa-chevron-left" aria-hidden="true"></i>
+  <span>Air<br>Mail<br>Rates</span>
+</button>
+
+<div id="postageSliderOverlay" class="postage-slider-overlay" onclick="closeSideSliders()"></div>
+
+<aside id="postageSlider" class="postage-slider" aria-hidden="true">
+  <div class="postage-slider-header">
+    <div class="postage-slider-title">
+      <i class="fas fa-calculator" aria-hidden="true"></i>
+      <span>Local Postage Calculator</span>
+    </div>
+    <button class="postage-slider-close" onclick="closePostageSlider()" aria-label="Close postage calculator">
+      <i class="fas fa-times" aria-hidden="true"></i>
+    </button>
+  </div>
+  <iframe class="postage-slider-frame" src="new local rate calculator/postage_calculator.html?embedded=1" title="Local Postage Calculator"></iframe>
+</aside>
+
+<aside id="foreignSlider" class="postage-slider foreign-slider" aria-hidden="true">
+  <div class="postage-slider-header">
+    <div class="postage-slider-title">
+      <i class="fas fa-globe" aria-hidden="true"></i>
+      <span>Foreign Services & Rates</span>
+    </div>
+    <button class="postage-slider-close" onclick="closeForeignSlider()" aria-label="Close foreign rates">
+      <i class="fas fa-times" aria-hidden="true"></i>
+    </button>
+  </div>
+  <iframe class="postage-slider-frame" src="foreign services and rates/index.html?embedded=1" title="Foreign Services and Rates"></iframe>
+</aside>
+
+<script>
+let sliderButtonRestoreTimer;
+let oppositeSliderButtonRestoreTimer;
+
+function toggleSidebar(){
+  document.querySelector('.tabs').classList.toggle('open');
+}
+
+function updateSliderButtonMode(activeTabId){
+  const shouldMinimize = activeTabId !== 'tab1';
+  document.body.classList.toggle('slider-buttons-minimized', shouldMinimize);
+}
+
+function temporarilyMinimizeSliderButtons(){
+  if (!document.getElementById('tab1').classList.contains('active')) return;
+  document.body.classList.add('slider-buttons-temporarily-minimized');
+  clearTimeout(sliderButtonRestoreTimer);
+  sliderButtonRestoreTimer = setTimeout(() => {
+    document.body.classList.remove('slider-buttons-temporarily-minimized');
+  }, 10000);
+}
+
+function temporarilyMinimizeOppositeSliderButton(source){
+  document.body.classList.remove('minimize-postage-side-button', 'minimize-foreign-side-button');
+
+  if(source === 'local-rate-typing'){
+    document.body.classList.add('minimize-foreign-side-button');
+  }
+
+  if(source === 'foreign-rate-typing'){
+    document.body.classList.add('minimize-postage-side-button');
+  }
+
+  clearTimeout(oppositeSliderButtonRestoreTimer);
+  oppositeSliderButtonRestoreTimer = setTimeout(() => {
+    document.body.classList.remove('minimize-postage-side-button', 'minimize-foreign-side-button');
+  }, 10000);
+}
+
+function switchTab(id){
+  // 1. Hide all tab content and clear active menu states
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  
+  // 2. Show the selected tab
+  const activeDiv = document.getElementById(id);
+  activeDiv.classList.add('active');
+
+  // 3. FIXED: Push ads after tab is visible
+  const tabAds = activeDiv.querySelectorAll('.adsbygoogle');
+  tabAds.forEach(ad => {
+    // Check if the ad hasn't been initialized yet to avoid double loading
+    if (!ad.getAttribute('data-adsbygoogle-status')) {
+      try {
+        (adsbygoogle = window.adsbygoogle || []).push({});
+      } catch (e) {
+        console.error("AdSense load error:", e);
+      }
+    }
+  });
+
+  // 4. Highlight the current menu tab
+  const clickedTab = Array.from(document.querySelectorAll('.tab')).find(tab => tab.getAttribute('onclick')?.includes(id));
+  if(clickedTab) clickedTab.classList.add('active');
+
+  // 5. Reload iframe to ensure content is fresh
+  const ifr = activeDiv.querySelector('iframe');
+  if(ifr) ifr.src = ifr.src;
+
+  updateSliderButtonMode(id);
+  document.body.classList.remove('slider-buttons-temporarily-minimized');
+  clearTimeout(sliderButtonRestoreTimer);
+  toggleSidebar();
+}
+
+function openPopup(){ window.open('colombo_areas_table.html','popup','width=900,height=600'); }
+
+function togglePostageSlider(){
+  const slider = document.getElementById('postageSlider');
+  if(slider.classList.contains('open')){
+    closePostageSlider();
+  } else {
+    openPostageSlider();
+  }
+}
+
+function openPostageSlider(){
+  const slider = document.getElementById('postageSlider');
+  const overlay = document.getElementById('postageSliderOverlay');
+  const toggle = document.getElementById('postageSliderToggle');
+  closeForeignSlider();
+  document.querySelector('.tabs').classList.remove('open');
+  slider.classList.add('open');
+  overlay.classList.add('open');
+  toggle.classList.add('open');
+  document.body.classList.add('postage-slider-active');
+  document.body.classList.remove('foreign-slider-active');
+  slider.setAttribute('aria-hidden', 'false');
+  toggle.setAttribute('aria-expanded', 'true');
+  toggle.setAttribute('title', 'Close postage calculator');
+}
+
+function closePostageSlider(){
+  const slider = document.getElementById('postageSlider');
+  const overlay = document.getElementById('postageSliderOverlay');
+  const toggle = document.getElementById('postageSliderToggle');
+  slider.classList.remove('open');
+  overlay.classList.remove('open');
+  toggle.classList.remove('open');
+  document.body.classList.remove('postage-slider-active');
+  slider.setAttribute('aria-hidden', 'true');
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.setAttribute('title', 'Open postage calculator');
+}
+
+function toggleForeignSlider(){
+  const slider = document.getElementById('foreignSlider');
+  if(slider.classList.contains('open')){
+    closeForeignSlider();
+  } else {
+    openForeignSlider();
+  }
+}
+
+function openForeignSlider(){
+  const slider = document.getElementById('foreignSlider');
+  const overlay = document.getElementById('postageSliderOverlay');
+  const toggle = document.getElementById('foreignSliderToggle');
+  closePostageSlider();
+  document.querySelector('.tabs').classList.remove('open');
+  slider.classList.add('open');
+  overlay.classList.add('open');
+  toggle.classList.add('open');
+  document.body.classList.add('foreign-slider-active');
+  document.body.classList.remove('postage-slider-active');
+  slider.setAttribute('aria-hidden', 'false');
+  toggle.setAttribute('aria-expanded', 'true');
+  toggle.setAttribute('title', 'Close foreign rates');
+}
+
+function closeForeignSlider(){
+  const slider = document.getElementById('foreignSlider');
+  const overlay = document.getElementById('postageSliderOverlay');
+  const toggle = document.getElementById('foreignSliderToggle');
+  slider.classList.remove('open');
+  toggle.classList.remove('open');
+  document.body.classList.remove('foreign-slider-active');
+  slider.setAttribute('aria-hidden', 'true');
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.setAttribute('title', 'Open foreign rates');
+  if(!document.getElementById('postageSlider').classList.contains('open')){
+    overlay.classList.remove('open');
+  }
+}
+
+function closeSideSliders(){
+  closePostageSlider();
+  closeForeignSlider();
+}
+
+function normalizeSideSliders(){
+  document.body.classList.remove('slider-buttons-temporarily-minimized', 'minimize-postage-side-button', 'minimize-foreign-side-button');
+  clearTimeout(sliderButtonRestoreTimer);
+  clearTimeout(oppositeSliderButtonRestoreTimer);
+
+  const postageSlider = document.getElementById('postageSlider');
+  const foreignSlider = document.getElementById('foreignSlider');
+  const overlay = document.getElementById('postageSliderOverlay');
+  const postageToggle = document.getElementById('postageSliderToggle');
+  const foreignToggle = document.getElementById('foreignSliderToggle');
+  const postageOpen = postageSlider.classList.contains('open');
+  const foreignOpen = foreignSlider.classList.contains('open');
+
+  overlay.classList.toggle('open', postageOpen || foreignOpen);
+  document.body.classList.toggle('postage-slider-active', postageOpen);
+  document.body.classList.toggle('foreign-slider-active', foreignOpen);
+  postageSlider.setAttribute('aria-hidden', postageOpen ? 'false' : 'true');
+  foreignSlider.setAttribute('aria-hidden', foreignOpen ? 'false' : 'true');
+  postageToggle.setAttribute('aria-expanded', postageOpen ? 'true' : 'false');
+  foreignToggle.setAttribute('aria-expanded', foreignOpen ? 'true' : 'false');
+  postageToggle.setAttribute('title', postageOpen ? 'Close postage calculator' : 'Open postage calculator');
+  foreignToggle.setAttribute('title', foreignOpen ? 'Close foreign rates' : 'Open foreign rates');
+
+  const activeTab = document.querySelector('.tab-content.active');
+  updateSliderButtonMode(activeTab ? activeTab.id : 'tab1');
+}
+
+document.addEventListener('keydown', function(event){
+  if(event.key === 'Escape'){
+    closeSideSliders();
+  }
+});
+
+window.addEventListener('pageshow', function(){
+  setTimeout(normalizeSideSliders, 0);
+});
+
+document.addEventListener('visibilitychange', function(){
+  if(!document.hidden){
+    normalizeSideSliders();
+  }
+});
+
+window.addEventListener('message', function(event){
+  if(event.data && event.data.type === 'main-search-typing'){
+    temporarilyMinimizeSliderButtons();
+  }
+  if(event.data && (event.data.type === 'local-rate-typing' || event.data.type === 'foreign-rate-typing')){
+    temporarilyMinimizeOppositeSliderButton(event.data.type);
+  }
+});
+
+updateSliderButtonMode('tab1');
+</script>
+
+</body>
+</html>

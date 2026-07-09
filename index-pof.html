@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Post Office Details</title>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5319251793828504"
+      crossorigin="anonymous"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding-top: var(--search-header-height, 100px);
+        }
+        #notification {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        #errorMessage {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            margin: 20px;
+            display: none;
+            text-align: center;
+            font-weight: bold;
+        }
+        #loadingIndicator {
+            text-align: center;
+            margin: 20px;
+            font-size: 18px;
+            display: none;
+        }
+        #searchContainer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            box-sizing: border-box;
+            background-color: white;
+            padding: 10px;
+            z-index: 1000;
+            text-align: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+        /* New wrapper for search box and clear icon */
+        #searchBoxWrapper {
+            position: relative;
+            width: 60%; /* Adjust as needed */
+            box-sizing: border-box;
+        }
+        #searchBox {
+            width: 100%; /* Fill the wrapper */
+            padding: 12px;
+            padding-right: 40px; /* Make space for the clear icon */
+            font-size: 18px;
+            border: 2px solid #007bff;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        #clearIcon {
+            position: absolute;
+            right: 15px; /* Adjust positioning */
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 20px;
+            color: #aaa;
+            cursor: pointer;
+            display: none; /* Hidden by default */
+        }
+        #clearIcon:hover {
+            color: #666;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            word-wrap: break-word;
+            white-space: normal;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .clickable {
+            color: blue;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+        .highlight {
+            background-color: #ffff99;
+        }
+        #backButton {
+            display: none;
+            margin: 20px auto;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        #updateButton {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        .downloadButton {
+            padding: 12px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .downloadButton:hover {
+            background-color: #218838;
+        }
+        .call-icon {
+            display: inline-block;
+            cursor: pointer;
+            color: #007bff;
+            margin-left: 8px;
+            text-decoration: none;
+            font-size: 18px;
+        }
+        .call-icon:hover {
+            color: #0056b3;
+        }
+        #retryButton {
+            display: none;
+            margin: 20px auto;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        .shareButton {
+            background-color: #4267B2;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-left: 5px;
+            padding: 2px 5px;
+        }
+        .shareButton:hover {
+            background-color: #365899;
+        }
+        #shareModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 1001;
+        }
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 5px;
+            width: 80%;
+            max-width: 500px;
+        }
+        .close-modal {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close-modal:hover {
+            color: black;
+        }
+        #shareLink {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        #copyButton {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #copyButton:hover {
+            background-color: #45a049;
+        }
+        .correctionButton {
+            padding: 12px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #FF9800;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            text-decoration: none;
+            display: inline-block;
+            margin-left: 10px;
+        }
+        .correctionButton:hover {
+            background-color: #F57C00;
+        }
+        #correctionInstruction {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 10px;
+            border: 1px solid #ffeeba;
+            border-radius: 5px;
+            margin-top: 10px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        /* Mobile-specific styles for searchContainer */
+        @media (max-width: 768px) {
+            body {
+                padding-top: var(--search-header-height, 180px);
+            }
+            #searchContainer {
+                flex-direction: column;
+                align-items: center;
+            }
+            #searchBoxWrapper { /* Apply width and order to the wrapper */
+                width: 90%;
+                order: 2;
+            }
+            .downloadButton, .correctionButton {
+                width: 90%;
+                margin-top: 5px;
+                order: 1;
+            }
+        }
+    </style>
+</head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9QT4KVCK3S"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-9QT4KVCK3S');
+</script>
+<body>
+    <div id="shareModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h3>Share this Post Office</h3>
+            <p>Copy this link to share:</p>
+            <input type="text" id="shareLink" readonly>
+            <button id="copyButton">Copy Link</button>
+        </div>
+    </div>
+
+    <div id="searchContainer">
+        <a href="POFinder.apk" download class="downloadButton">Download Android App</a>
+        <a href="https://forms.gle/i7VVAKtcbe44xjJc6" target="_blank" class="correctionButton">Submit Correction</a>
+        <div id="searchBoxWrapper">
+            <input type="text" id="searchBox" placeholder="Search by Office Name, Short Code or Postal Code...">
+            <span id="clearIcon">&times;</span>
+        </div>
+    </div>
+    <div id="loadingIndicator">Loading data, please wait...</div>
+    <div id="errorMessage">Failed to load data. Please check your internet connection and try again.</div>
+    <button id="retryButton">Retry Loading Data</button>
+
+    <table id="postOfficeTable">
+        <thead>
+            <tr>
+                <th>Post Office and Sub Post Office Name</th>
+                <th>Controlling Office</th>
+                <th>Telephone Number</th>
+                <th>Delivery/Non-Delivery</th>
+                <th>Number of SPO</th>
+                <th>DS Area</th>
+                <th>DPMG Area</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <button id="backButton">Back to Full List</button>
+    <button id="updateButton">Update Data</button>
+
+    <script>
+        let data = [];
+        let isOnline = navigator.onLine;
+        const tableBody = document.querySelector('#postOfficeTable tbody');
+        const searchBox = document.getElementById('searchBox');
+        const clearIcon = document.getElementById('clearIcon'); // Get the new clear icon
+        const backButton = document.getElementById('backButton');
+        const errorMessage = document.getElementById('errorMessage');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const retryButton = document.getElementById('retryButton');
+        const searchContainer = document.getElementById('searchContainer');
+
+        function updateSearchHeaderSpace() {
+            if (!searchContainer) return;
+            const headerHeight = Math.ceil(searchContainer.getBoundingClientRect().height + 20);
+            document.documentElement.style.setProperty('--search-header-height', `${headerHeight}px`);
+        }
+
+        updateSearchHeaderSpace();
+        window.addEventListener('resize', updateSearchHeaderSpace);
+        window.addEventListener('load', updateSearchHeaderSpace);
+        if ('ResizeObserver' in window) {
+            new ResizeObserver(updateSearchHeaderSpace).observe(searchContainer);
+        }
+        let clickedRow = null;
+        let debounceTimer;
+        let retryCount = 0;
+        let maxRetries = 3;
+        let retryInterval = 5000; // 5 seconds
+
+        function formatPhoneNumber(phoneNumber) {
+            if (!phoneNumber || phoneNumber === 'N/A') return 'N/A';
+            
+            // Check if there are multiple numbers separated by hyphens
+            if (phoneNumber.includes('-')) {
+                // Split by hyphens and process each number
+                const numbers = phoneNumber.split('-');
+                return numbers.map(num => {
+                    const trimmedNum = num.trim();
+                    if (trimmedNum) {
+                        const cleanNumber = trimmedNum.replace(/\D/g, '');
+                        if (cleanNumber.length > 0) {
+                            return `${trimmedNum} <a href="tel:${cleanNumber}" class="call-icon" title="Call this number">📞</a>`;
+                        }
+                        return trimmedNum;
+                    }
+                    return '';
+                }).join(' - ');
+            } else {
+                // Handle single phone number
+                const cleanNumber = phoneNumber.toString().replace(/\D/g, '');
+                if (cleanNumber.length > 0) {
+                    return `${phoneNumber} <a href="tel:${cleanNumber}" class="call-icon" title="Call this number">📞</a>`;
+                }
+                return phoneNumber;
+            }
+        }
+
+        // Check network status
+        function updateNetworkStatus() {
+            isOnline = navigator.onLine;
+            // If we were previously showing an error and now online, retry loading
+            if (isOnline && errorMessage.style.display === 'block') {
+                retryLoading();
+            }
+        }
+
+        // Add network status event listeners
+        window.addEventListener('online', function() {
+            updateNetworkStatus();
+            // Auto-retry when connection is restored
+            if (errorMessage.style.display === 'block') {
+                retryLoading();
+            }
+        });
+        
+        window.addEventListener('offline', updateNetworkStatus);
+
+        // Load data from cache or fetch
+        function loadData() {
+            updateNetworkStatus();
+            loadingIndicator.style.display = 'block';
+            retryButton.style.display = 'none';
+            errorMessage.style.display = 'none';
+            
+            const lastFetchTime = localStorage.getItem('lastFetchTime');
+            const currentTime = new Date().getTime();
+            const twentyFourHours = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+            // Check if 24 hours have passed since last fetch
+            if (!lastFetchTime || (currentTime - parseInt(lastFetchTime)) > twentyFourHours) {
+                // Clear cache and fetch fresh data
+                localStorage.removeItem('postOfficedata10');
+                localStorage.setItem('lastFetchTime', currentTime);
+                fetchDataFromFile();
+            } else {
+                // Use cached data if available and within 24 hours
+                const cachedData = localStorage.getItem('postOfficedata10');
+                if (cachedData) {
+                    try {
+                        data = JSON.parse(cachedData);
+                        if (data && data.Main && Array.isArray(data.Main)) {
+                            populateTable();
+                            loadingIndicator.style.display = 'none';
+                        } else {
+                            throw new Error('Invalid data format');
+                        }
+                    } catch (error) {
+                        console.error('Error parsing cached data:', error);
+                        localStorage.removeItem('postOfficedata10');
+                        fetchDataFromFile();
+                    }
+                } else {
+                    fetchDataFromFile();
+                }
+            }
+        }
+
+        function fetchDataFromFile() {
+            // Add cache busting query parameter
+            fetch('data10.json?' + new Date().getTime())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(fetchedData => {
+                    if (fetchedData && fetchedData.Main && Array.isArray(fetchedData.Main)) {
+                        localStorage.setItem('postOfficedata10', JSON.stringify(fetchedData));
+                        localStorage.setItem('lastFetchTime', new Date().getTime());
+                        data = fetchedData;
+                        populateTable();
+                        loadingIndicator.style.display = 'none';
+                        errorMessage.style.display = 'none';
+                        retryButton.style.display = 'none';
+                        retryCount = 0;
+                    } else {
+                        throw new Error('Invalid data format in JSON file');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching JSON:', error);
+                    loadingIndicator.style.display = 'none';
+                    
+                    // Try to use cached data if available
+                    const cachedData = localStorage.getItem('postOfficedata10');
+                    if (cachedData) {
+                        try {
+                            data = JSON.parse(cachedData);
+                            if (data && data.Main && Array.isArray(data.Main)) {
+                                populateTable();
+                                return;
+                            }
+                        } catch (e) {
+                            console.error('Cannot use cached data:', e);
+                        }
+                    }
+                    
+                    errorMessage.style.display = 'block';
+                    retryButton.style.display = 'block';
+                    document.getElementById('postOfficeTable').style.display = 'none';
+                    
+                    // Auto-retry if online
+                    if (navigator.onLine && retryCount < maxRetries) {
+                        retryCount++;
+                        setTimeout(retryLoading, retryInterval);
+                    }
+                });
+        }
+
+        // Retry loading function
+        function retryLoading() {
+            document.getElementById('postOfficeTable').style.display = 'table';
+            loadingIndicator.style.display = 'block';
+            errorMessage.style.display = 'none';
+            retryButton.style.display = 'none';
+            fetchDataFromFile();
+        }
+
+        // Populate table
+        function populateTable(filterText = '') {
+            if (filterText && filterText.length < 2) return;
+            
+            const fragment = document.createDocumentFragment();
+            const maxResults = 100; // Limit results for better performance
+            let resultCount = 0;
+
+            tableBody.innerHTML = ''; // Clear existing content before populating
+
+            data.Main.some(office => {
+                const officeName = office['Office Name'] || '';
+                const shortCode = office['Short Code'] || '';
+                const postalCode = office['Postal Code'] ? office['Postal Code'].toString() : ''; // Ensure postal code is string
+
+                const lowerCaseFilterText = filterText.toLowerCase();
+
+                if (!filterText || 
+                    officeName.toLowerCase().includes(lowerCaseFilterText) ||
+                    shortCode.toLowerCase().includes(lowerCaseFilterText) ||
+                    postalCode.includes(lowerCaseFilterText)
+                ) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><span class="clickable">${officeName}</span> <button class="shareButton" data-office="${encodeURIComponent(officeName)}" title="Share this post office">🔗</button></td>
+                        <td>${office['controlling Office'] === 0 ? 'Post Office' : office['controlling Office'] || 'N/A'}</td>
+                        <td>${formatPhoneNumber(office['Te. No'] || 'N/A')}</td>
+                        <td>${office['Delivery / Non Delivery'] || 'N/A'}</td>
+                        <td>${office['Number of SPO'] || 'N/A'}</td>
+                        <td>${office.DS || 'N/A'}</td>
+                        <td>${office.DPMG || 'N/A'}</td>
+                    `;
+
+                    const clickableOfficeName = row.querySelector('.clickable');
+                    clickableOfficeName.addEventListener('click', () => {
+                        if (clickedRow) clickedRow.classList.remove('highlight');
+                        row.classList.add('highlight');
+                        clickedRow = row;
+                        filterByControllingOffice(officeName);
+                    });
+
+                    fragment.appendChild(row);
+                    resultCount++;
+                    return resultCount >= maxResults;
+                }
+                return false;
+            });
+
+            tableBody.appendChild(fragment);
+            // Show/hide clear icon based on search box content
+            if (searchBox.value.length > 0) {
+                clearIcon.style.display = 'block';
+            } else {
+                clearIcon.style.display = 'none';
+            }
+        }
+
+        // Filter by Controlling Office
+        function filterByControllingOffice(officeName) {
+            tableBody.innerHTML = '';
+            const fragment = document.createDocumentFragment();
+
+            data.Main.forEach(office => {
+                const controllingOffice = office['controlling Office'] || '';
+                const officeNameMatch = office['Office Name'] || '';
+
+                if (
+                    controllingOffice.toLowerCase() === officeName.toLowerCase() ||
+                    officeNameMatch.toLowerCase() === officeName.toLowerCase()
+                ) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${office['Office Name'] || 'N/A'} <button class="shareButton" data-office="${encodeURIComponent(office['Office Name'] || '')}" title="Share this post office">🔗</button></td>
+                        <td>${office['controlling Office'] === 0 ? 'Post Office' : office['controlling Office'] || 'N/A'}</td>
+                        <td>${formatPhoneNumber(office['Te. No'] || 'N/A')}</td>
+                        <td>${office['Delivery / Non Delivery'] || 'N/A'}</td>
+                        <td>${office['Number of SPO'] || 'N/A'}</td>
+                        <td>${office.DS || 'N/A'}</td>
+                        <td>${office.DPMG || 'N/A'}</td>
+                    `;
+
+                    if (officeNameMatch.toLowerCase() === officeName.toLowerCase()) {
+                        row.classList.add('highlight');
+                    }
+
+                    fragment.appendChild(row);
+                }
+            });
+
+            tableBody.appendChild(fragment);
+            backButton.style.display = 'block';
+            // Always show clear icon when filtered by clicking a row
+            clearIcon.style.display = 'block';
+        }
+
+        // Back button functionality
+        backButton.addEventListener('click', () => {
+            searchBox.value = ''; // Clear search box when going back
+            populateTable();
+            backButton.style.display = 'none';
+            if (clickedRow) {
+                clickedRow.classList.remove('highlight');
+                clickedRow = null;
+            }
+            clearIcon.style.display = 'none'; // Hide clear icon after clearing search
+        });
+
+        // Debounced search
+        searchBox.addEventListener('input', (event) => {
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({ type: 'main-search-typing' }, '*');
+            }
+            clearTimeout(debounceTimer);
+            const searchTerm = event.target.value.trim();
+            // Show/hide clear icon instantly based on input
+            if (searchTerm.length > 0) {
+                clearIcon.style.display = 'block';
+            } else {
+                clearIcon.style.display = 'none';
+            }
+
+            debounceTimer = setTimeout(() => {
+                if (searchTerm.length < 2 && searchTerm.length !== 0) {
+                    return; // Don't search if less than 2 characters and not empty
+                }
+                populateTable(searchTerm);
+            }, 400);
+        });
+
+        // Clear icon functionality
+        clearIcon.addEventListener('click', () => {
+            searchBox.value = '';
+            populateTable(); // Re-populate with all data
+            clearIcon.style.display = 'none'; // Hide the icon
+            searchBox.focus(); // Keep focus on the search box
+        });
+
+        // Update button functionality
+        const updateButton = document.getElementById('updateButton');
+        updateButton.addEventListener('click', () => {
+            localStorage.removeItem('postOfficedata10');
+            localStorage.removeItem('lastFetchTime');
+            loadData();
+        });
+
+        // Retry button functionality
+        retryButton.addEventListener('click', retryLoading);
+
+        // Load data on page load
+        loadData();
+
+        // Check network status every 10 seconds to auto-retry if needed
+        setInterval(updateNetworkStatus, 10000);
+
+        // Handle share functionality
+        const shareModal = document.getElementById('shareModal');
+        const closeModal = document.querySelector('.close-modal');
+        const shareLinkInput = document.getElementById('shareLink');
+        const copyButton = document.getElementById('copyButton');
+
+        // Close modal when clicking the X
+        closeModal.addEventListener('click', () => {
+            shareModal.style.display = 'none';
+        });
+
+        // Close modal when clicking outside of it
+        window.addEventListener('click', (event) => {
+            if (event.target === shareModal) {
+                shareModal.style.display = 'none';
+            }
+        });
+
+        // Copy link to clipboard
+        copyButton.addEventListener('click', () => {
+            shareLinkInput.select();
+            document.execCommand('copy');
+            
+            // Change button text temporarily
+            const originalText = copyButton.textContent;
+            copyButton.textContent = 'Copied!';
+            setTimeout(() => {
+                copyButton.textContent = originalText;
+            }, 2000);
+        });
+
+        // Handle share button clicks (using event delegation)
+        document.addEventListener('click', (event) => {
+            if (event.target.classList.contains('shareButton')) {
+                const officeName = decodeURIComponent(event.target.dataset.office);
+                const currentUrl = window.location.href.split('?')[0];
+                const shareUrl = `${currentUrl}?office=${encodeURIComponent(officeName)}`;
+                
+                // Set the link in the modal
+                shareLinkInput.value = shareUrl;
+                
+                // Show the modal
+                shareModal.style.display = 'block';
+            }
+        });
+
+        // Check for office param in URL on page load
+        function checkUrlForOffice() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const officeName = urlParams.get('office');
+            
+            if (officeName) {
+                // Wait for data to load first, then search
+                const checkDataInterval = setInterval(() => {
+                    if (data && data.Main && data.Main.length > 0) {
+                        clearInterval(checkDataInterval);
+                        
+                        // Set the search box value
+                        searchBox.value = decodeURIComponent(officeName);
+                        
+                        // Trigger the search
+                        populateTable(decodeURIComponent(officeName));
+                        
+                        // Scroll to the table results
+                        document.getElementById('postOfficeTable').scrollIntoView({ behavior: 'smooth' });
+                    }
+                }, 100);
+            }
+        }
+        
+        // Call on page load
+        checkUrlForOffice();
+    </script>
+<div id="correctionInstruction">
+    If you have any data corrections or updates, please click the "Submit Correction" button above to fill out our form.
+</div>
+
+    <div id="notification">
+        Please send an email to <a href="mailto:ddarshaka1@gmail.com">ddarshaka1@gmail.com</a> or whatapp 0761402495 get in touch.
+        To see more details about SPO, click on the post office name.
+    </div>
+</body>
+</html>

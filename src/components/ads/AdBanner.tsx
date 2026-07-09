@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { AdMob, BannerAdSize, BannerAdPosition } from "@capacitor-community/admob";
-import { Capacitor } from "@capacitor/core";
 import { MapPin } from "lucide-react";
 import { useAds } from "./AdManager";
+
+function isNativePlatform(): boolean {
+    return typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.();
+}
 
 interface AdBannerProps {
     position?: "sticky-bottom" | "in-feed";
@@ -19,7 +21,7 @@ export default function AdBanner({ position = "in-feed", className = "", style, 
     const { adsEnabled, loading } = useAds();
 
     useEffect(() => {
-        const native = Capacitor.isNativePlatform();
+        const native = isNativePlatform();
         setIsNative(native);
 
         if (native && position === "sticky-bottom" && !hasRequestedNativeBanner.current && adsEnabled) {
@@ -27,6 +29,8 @@ export default function AdBanner({ position = "in-feed", className = "", style, 
             
             const showNativeBanner = async () => {
                 try {
+                    const { AdMob, BannerAdSize, BannerAdPosition } = await import("@capacitor-community/admob");
+                    const { Capacitor } = await import("@capacitor/core");
                     await AdMob.showBanner({
                         adId: Capacitor.getPlatform() === 'ios' ? 'ca-app-pub-3940256099942544/2934735716' : 'ca-app-pub-3940256099942544/6300978111',
                         adSize: BannerAdSize.BANNER,
@@ -42,8 +46,10 @@ export default function AdBanner({ position = "in-feed", className = "", style, 
             showNativeBanner();
 
             return () => {
-                AdMob.hideBanner().catch(console.error);
-                AdMob.removeBanner().catch(console.error);
+                import("@capacitor-community/admob").then(({ AdMob }) => {
+                    AdMob.hideBanner().catch(console.error);
+                    AdMob.removeBanner().catch(console.error);
+                }).catch(console.error);
                 hasRequestedNativeBanner.current = false;
             };
         }

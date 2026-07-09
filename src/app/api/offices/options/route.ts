@@ -17,7 +17,15 @@ export async function GET() {
             .map(d => d.value.trim())
             .filter(Boolean);
 
-        return NextResponse.json({ divisions: divisionNames }, { status: 200 });
+        return NextResponse.json(
+            { divisions: divisionNames },
+            {
+                status: 200,
+                headers: {
+                    'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+                },
+            }
+        );
     } catch (error) {
         console.error("Error fetching divisions:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

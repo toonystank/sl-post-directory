@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import PhotoUpload from "@/components/office/PhotoUpload";
 import PhotoGallery from "@/components/office/PhotoGallery";
 import { PhotoUploadClient } from "./PhotoUploadClient";
+import ReviewSection from "@/components/ReviewSection";
 
 export const revalidate = 86400; // Cache the post office page for 24 hours
 
@@ -56,7 +57,11 @@ export default async function OfficeDetails({ params }: { params: Promise<{ id: 
             photos: {
                 where: { status: "APPROVED" },
                 orderBy: { createdAt: 'desc' }
-            }
+            },
+            reviews: {
+                orderBy: { createdAt: 'desc' },
+                take: 20,
+            },
         }
     });
 
@@ -70,6 +75,10 @@ export default async function OfficeDetails({ params }: { params: Promise<{ id: 
     const is24HourField = office.fields.find(f => f.name === 'Is24Hour');
     const is24Hour = is24HourField?.value === 'true';
 
+    const avgRating = office.reviews.length > 0
+        ? office.reviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / office.reviews.length
+        : undefined;
+
     const jsonLd = {
         "@context": "https://schema.org",
         "@type": "GovernmentOffice",
@@ -82,6 +91,13 @@ export default async function OfficeDetails({ params }: { params: Promise<{ id: 
         "url": `https://postagedirectory.vercel.app/office/${office.id}`,
         "telephone": office.fields.find(f => f.name === 'Telephone' || f.name === 'Phone')?.value,
         "openingHours": is24Hour ? "Mo-Su 00:00-23:59" : undefined,
+        ...(avgRating ? {
+            "aggregateRating": {
+                "@type": "AggregateRating",
+                "ratingValue": avgRating.toFixed(1),
+                "reviewCount": office.reviews.length
+            }
+        } : {}),
     };
 
     return (
@@ -178,6 +194,16 @@ export default async function OfficeDetails({ params }: { params: Promise<{ id: 
                             <PhotoUploadClient officeId={office.id} />
                         </div>
                     </div>
+
+                    {/* Reviews Section */}
+                    <Separator className="my-12 opacity-50" />
+                    <ReviewSection
+                        reviews={office.reviews.map(r => ({
+                            ...r,
+                            createdAt: r.createdAt.toISOString(),
+                        }))}
+                        officeId={office.id}
+                    />
 
                     {/* Suggestion Section */}
                     <Separator className="my-12 opacity-50" />

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RMSC / TPO Office Finder</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-4">
+
+<div class="max-w-6xl mx-auto bg-white p-4 rounded shadow">
+  <h1 class="text-xl font-bold mb-4">RMSC / TPO Office Finder</h1>
+
+  <!-- Filters -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+    <select id="rmscFilter" class="border p-2 rounded">
+      <option value="">All RMSC / TPO</option>
+    </select>
+
+    <input id="officeFilter" type="text" placeholder="Search Office"
+      class="border p-2 rounded"/>
+
+    <input id="codeFilter" type="text" placeholder="Search Code"
+      class="border p-2 rounded"/>
+  </div>
+
+  <div class="flex gap-3 mb-4">
+    <button id="refreshBtn"
+      class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors">
+      🔄 Update Data
+    </button>
+
+    <a href="https://docs.google.com/forms/d/e/1FAIpQLSf5EBMKImoo-YZFsPva8_meCaYFguzUC1TCrmo7rnF-Fe3RlA/viewform?usp=dialog" 
+       target="_blank" 
+       class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded transition-colors font-medium">
+      Data Correction
+    </a>
+  </div>
+
+  <!-- Table -->
+  <div class="overflow-x-auto">
+    <table class="w-full border text-sm">
+      <thead class="bg-gray-200">
+        <tr>
+          <th class="border p-2 text-left">RMSC / TPO</th>
+          <th class="border p-2 text-left">Office</th>
+          <th class="border p-2 text-left">Code</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const DATA_KEY = "RMSC_OFFICES_CACHE";
+const TIME_KEY = "RMSC_OFFICES_CACHE_TIME";
+const ONE_WEEK = 7 * 24 * 60 * 60 * 1000;
+
+let allData = [];
+
+// Load data with weekly auto refresh
+async function loadData(force = false) {
+  const cached = localStorage.getItem(DATA_KEY);
+  const cachedTime = localStorage.getItem(TIME_KEY);
+  const now = Date.now();
+
+  const expired = !cachedTime || (now - cachedTime > ONE_WEEK);
+
+  if (!force && cached && !expired) {
+    allData = JSON.parse(cached);
+    initUI();
+  } else {
+    await fetchAndCache();
+  }
+}
+
+async function fetchAndCache() {
+  const res = await fetch("RMSC OFFICES.json", { cache: "no-store" });
+  const json = await res.json();
+
+  allData = json.Sheet1;
+  localStorage.setItem(DATA_KEY, JSON.stringify(allData));
+  localStorage.setItem(TIME_KEY, Date.now());
+
+  initUI();
+}
+
+// Init dropdown
+function initUI() {
+  const rmscSelect = document.getElementById("rmscFilter");
+  rmscSelect.innerHTML = '<option value="">All RMSC / TPO</option>';
+
+  [...new Set(allData.map(d => d["RMSC / TPO"]))].sort()
+    .forEach(rmsc => {
+      const opt = document.createElement("option");
+      opt.value = rmsc;
+      opt.textContent = rmsc;
+      rmscSelect.appendChild(opt);
+    });
+
+  renderTable(allData);
+}
+
+// Render table
+function renderTable(data) {
+  const tbody = document.getElementById("tableBody");
+  tbody.innerHTML = "";
+
+  data.forEach(d => {
+    const tr = document.createElement("tr");
+    tr.className = "cursor-pointer hover:bg-blue-50";
+    tr.onclick = () => {
+      const rmsc = encodeURIComponent(d["RMSC / TPO"]);
+      const office = encodeURIComponent(d["OFFICE "] || "");
+      const code = encodeURIComponent((d["CODE"] || "").trim());
+      window.location.href = `office.html?rmsc=${rmsc}&office=${office}&code=${code}`;
+    };
+
+    tr.innerHTML = `
+      <td class="border p-2">${d["RMSC / TPO"] || ""}</td>
+      <td class="border p-2">${d["OFFICE "] || ""}</td>
+      <td class="border p-2">${(d["CODE"] || "").trim()}</td>
+    `;
+
+    tbody.appendChild(tr);
+  });
+}
+
+// Filtering
+function applyFilters() {
+  const rmsc = rmscFilter.value.toLowerCase();
+  const office = officeFilter.value.toLowerCase();
+  const code = codeFilter.value.toLowerCase();
+
+  renderTable(
+    allData.filter(d =>
+      (!rmsc || d["RMSC / TPO"].toLowerCase().includes(rmsc)) &&
+      (!office || (d["OFFICE "] || "").toLowerCase().includes(office)) &&
+      (!code || (d["CODE"] || "").toLowerCase().includes(code))
+    )
+  );
+}
+
+// Manual refresh
+refreshBtn.onclick = async () => {
+  refreshBtn.textContent = "⏳ Updating...";
+  await loadData(true);
+  refreshBtn.textContent = "🔄 Update Data";
+  alert("Data updated successfully!");
+};
+
+// Events
+rmscFilter.onchange = applyFilters;
+officeFilter.oninput = applyFilters;
+codeFilter.oninput = applyFilters;
+
+// Init
+loadData();
+</script>
+
+</body>
+</html>
