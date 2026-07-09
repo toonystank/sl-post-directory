@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { CopyButton } from "@/components/CopyButton";
 import { BackButton } from "@/components/BackButton";
-import { Building2, Store, Hash, PenLine } from "lucide-react";
+import { Building2, Store, Hash, PenLine, Network } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -59,9 +59,12 @@ export default async function OfficeDetails({ params }: { params: Promise<{ id: 
                 orderBy: { createdAt: 'desc' }
             },
             reviews: {
+                where: { status: "APPROVED" },
                 orderBy: { createdAt: 'desc' },
                 take: 20,
             },
+            controllingOffice: { select: { id: true, name: true, postalCode: true } },
+            controlledOffices: { select: { id: true, name: true, postalCode: true } },
         }
     });
 
@@ -142,6 +145,15 @@ export default async function OfficeDetails({ params }: { params: Promise<{ id: 
                 </CardHeader>
 
                 <CardContent className="relative z-10 p-8 md:p-12">
+                    {office.rmsc && (
+                        <div className="mb-8 w-full">
+                            <div className="flex flex-col items-center justify-center p-6 bg-gradient-to-br from-red-500/10 to-amber-500/10 border border-red-500/20 rounded-2xl">
+                                <h3 className="text-sm font-mono text-muted-foreground uppercase tracking-widest mb-1">RMSC / TPO Classification</h3>
+                                <p className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-500">{office.rmsc}</p>
+                            </div>
+                        </div>
+                    )}
+                    
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Core Info Cards */}
                         <div className="group bg-background/50 border border-border/50 rounded-2xl p-6 flex flex-col items-start gap-4 hover:border-primary/50 transition-all hover:shadow-md hover:bg-card">
@@ -173,6 +185,52 @@ export default async function OfficeDetails({ params }: { params: Promise<{ id: 
                             </div>
                         ))}
                     </div>
+
+                    {/* Network Structure Section */}
+                    {(office.controllingOffice || (office.controlledOffices && office.controlledOffices.length > 0)) && (
+                        <>
+                            <Separator className="my-12 border-border/40" />
+                            <div className="space-y-6">
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-6">
+                                    <div>
+                                        <h2 className="text-2xl font-bold tracking-tight mb-1 flex items-center gap-2">
+                                            <Network className="w-6 h-6 text-primary" /> Network Structure
+                                        </h2>
+                                        <p className="text-sm text-muted-foreground">The hierarchy of this post office in the postal network.</p>
+                                    </div>
+                                </div>
+                                
+                                {office.controllingOffice && (
+                                    <div className="bg-background/40 border border-border/50 rounded-2xl p-6">
+                                        <h3 className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-3">Controlled By</h3>
+                                        <Link href={`/office/${office.controllingOffice.id}`} className="flex items-center justify-between bg-card/60 border border-border/40 hover:border-primary/50 hover:bg-card p-4 rounded-xl transition-all group">
+                                            <div className="flex items-center gap-4">
+                                                <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                                                    <Building2 className="w-5 h-5" />
+                                                </div>
+                                                <span className="font-semibold text-lg group-hover:text-primary transition-colors">{office.controllingOffice.name}</span>
+                                            </div>
+                                            <span className="font-mono text-muted-foreground bg-background px-3 py-1 rounded-md text-sm">{office.controllingOffice.postalCode}</span>
+                                        </Link>
+                                    </div>
+                                )}
+                                
+                                {office.controlledOffices && office.controlledOffices.length > 0 && (
+                                    <div className="bg-background/40 border border-border/50 rounded-2xl p-6">
+                                        <h3 className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-4">Controls {office.controlledOffices.length} Sub-Offices</h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                            {office.controlledOffices.map((sub: any) => (
+                                                <Link key={sub.id} href={`/office/${sub.id}`} className="flex items-center justify-between bg-card/60 border border-border/40 hover:border-primary/50 hover:bg-card p-3 rounded-xl transition-all group">
+                                                    <span className="font-medium text-sm group-hover:text-primary transition-colors truncate">{sub.name}</span>
+                                                    <span className="font-mono text-xs text-muted-foreground bg-background px-2 py-0.5 rounded-md shrink-0">{sub.postalCode}</span>
+                                                </Link>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    )}
 
                     {/* Community Photos Section */}
                     <Separator className="my-12 opacity-50" />

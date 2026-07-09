@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import OfficeEditModal from "./OfficeEditModal";
 
 interface Office {
     id: string;
@@ -25,6 +26,7 @@ export default function AdminOfficeManager({ isContributor = false }: { isContri
     const [bulkService, setBulkService] = useState<string>("Foreign parcel unit");
     const [isBulking, setIsBulking] = useState(false);
     const [isMobileCollapsed, setIsMobileCollapsed] = useState(true);
+    const [editingOfficeId, setEditingOfficeId] = useState<string | null>(null);
     const router = useRouter();
 
     const SERVICE_TAGS = ["Foreign parcel unit", "postal complex", "regional sorting unit"];
@@ -259,10 +261,13 @@ export default function AdminOfficeManager({ isContributor = false }: { isContri
                                                     </Button>
                                                 ) : (
                                                     <>
-                                                        <Button asChild size="sm" variant="outline" className="h-8 shadow-none gap-1">
-                                                            <Link href={`/dashboard/edit/${office.id}`}>
-                                                                <Edit3 className="w-3.5 h-3.5" /> Edit
-                                                            </Link>
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant="outline" 
+                                                            className="h-8 shadow-none gap-1"
+                                                            onClick={() => setEditingOfficeId(office.id)}
+                                                        >
+                                                            <Edit3 className="w-3.5 h-3.5" /> Edit
                                                         </Button>
                                                         <Button
                                                             size="sm"
@@ -312,10 +317,13 @@ export default function AdminOfficeManager({ isContributor = false }: { isContri
                                             </Button>
                                         ) : (
                                             <>
-                                                <Button asChild size="sm" variant="outline" className="h-8 shadow-none gap-1 flex-1">
-                                                    <Link href={`/dashboard/edit/${office.id}`}>
-                                                        <Edit3 className="w-3.5 h-3.5" /> Edit
-                                                    </Link>
+                                                <Button 
+                                                    size="sm" 
+                                                    variant="outline" 
+                                                    className="h-8 shadow-none gap-1 flex-1"
+                                                    onClick={() => setEditingOfficeId(office.id)}
+                                                >
+                                                    <Edit3 className="w-3.5 h-3.5" /> Edit
                                                 </Button>
                                                 <Button
                                                     size="sm"
@@ -336,6 +344,17 @@ export default function AdminOfficeManager({ isContributor = false }: { isContri
                 )}
             </CardContent>
             </div>
+            
+            {/* Edit Modal */}
+            <OfficeEditModal 
+                officeId={editingOfficeId} 
+                onClose={() => setEditingOfficeId(null)} 
+                onSaved={() => {
+                    setEditingOfficeId(null);
+                    fetchOffices(searchQuery);
+                    router.refresh();
+                }} 
+            />
         </Card>
     );
 }

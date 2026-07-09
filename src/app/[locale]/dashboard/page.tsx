@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import AdminOfficeManager from "./AdminOfficeManager";
 import ModerationQueue from "./ModerationQueue";
 import PhotoModeration from "./PhotoModeration";
+import ReviewModeration from "./ReviewModeration";
 import AdToggle from "./AdToggle";
 
 interface SessionUser {
@@ -43,7 +44,7 @@ export default async function AdminDashboard() {
     }
 
     // Dashboard Stats
-    const [totalOffices, pendingEdits, employeeCount, pendingEditItems, communityPhotos] = await Promise.all([
+    const [totalOffices, pendingEdits, employeeCount, pendingEditItems, communityPhotos, pendingReviewsCount, pendingReviewItems] = await Promise.all([
         prisma.postOffice.count(),
         prisma.editRequest.count({ where: { status: { in: ["PENDING", "MORE_INFO"] } } }),
         prisma.user.count({ where: { role: "CONTRIBUTOR" } }),
@@ -61,6 +62,14 @@ export default async function AdminDashboard() {
             },
             orderBy: { createdAt: 'desc' },
             take: 100 // Limit to recent 100 for safety
+        }),
+        prisma.review.count({ where: { status: "PENDING" } }),
+        prisma.review.findMany({
+            where: { status: "PENDING" },
+            include: {
+                postOffice: { select: { name: true, postalCode: true } }
+            },
+            orderBy: { createdAt: 'desc' }
         })
     ]);
 
@@ -171,6 +180,9 @@ export default async function AdminDashboard() {
 
                 {/* Photo Moderation */}
                 <PhotoModeration photos={communityPhotos} />
+
+                {/* Review Moderation */}
+                <ReviewModeration initialPendingReviews={pendingReviewsCount} initialPendingReviewItems={pendingReviewItems} />
             </div>
         </div>
     );

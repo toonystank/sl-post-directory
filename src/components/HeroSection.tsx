@@ -26,19 +26,19 @@ export default function HeroSection({ children }: HeroSectionProps) {
 
                 {/* Floating glow effects — CSS animations instead of framer-motion */}
                 <div className="absolute top-0 left-0 w-full h-full overflow-hidden">
-                    {/* Pink/Magenta glow */}
+                    {/* Red glow */}
                     <div
-                        className="hidden md:block absolute -top-[100px] -left-[100px] w-[500px] h-[500px] bg-fuchsia-600/10 dark:bg-fuchsia-600/40 rounded-full blur-[120px] animate-aurora-1"
+                        className="hidden md:block absolute -top-[100px] -left-[100px] w-[500px] h-[500px] bg-red-600/10 dark:bg-red-600/40 rounded-full blur-[120px] animate-aurora-1"
                     />
 
-                    {/* Blue/Cyan glow */}
+                    {/* Gold glow */}
                     <div
-                        className="hidden md:block absolute top-0 right-[-100px] w-[600px] h-[600px] bg-blue-600/10 dark:bg-blue-600/40 rounded-full blur-[130px] animate-aurora-2"
+                        className="hidden md:block absolute top-0 right-[-100px] w-[600px] h-[600px] bg-amber-500/10 dark:bg-amber-500/30 rounded-full blur-[130px] animate-aurora-2"
                     />
 
-                    {/* Teal/Emerald glow in center-bottom */}
+                    {/* Dark Red center-bottom */}
                     <div
-                        className="hidden md:block absolute bottom-[-100px] left-[30%] w-[500px] h-[500px] bg-teal-500/10 dark:bg-teal-500/30 rounded-full blur-[140px] animate-aurora-3"
+                        className="hidden md:block absolute bottom-[-100px] left-[30%] w-[500px] h-[500px] bg-rose-700/10 dark:bg-rose-700/30 rounded-full blur-[140px] animate-aurora-3"
                     />
                 </div>
 
@@ -69,7 +69,7 @@ export default function HeroSection({ children }: HeroSectionProps) {
                     className="text-4xl md:text-5xl lg:text-5xl font-extrabold tracking-tight mb-6 md:mb-4 text-foreground dark:text-white animate-fade-slide-up"
                 >
                     Navigate the Island&apos;s <br className="hidden md:block" />
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-indigo-600 dark:from-primary dark:to-blue-400">
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-amber-500 dark:from-red-500 dark:to-amber-400">
                         Postal Network
                     </span>
                 </h1>

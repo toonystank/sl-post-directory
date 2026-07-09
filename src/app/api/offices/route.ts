@@ -16,6 +16,9 @@ const OFFICE_SELECT = {
     name: true,
     postalCode: true,
     services: true,
+    rmsc: true,
+    controllingOffice: { select: { id: true, name: true } },
+    controlledOffices: { select: { id: true, name: true, postalCode: true } },
     fields: FIELD_SELECT,
 };
 
@@ -34,7 +37,7 @@ export async function GET(request: NextRequest) {
         if (isNaN(limit)) limit = 12;
         limit = Math.min(Math.max(limit, 1), 100); // Clamp between 1 and 100
 
-        let offices = [];
+        let offices: any[] = [];
         let total = 0;
 
         if (query && mode === "name") {

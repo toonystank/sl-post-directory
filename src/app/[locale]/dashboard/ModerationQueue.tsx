@@ -101,17 +101,17 @@ export default function ModerationQueue({ initialPendingEdits, initialPendingEdi
                                 <span className="font-bold text-foreground">Submitter notes:</span> {reason}
                             </div>
                         )}
-                        <div className="flex items-center gap-3 py-1.5 px-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                            <span className="font-medium text-muted-foreground w-24 shrink-0">Name</span>
+                        <div className="flex items-center gap-3 py-2 px-3 bg-emerald-500/5 border-l-2 border-emerald-500 rounded-r-lg">
+                            <span className="font-medium text-muted-foreground w-28 shrink-0">Name</span>
                             <span className="text-emerald-500 font-medium">+ {changes.name}</span>
                         </div>
-                        <div className="flex items-center gap-3 py-1.5 px-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                            <span className="font-medium text-muted-foreground w-24 shrink-0">Postal Code</span>
+                        <div className="flex items-center gap-3 py-2 px-3 bg-emerald-500/5 border-l-2 border-emerald-500 rounded-r-lg">
+                            <span className="font-medium text-muted-foreground w-28 shrink-0">Postal Code</span>
                             <span className="text-emerald-500 font-medium">+ {changes.postalCode}</span>
                         </div>
                         {changes.fields && changes.fields.map((f: any, i: number) => (
-                            <div key={i} className="flex items-center gap-3 py-1.5 px-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                                <span className="font-medium text-muted-foreground w-24 shrink-0">{f.name}</span>
+                            <div key={i} className="flex items-center gap-3 py-2 px-3 bg-emerald-500/5 border-l-2 border-emerald-500 rounded-r-lg">
+                                <span className="font-medium text-muted-foreground w-28 shrink-0">{f.name}</span>
                                 <span className="text-emerald-500 font-medium">+ {f.value}</span>
                             </div>
                         ))}
@@ -126,19 +126,19 @@ export default function ModerationQueue({ initialPendingEdits, initialPendingEdi
                 <div className="space-y-3 text-sm">
                     {/* Basic fields — name & postalCode */}
                     {changes.name && (
-                        <div className="flex items-center gap-3 py-1.5 px-3 bg-muted/30 rounded-lg">
-                            <span className="font-medium text-muted-foreground w-24 shrink-0">Name</span>
-                            <span className="line-through text-muted-foreground/60">{currentOffice.name}</span>
+                        <div className="flex items-center gap-3 py-2 px-3 bg-muted/20 border-l-2 border-primary rounded-r-lg">
+                            <span className="font-medium text-muted-foreground w-28 shrink-0">Name</span>
+                            <span className="line-through text-destructive font-medium bg-destructive/10 px-1.5 rounded">{currentOffice.name}</span>
                             <span className="text-muted-foreground">→</span>
-                            <span className="text-emerald-500 font-medium">{changes.name}</span>
+                            <span className="text-emerald-500 font-medium bg-emerald-500/10 px-1.5 rounded">{changes.name}</span>
                         </div>
                     )}
                     {changes.postalCode && (
-                        <div className="flex items-center gap-3 py-1.5 px-3 bg-muted/30 rounded-lg">
-                            <span className="font-medium text-muted-foreground w-24 shrink-0">Postal Code</span>
-                            <span className="line-through text-muted-foreground/60">{currentOffice.postalCode}</span>
+                        <div className="flex items-center gap-3 py-2 px-3 bg-muted/20 border-l-2 border-primary rounded-r-lg">
+                            <span className="font-medium text-muted-foreground w-28 shrink-0">Postal Code</span>
+                            <span className="line-through text-destructive font-medium bg-destructive/10 px-1.5 rounded">{currentOffice.postalCode}</span>
                             <span className="text-muted-foreground">→</span>
-                            <span className="text-emerald-500 font-medium">{changes.postalCode}</span>
+                            <span className="text-emerald-500 font-medium bg-emerald-500/10 px-1.5 rounded">{changes.postalCode}</span>
                         </div>
                     )}
 
@@ -151,18 +151,18 @@ export default function ModerationQueue({ initialPendingEdits, initialPendingEdi
                                 const isChanged = !isNew && currentValue !== f.value;
 
                                 return (
-                                    <div key={i} className="flex items-center gap-3 py-1.5 px-3 bg-muted/30 rounded-lg">
-                                        <span className="font-medium text-muted-foreground w-24 shrink-0">{f.name}</span>
+                                    <div key={i} className={`flex items-center gap-3 py-2 px-3 bg-muted/20 border-l-2 rounded-r-lg ${isNew ? 'border-emerald-500' : isChanged ? 'border-primary' : 'border-border'}`}>
+                                        <span className="font-medium text-muted-foreground w-28 shrink-0">{f.name}</span>
                                         {isNew ? (
-                                            <span className="text-emerald-500 font-medium italic">+ {f.value} (new field)</span>
+                                            <span className="text-emerald-500 font-medium bg-emerald-500/10 px-1.5 rounded">+ {f.value}</span>
                                         ) : isChanged ? (
                                             <>
-                                                <span className="line-through text-muted-foreground/60">{currentValue}</span>
+                                                <span className="line-through text-destructive font-medium bg-destructive/10 px-1.5 rounded">{currentValue}</span>
                                                 <span className="text-muted-foreground">→</span>
-                                                <span className="text-emerald-500 font-medium">{f.value}</span>
+                                                <span className="text-emerald-500 font-medium bg-emerald-500/10 px-1.5 rounded">{f.value}</span>
                                             </>
                                         ) : (
-                                            <span className="text-muted-foreground/60 italic">No change ({f.value})</span>
+                                            <span className="text-muted-foreground/60 italic">{f.value}</span>
                                         )}
                                     </div>
                                 );
@@ -260,28 +260,28 @@ export default function ModerationQueue({ initialPendingEdits, initialPendingEdi
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-2">
                                                     <button
-                                                        className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-colors disabled:opacity-50"
+                                                        className="px-3 py-2 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2 text-xs font-bold"
                                                         title="Approve"
                                                         disabled={processingId === edit.id}
                                                         onClick={() => handleAction(edit.id, "APPROVE")}
                                                     >
-                                                        <Check className="w-4 h-4" />
+                                                        <Check className="w-4 h-4" /> Approve
                                                     </button>
                                                     <button
-                                                        className="p-1.5 text-amber-500 hover:bg-amber-500/10 rounded-lg transition-colors disabled:opacity-50"
+                                                        className="px-3 py-2 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2 text-xs font-bold"
                                                         title="Need More Info"
                                                         disabled={processingId === edit.id}
                                                         onClick={() => handleAction(edit.id, "MORE_INFO")}
                                                     >
-                                                        <Info className="w-4 h-4" />
+                                                        <Info className="w-4 h-4" /> Needs Info
                                                     </button>
                                                     <button
-                                                        className="p-1.5 text-destructive hover:bg-destructive/10 rounded-lg transition-colors disabled:opacity-50"
+                                                        className="px-3 py-2 bg-destructive/10 text-destructive hover:bg-destructive/20 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2 text-xs font-bold"
                                                         title="Reject"
                                                         disabled={processingId === edit.id}
                                                         onClick={() => handleAction(edit.id, "REJECT")}
                                                     >
-                                                        <X className="w-4 h-4" />
+                                                        <X className="w-4 h-4" /> Reject
                                                     </button>
                                                 </div>
                                                 <button

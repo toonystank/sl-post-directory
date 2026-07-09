@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Image as ImageIcon, Trash2, CameraOff, ExternalLink } from "lucide-react";
+import { Image as ImageIcon, Trash2, CameraOff, ExternalLink, Maximize2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -25,6 +26,7 @@ interface PhotoModerationProps {
 export default function PhotoModeration({ photos: initialPhotos }: PhotoModerationProps) {
     const [photos, setPhotos] = useState(initialPhotos);
     const [processingId, setProcessingId] = useState<string | null>(null);
+    const [selectedPhoto, setSelectedPhoto] = useState<typeof photos[0] | null>(null);
     const router = useRouter();
 
     const handleDelete = async (photoId: string) => {
@@ -39,6 +41,7 @@ export default function PhotoModeration({ photos: initialPhotos }: PhotoModerati
             if (res.ok) {
                 // Remove from local state to immediately update UI
                 setPhotos(prev => prev.filter(p => p.id !== photoId));
+                if (selectedPhoto?.id === photoId) setSelectedPhoto(null);
                 // Inform next/navigation to re-fetch the server component state
                 router.refresh();
             } else {
@@ -73,7 +76,7 @@ export default function PhotoModeration({ photos: initialPhotos }: PhotoModerati
                 ) : (
                     <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-h-[600px] overflow-y-auto">
                         {photos.map((photo) => (
-                            <div key={photo.id} className="group relative rounded-xl border border-border/50 overflow-hidden bg-background/50 flex flex-col hover:border-primary/40 transition-all shadow-sm hover:shadow-md">
+                            <div key={photo.id} className="group relative rounded-xl border border-border/50 overflow-hidden bg-background/50 flex flex-col hover:border-primary/40 transition-all shadow-sm hover:shadow-md cursor-pointer" onClick={() => setSelectedPhoto(photo)}>
                                 <div className="aspect-video relative overflow-hidden bg-muted">
                                     <Image 
                                         src={`${photo.url}-/preview/600x400/-/quality/smart/`} 
@@ -84,15 +87,11 @@ export default function PhotoModeration({ photos: initialPhotos }: PhotoModerati
                                         className="object-cover transition-transform duration-500 group-hover:scale-105"
                                     />
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                                    <button
-                                        className="absolute top-3 right-3 p-2 bg-destructive/90 hover:bg-destructive text-destructive-foreground rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-105 disabled:opacity-50 flex items-center gap-2 text-xs font-medium backdrop-blur-sm"
-                                        title="Delete Photo"
-                                        disabled={processingId === photo.id}
-                                        onClick={() => handleDelete(photo.id)}
-                                    >
-                                        <Trash2 className="w-4 h-4" /> 
-                                        {processingId === photo.id ? "Deleting..." : "Delete"}
-                                    </button>
+                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                        <div className="p-3 bg-black/50 backdrop-blur-sm rounded-full text-white">
+                                            <Maximize2 className="w-6 h-6" />
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="p-4 flex-1 flex flex-col justify-between">
                                     <div>
@@ -123,6 +122,55 @@ export default function PhotoModeration({ photos: initialPhotos }: PhotoModerati
                     </div>
                 )}
             </CardContent>
+
+            <Dialog open={!!selectedPhoto} onOpenChange={(open) => !open && setSelectedPhoto(null)}>
+                <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black/95 border-border/50">
+                    <DialogHeader className="p-4 absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 to-transparent flex flex-row items-start justify-between">
+                        <div className="text-left text-white drop-shadow-md">
+                            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                                {selectedPhoto?.postOffice.name}
+                            </DialogTitle>
+                            <DialogDescription className="text-gray-300 mt-1">
+                                {selectedPhoto?.postOffice.postalCode} • Uploaded {selectedPhoto ? new Date(selectedPhoto.createdAt).toLocaleDateString() : ''}
+                            </DialogDescription>
+                        </div>
+                    </DialogHeader>
+                    
+                    <div className="relative w-full h-[70vh] flex items-center justify-center">
+                        {selectedPhoto && (
+                            <Image 
+                                src={selectedPhoto.url} 
+                                alt={selectedPhoto.caption || "Community photo"}
+                                fill
+                                unoptimized={true}
+                                className="object-contain"
+                            />
+                        )}
+                    </div>
+                    
+                    <div className="p-6 bg-card border-t border-border/40 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                        <div className="flex-1">
+                            {selectedPhoto?.caption ? (
+                                <p className="text-sm text-foreground/90 italic">
+                                    "{selectedPhoto.caption}"
+                                </p>
+                            ) : (
+                                <p className="text-sm text-muted-foreground italic">No caption provided.</p>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0 w-full md:w-auto">
+                            <button
+                                className="w-full md:w-auto px-6 py-2.5 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-bold shadow-lg shadow-destructive/20"
+                                disabled={processingId === selectedPhoto?.id}
+                                onClick={() => selectedPhoto && handleDelete(selectedPhoto.id)}
+                            >
+                                <Trash2 className="w-4 h-4" /> 
+                                {processingId === selectedPhoto?.id ? "Deleting..." : "Delete Photo"}
+                            </button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </Card>
     );
 }

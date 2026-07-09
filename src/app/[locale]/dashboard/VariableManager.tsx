@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, Edit3, Trash2, CheckCircle, Save, X } from "lucide-react";
+import { PlusCircle, Edit3, Trash2, CheckCircle, Save, X, Code2 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import type { SiteVariable } from "@prisma/client";
 
 export default function VariableManager() {
@@ -90,22 +92,73 @@ export default function VariableManager() {
     };
 
     return (
-        <div className="bg-card rounded-2xl border border-border/50 overflow-hidden shadow-sm">
-            <div className="p-6 border-b border-border/50 flex items-center justify-between">
+        <Card className="border-border/50 overflow-hidden">
+            <CardHeader className="border-b border-border/40 bg-card/80 flex flex-row items-center justify-between">
                 <div>
-                    <h2 className="text-xl font-bold">Sitewide Placeholders</h2>
-                    <p className="text-sm text-muted-foreground mt-1">Define dynamic variables to use anywhere via {'{{key}}'}.</p>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                        Sitewide Placeholders
+                    </CardTitle>
+                    <CardDescription className="text-sm mt-1">Define dynamic variables to use anywhere via {'{{key}}'}.</CardDescription>
                 </div>
-                {!isCreating && !editingKey && (
-                    <Button onClick={handleNew} className="gap-2 rounded-xl">
-                        <PlusCircle className="w-4 h-4" /> Add Variable
-                    </Button>
+                <Button onClick={handleNew} className="gap-2 rounded-xl h-10">
+                    <PlusCircle className="w-4 h-4" /> Add Variable
+                </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+                {loading ? (
+                    <div className="p-16 text-center text-muted-foreground">
+                        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
+                        <p>Loading variables...</p>
+                    </div>
+                ) : variables.length === 0 ? (
+                    <div className="text-center py-16 text-muted-foreground">
+                        <Code2 className="w-16 h-16 mx-auto mb-4 opacity-15" />
+                        <p className="text-lg font-medium mb-1">No Variables</p>
+                        <p className="text-sm">Create a variable to get started.</p>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left relative">
+                            <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border/50 sticky top-0">
+                                <tr>
+                                    <th className="px-6 py-4 font-medium">Tag Usage</th>
+                                    <th className="px-6 py-4 font-medium">Value</th>
+                                    <th className="px-6 py-4 font-medium">Description</th>
+                                    <th className="px-6 py-4 font-medium text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/50">
+                                {variables.map((v) => (
+                                    <tr key={v.key} className="hover:bg-muted/30 transition-colors">
+                                        <td className="px-6 py-4 font-mono text-primary font-medium">{`{{${v.key}}}`}</td>
+                                        <td className="px-6 py-4 font-medium max-w-xs truncate" title={v.value}>{v.value}</td>
+                                        <td className="px-6 py-4 text-muted-foreground">{v.description || "-"}</td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <Button variant="ghost" size="sm" onClick={() => handleEdit(v)} className="h-8 px-2 text-primary hover:text-primary hover:bg-primary/10">
+                                                    <Edit3 className="w-4 h-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="sm" onClick={() => handleDelete(v.key)} className="h-8 px-2 text-destructive hover:text-destructive hover:bg-destructive/10">
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
-            </div>
+            </CardContent>
 
-            {(isCreating || editingKey) && (
-                <div className="p-6 bg-muted/20 border-b border-border/50 space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Dialog open={isCreating || !!editingKey} onOpenChange={(open) => !open && handleCancel()}>
+                <DialogContent className="max-w-lg p-0 border-border/50 bg-card">
+                    <DialogHeader className="p-6 pb-0">
+                        <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                            {isCreating ? "Add Variable" : "Edit Variable"}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="p-6 space-y-4">
                         <div>
                             <label className="text-sm font-medium text-muted-foreground mb-1 block">Key (e.g. register_price)</label>
                             <Input 
@@ -134,48 +187,14 @@ export default function VariableManager() {
                             />
                         </div>
                     </div>
-                    <div className="flex justify-end gap-2">
-                        <Button variant="ghost" onClick={handleCancel}>Cancel</Button>
-                        <Button onClick={handleSave} className="gap-2"><Save className="w-4 h-4"/> Save</Button>
-                    </div>
-                </div>
-            )}
-
-            {loading ? (
-                <div className="p-8 text-center text-muted-foreground animate-pulse">Loading variables...</div>
-            ) : variables.length === 0 && !isCreating ? (
-                <div className="p-8 text-center text-muted-foreground">No variables defined yet.</div>
-            ) : (
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                        <thead className="text-xs text-muted-foreground uppercase bg-muted/20 border-b border-border/50">
-                            <tr>
-                                <th className="px-6 py-4 font-medium">Tag Usage</th>
-                                <th className="px-6 py-4 font-medium">Value</th>
-                                <th className="px-6 py-4 font-medium">Description</th>
-                                <th className="px-6 py-4 font-medium text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/50">
-                            {variables.map((v) => (
-                                <tr key={v.key} className="hover:bg-muted/10 transition-colors">
-                                    <td className="px-6 py-4 font-mono text-primary font-medium">{`{{${v.key}}}`}</td>
-                                    <td className="px-6 py-4 font-medium">{v.value}</td>
-                                    <td className="px-6 py-4 text-muted-foreground">{v.description || "-"}</td>
-                                    <td className="px-6 py-4 text-right">
-                                        <Button variant="ghost" size="icon" onClick={() => handleEdit(v)} className="w-8 h-8 rounded-lg text-blue-500 hover:text-blue-600 hover:bg-blue-500/10 mr-2">
-                                            <Edit3 className="w-4 h-4" />
-                                        </Button>
-                                        <Button variant="ghost" size="icon" onClick={() => handleDelete(v.key)} className="w-8 h-8 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10">
-                                            <Trash2 className="w-4 h-4" />
-                                        </Button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
-        </div>
+                    <DialogFooter className="p-6 pt-0">
+                        <div className="flex justify-end gap-2 w-full">
+                            <Button variant="ghost" onClick={handleCancel}>Cancel</Button>
+                            <Button onClick={handleSave} className="gap-2"><Save className="w-4 h-4"/> Save</Button>
+                        </div>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </Card>
     );
 }
