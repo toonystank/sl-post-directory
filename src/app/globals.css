@@ -58,7 +58,7 @@
     --secondary-foreground: 222 47% 11%;
 
     --muted: 220 14% 90%;
-    --muted-foreground: 220 10% 40%;
+    --muted-foreground: 220 10% 35%;
 
     --accent: 0 84% 95%;
     --accent-foreground: 0 84% 30%;
@@ -83,7 +83,7 @@
     --popover: 230 15% 8%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 0 84% 50%; /* Glowing Red */
+    --primary: 0 84% 60%; /* Glowing Red - Lightened for WCAG Contrast */
     --primary-foreground: 0 0% 100%;
 
     --secondary: 45 93% 50%; /* Glowing Gold */
