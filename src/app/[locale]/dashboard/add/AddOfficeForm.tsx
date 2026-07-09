@@ -58,7 +58,7 @@ export default function AddOfficeForm() {
                 const json = await res.json();
                 setMessage("Post office added successfully!");
                 setTimeout(() => {
-                    router.push(`/office/${json.office.id}`);
+                    router.push(`/office/${json.office.slug}`);
                     router.refresh();
                 }, 1500);
             } else {

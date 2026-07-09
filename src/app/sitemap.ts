@@ -3,18 +3,18 @@ import { prisma } from '@/lib/prisma';
 import { getAllPosts } from '@/lib/blog';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://postagedirectory.vercel.app';
+  const baseUrl = 'https://lankapost.vercel.app';
 
   // Fetch all post offices
   const postOffices = await prisma.postOffice.findMany({
     select: {
-      id: true,
+      slug: true,
       updatedAt: true,
     },
   });
 
   const officeUrls: MetadataRoute.Sitemap = postOffices.map((office) => ({
-    url: `${baseUrl}/office/${office.id}`,
+    url: `${baseUrl}/office/${office.slug}`,
     lastModified: office.updatedAt,
     changeFrequency: 'weekly',
     priority: 0.8,

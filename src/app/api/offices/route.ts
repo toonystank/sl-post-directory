@@ -13,12 +13,13 @@ const FIELD_SELECT = {
 
 const OFFICE_SELECT = {
     id: true,
+    slug: true,
     name: true,
     postalCode: true,
     services: true,
     rmsc: true,
-    controllingOffice: { select: { id: true, name: true } },
-    controlledOffices: { select: { id: true, name: true, postalCode: true } },
+    controllingOffice: { select: { id: true, slug: true, name: true } },
+    controlledOffices: { select: { id: true, slug: true, name: true, postalCode: true } },
     fields: FIELD_SELECT,
 };
 

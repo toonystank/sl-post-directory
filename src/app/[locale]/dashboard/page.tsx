@@ -58,7 +58,7 @@ export default async function AdminDashboard() {
         }),
         prisma.communityPhoto.findMany({
             include: {
-                postOffice: { select: { name: true, postalCode: true } }
+                postOffice: { select: { name: true, postalCode: true, slug: true } }
             },
             orderBy: { createdAt: 'desc' },
             take: 100 // Limit to recent 100 for safety

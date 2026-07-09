@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { generateSlug } from '../../src/lib/utils'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -57,8 +58,9 @@ async function main() {
 
       try {
         // Create the post office (cuid ID auto-generated)
+        const slug = generateSlug(name);
         const office = await prisma.postOffice.create({
-          data: { name, postalCode },
+          data: { name, postalCode, slug },
         })
 
         // Build fields

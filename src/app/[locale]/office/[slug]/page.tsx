@@ -16,11 +16,11 @@ import ReviewSection from "@/components/ReviewSection";
 
 export const revalidate = 86400; // Cache the post office page for 24 hours
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
-    const { id } = await params;
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+    const { slug } = await params;
     
     const office = await prisma.postOffice.findUnique({
-        where: { id },
+        where: { slug },
         include: { fields: true }
     });
 
@@ -31,27 +31,27 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     }
 
     const typeField = office.fields.find(f => f.name === 'Type')?.value || 'Post Office';
-    const description = `Details, contact information, and operating hours for ${office.name} (${typeField}) - Postal Code ${office.postalCode}, Sri Lanka.`;
+    const description = `Find contact numbers, opening hours, and location for ${office.name} (${typeField}). Postal Code: ${office.postalCode}, Sri Lanka. Check services, reviews, and community photos.`;
 
     return {
-        title: office.name,
+        title: `${office.name} - Postal Code ${office.postalCode} | Sri Lanka Postal Directory`,
         description,
         alternates: {
-            canonical: `/office/${office.id}`,
+            canonical: `https://lankapost.vercel.app/office/${office.slug}`,
         },
         openGraph: {
-            title: office.name,
+            title: `${office.name} - Postal Code ${office.postalCode} | Sri Lanka Postal Directory`,
             description,
-            url: `https://postagedirectory.vercel.app/office/${office.id}`,
+            url: `https://lankapost.vercel.app/office/${office.slug}`,
         },
     }
 }
 
-export default async function OfficeDetails({ params }: { params: Promise<{ id: string }> }) {
-    const { id } = await params;
+export default async function OfficeDetails({ params }: { params: Promise<{ slug: string }> }) {
+    const { slug } = await params;
 
     const office = await prisma.postOffice.findUnique({
-        where: { id },
+        where: { slug },
         include: {
             fields: true, // Include any dynamic fields
             photos: {
@@ -63,8 +63,8 @@ export default async function OfficeDetails({ params }: { params: Promise<{ id: 
                 orderBy: { createdAt: 'desc' },
                 take: 20,
             },
-            controllingOffice: { select: { id: true, name: true, postalCode: true } },
-            controlledOffices: { select: { id: true, name: true, postalCode: true } },
+            controllingOffice: { select: { id: true, slug: true, name: true, postalCode: true } },
+            controlledOffices: { select: { id: true, slug: true, name: true, postalCode: true } },
         }
     });
 
@@ -82,18 +82,36 @@ export default async function OfficeDetails({ params }: { params: Promise<{ id: 
         ? office.reviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / office.reviews.length
         : undefined;
 
+    const telephone = office.fields.find(f => f.name === 'Telephone' || f.name === 'Phone')?.value;
+    const firstImage = office.photos.length > 0 ? office.photos[0].url : undefined;
+
     const jsonLd = {
         "@context": "https://schema.org",
-        "@type": "GovernmentOffice",
+        "@type": "PostOffice",
         "name": office.name,
         "address": {
             "@type": "PostalAddress",
             "postalCode": office.postalCode,
             "addressCountry": "LK"
         },
-        "url": `https://postagedirectory.vercel.app/office/${office.id}`,
-        "telephone": office.fields.find(f => f.name === 'Telephone' || f.name === 'Phone')?.value,
-        "openingHours": is24Hour ? "Mo-Su 00:00-23:59" : undefined,
+        "url": `https://lankapost.vercel.app/office/${office.slug}`,
+        ...(telephone ? { "telephone": telephone } : {}),
+        ...(firstImage ? { "image": firstImage } : {}),
+        ...(office.latitude && office.longitude ? {
+            "geo": {
+                "@type": "GeoCoordinates",
+                "latitude": office.latitude,
+                "longitude": office.longitude
+            }
+        } : {}),
+        "openingHoursSpecification": is24Hour ? [
+            {
+                "@type": "OpeningHoursSpecification",
+                "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+                "opens": "00:00",
+                "closes": "23:59"
+            }
+        ] : undefined,
         ...(avgRating ? {
             "aggregateRating": {
                 "@type": "AggregateRating",
@@ -103,11 +121,40 @@ export default async function OfficeDetails({ params }: { params: Promise<{ id: 
         } : {}),
     };
 
+    const breadcrumbLd = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Home",
+                "item": "https://lankapost.vercel.app/"
+            },
+            {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "Post Offices",
+                "item": "https://lankapost.vercel.app/office"
+            },
+            {
+                "@type": "ListItem",
+                "position": 3,
+                "name": office.name,
+                "item": `https://lankapost.vercel.app/office/${office.slug}`
+            }
+        ]
+    };
+
     return (
-        <div className="container mx-auto px-4 py-12 max-w-4xl min-h-[calc(100vh-4rem)]">
+        <article className="container mx-auto px-4 py-12 max-w-4xl min-h-[calc(100vh-4rem)]">
             <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+            />
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
             />
             <BackButton />
 
@@ -203,7 +250,7 @@ export default async function OfficeDetails({ params }: { params: Promise<{ id: 
                                 {office.controllingOffice && (
                                     <div className="bg-background/40 border border-border/50 rounded-2xl p-6">
                                         <h3 className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-3">Controlled By</h3>
-                                        <Link href={`/office/${office.controllingOffice.id}`} className="flex items-center justify-between bg-card/60 border border-border/40 hover:border-primary/50 hover:bg-card p-4 rounded-xl transition-all group">
+                                        <Link href={`/office/${office.controllingOffice.slug}`} className="flex items-center justify-between bg-card/60 border border-border/40 hover:border-primary/50 hover:bg-card p-4 rounded-xl transition-all group">
                                             <div className="flex items-center gap-4">
                                                 <div className="p-2 bg-primary/10 rounded-lg text-primary">
                                                     <Building2 className="w-5 h-5" />
@@ -220,7 +267,7 @@ export default async function OfficeDetails({ params }: { params: Promise<{ id: 
                                         <h3 className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-4">Controls {office.controlledOffices.length} Sub-Offices</h3>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                             {office.controlledOffices.map((sub: any) => (
-                                                <Link key={sub.id} href={`/office/${sub.id}`} className="flex items-center justify-between bg-card/60 border border-border/40 hover:border-primary/50 hover:bg-card p-3 rounded-xl transition-all group">
+                                                <Link key={sub.id} href={`/office/${sub.slug}`} className="flex items-center justify-between bg-card/60 border border-border/40 hover:border-primary/50 hover:bg-card p-3 rounded-xl transition-all group">
                                                     <span className="font-medium text-sm group-hover:text-primary transition-colors truncate">{sub.name}</span>
                                                     <span className="font-mono text-xs text-muted-foreground bg-background px-2 py-0.5 rounded-md shrink-0">{sub.postalCode}</span>
                                                 </Link>
@@ -281,6 +328,6 @@ export default async function OfficeDetails({ params }: { params: Promise<{ id: 
                     </div>
                 </CardContent>
             </Card>
-        </div>
+        </article>
     );
 }

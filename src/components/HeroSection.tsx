@@ -22,7 +22,7 @@ export default function HeroSection({ children }: HeroSectionProps) {
             {/* Bright Floating Aurora Background */}
             <div className="absolute inset-0 w-full h-full overflow-hidden overflow-x-clip border-b border-border/50 bg-slate-50 dark:bg-[#020817]">
                 {/* Subtle grid base */}
-                <div className="absolute inset-0 w-full h-full bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:3rem_3rem]" />
+                <div suppressHydrationWarning className="absolute inset-0 w-full h-full bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:3rem_3rem]" />
 
                 {/* Floating glow effects — CSS animations instead of framer-motion */}
                 <div className="absolute top-0 left-0 w-full h-full overflow-hidden">
