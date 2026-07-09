@@ -75,7 +75,7 @@ export default function PostOfficeCard({ office, index }: PostOfficeCardProps) {
                                 {type === "Sub Post office" ? <Store className="w-6 h-6" /> : <Building2 className="w-6 h-6" />}
                             </div>
                             <div>
-                                <h3 className="text-lg font-bold tracking-tight text-foreground group-hover:text-primary transition-colors line-clamp-1">{office.name}</h3>
+                                <h3 className="text-lg font-bold tracking-tight text-foreground group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors line-clamp-1">{office.name}</h3>
                                 {type && <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider">{type}</p>}
                             </div>
                         </div>
@@ -124,7 +124,7 @@ export default function PostOfficeCard({ office, index }: PostOfficeCardProps) {
                             {office.controllingOffice && (
                                 <div className="flex items-center justify-between text-xs font-mono">
                                     <span className="text-muted-foreground">Controlled by:</span>
-                                    <span className="text-primary tracking-wider truncate max-w-[150px]">{office.controllingOffice.name}</span>
+                                    <span className="text-red-600 dark:text-red-400 tracking-wider truncate max-w-[150px]">{office.controllingOffice.name}</span>
                                 </div>
                             )}
                         </div>
@@ -136,7 +136,7 @@ export default function PostOfficeCard({ office, index }: PostOfficeCardProps) {
                     <div className="border-t border-border/40 bg-background/30 backdrop-blur-sm z-20">
                         <button 
                             onClick={(e) => { e.preventDefault(); setIsExpanded(!isExpanded); }}
-                            className="w-full flex items-center justify-between p-3 text-xs font-mono uppercase tracking-widest text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
+                            className="w-full flex items-center justify-between p-3 text-xs font-mono uppercase tracking-widest text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:bg-primary/5 transition-colors"
                         >
                             <span className="flex items-center gap-2">
                                 <Network className="w-4 h-4" />
@@ -155,7 +155,7 @@ export default function PostOfficeCard({ office, index }: PostOfficeCardProps) {
                                             href={`/office/${sub.slug}`}
                                             className="flex items-center justify-between p-2 rounded bg-background/50 border border-border/40 hover:border-primary/40 hover:bg-primary/10 transition-colors group/sub"
                                         >
-                                            <span className="text-xs font-medium text-foreground group-hover/sub:text-primary transition-colors truncate">
+                                            <span className="text-xs font-medium text-foreground group-hover/sub:text-red-600 dark:group-hover/sub:text-red-400 transition-colors truncate">
                                                 {sub.name}
                                             </span>
                                             <span className="text-[10px] font-mono text-muted-foreground">

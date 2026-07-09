@@ -83,7 +83,7 @@
     --popover: 230 15% 8%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 0 84% 60%; /* Glowing Red - Lightened for WCAG Contrast */
+    --primary: 0 84% 45%; /* Darker red so white text passes contrast inside buttons */
     --primary-foreground: 0 0% 100%;
 
     --secondary: 45 93% 50%; /* Glowing Gold */
