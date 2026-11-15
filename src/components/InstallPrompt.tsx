@@ -1,105 +1,72 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Download, X } from "lucide-react";
+import { X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "./ui/button";
+import { StampMark } from "./brand/StampLogo";
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
+
+/** "Add to home screen" card — stamp styling, sits above the mobile tab bar. */
 export function InstallPrompt() {
-  const [isReadyForInstall, setIsReadyForInstall] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const t = useTranslations("Install");
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isDismissed, setIsDismissed] = useState(false);
 
   useEffect(() => {
-    const hasDismissed = localStorage.getItem("pwa-install-dismissed");
-    if (hasDismissed) {
-      setIsDismissed(true);
-    }
-
-    const handleBeforeInstallPrompt = (e: Event) => {
-      // Prevent the mini-infobar from appearing on mobile
+    const onPrompt = (e: Event) => {
       e.preventDefault();
-      // Stash the event so it can be triggered later.
-      setDeferredPrompt(e);
-      // Update UI notify the user they can install the PWA
-      setIsReadyForInstall(true);
+      if (!localStorage.getItem("pwa-install-dismissed")) {
+        setDeferredPrompt(e as BeforeInstallPromptEvent);
+      }
     };
+    const onInstalled = () => setDeferredPrompt(null);
 
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-
-    // If the app is already installed, don't show the prompt
-    window.addEventListener("appinstalled", () => {
-      setIsReadyForInstall(false);
-      setDeferredPrompt(null);
-    });
-
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
     return () => {
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
     };
   }, []);
 
-  const handleInstallClick = async () => {
+  const install = async () => {
     if (!deferredPrompt) return;
-    
-    // Show the install prompt
-    deferredPrompt.prompt();
-    
-    // Wait for the user to respond to the prompt
-    const { outcome } = await deferredPrompt.userChoice;
-    
-    if (outcome === "accepted") {
-      setIsReadyForInstall(false);
-    }
-    
-    // We've used the prompt, and can't use it again, throw it away
+    await deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
     setDeferredPrompt(null);
   };
 
-  const handleDismiss = () => {
-    setIsReadyForInstall(false);
+  const dismiss = () => {
     setIsDismissed(true);
     localStorage.setItem("pwa-install-dismissed", "true");
   };
 
-  if (!isReadyForInstall || isDismissed) {
-    return null;
-  }
+  if (!deferredPrompt || isDismissed) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-[400px] z-50 bg-card border shadow-lg rounded-xl p-4 flex flex-col gap-3 animate-in slide-in-from-bottom-5 fade-in duration-300">
-      <div className="flex justify-between items-start">
-        <div className="flex gap-3 items-center">
-          <div className="bg-primary/10 p-2 rounded-lg">
-            <Download className="w-6 h-6 text-primary" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-sm">Install SL Post Directory</h3>
-            <p className="text-xs text-muted-foreground">
-              Add to your home screen for quick access and offline use.
-            </p>
-          </div>
+    <div
+      role="dialog"
+      aria-label={t("title")}
+      className="fixed left-3 right-3 bottom-tabbar mb-3 z-[70] md:left-auto md:right-6 md:mb-6 md:w-[380px] rounded-lg border-2 border-foreground bg-card p-4 shadow-[4px_4px_0_0_hsl(var(--foreground))] animate-in slide-in-from-bottom-5 fade-in duration-300"
+    >
+      <div className="flex items-start gap-3">
+        <StampMark size={40} />
+        <div className="flex-1 min-w-0">
+          <h3 className="font-heading text-base font-extrabold leading-tight [font-stretch:85%]">{t("title")}</h3>
+          <p className="mt-0.5 text-sm text-muted-foreground">{t("body")}</p>
         </div>
-        <button
-          onClick={handleDismiss}
-          className="text-muted-foreground hover:text-foreground transition-colors p-1"
-          aria-label="Dismiss"
-        >
-          <X className="w-4 h-4" />
+        <button onClick={dismiss} className="tap -mr-1 -mt-1 rounded-full p-1.5 text-muted-foreground hover:bg-muted" aria-label={t("notNow")}>
+          <X className="h-4 w-4" />
         </button>
       </div>
-      <div className="flex gap-2 w-full mt-1">
-        <Button
-          variant="secondary"
-          className="flex-1 h-9 text-xs"
-          onClick={handleDismiss}
-        >
-          Not now
-        </Button>
-        <Button
-          className="flex-1 h-9 text-xs"
-          onClick={handleInstallClick}
-        >
-          Install App
-        </Button>
+      <div className="mt-3 flex gap-2">
+        <Button variant="outline" className="flex-1" onClick={dismiss}>{t("notNow")}</Button>
+        <Button className="flex-1" onClick={install}>{t("install")}</Button>
       </div>
     </div>
   );

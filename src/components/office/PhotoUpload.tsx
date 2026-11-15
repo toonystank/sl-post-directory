@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useRef, useState, useEffect, useCallback } from "react";
+import React, { useRef, useState, useCallback } from "react";
 import Image from "next/image";
-import { Camera, Upload, X, CheckCircle, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Camera, X, CheckCircle, Loader2 } from "lucide-react";
 
 interface PhotoUploadProps {
     officeId: string;
@@ -74,10 +73,10 @@ export default function PhotoUpload({ officeId, onUploadComplete }: PhotoUploadP
 
     if (uploadedUrl) {
         return (
-            <div className="relative rounded-2xl overflow-hidden border border-emerald-500/30 bg-emerald-500/5 p-4">
+            <div className="relative rounded-md overflow-hidden border border-status-open/40 bg-status-open/10 p-4">
                 <div className="flex items-center gap-3">
-                    <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
-                    <p className="text-sm text-emerald-400 font-medium">Photo uploaded successfully!</p>
+                    <CheckCircle className="w-5 h-5 text-status-open shrink-0" />
+                    <p className="text-sm text-status-open font-medium">Photo uploaded successfully!</p>
                     <button
                         onClick={() => { setUploadedUrl(null); setError(null); }}
                         className="ml-auto text-muted-foreground hover:text-foreground transition-colors"
@@ -90,7 +89,7 @@ export default function PhotoUpload({ officeId, onUploadComplete }: PhotoUploadP
                         src={`${uploadedUrl}-/preview/400x300/-/quality/smart/`}
                         alt="Uploaded"
                         fill
-                        className="object-cover rounded-xl"
+                        className="object-cover rounded-md"
                     />
                 </div>
             </div>
@@ -104,10 +103,10 @@ export default function PhotoUpload({ officeId, onUploadComplete }: PhotoUploadP
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
-                className={`relative rounded-2xl border-2 border-dashed p-8 text-center cursor-pointer transition-all duration-300 ${
+                className={`relative rounded-md border-2 border-dashed p-8 text-center cursor-pointer transition-colors ${
                     isDragging
-                        ? "border-primary bg-primary/10 scale-[1.02]"
-                        : "border-border/50 hover:border-primary/50 hover:bg-card/50"
+                        ? "border-foreground bg-secondary/20"
+                        : "border-border bg-card hover:border-foreground/50"
                 }`}
             >
                 <input
@@ -125,8 +124,8 @@ export default function PhotoUpload({ officeId, onUploadComplete }: PhotoUploadP
                     </div>
                 ) : (
                     <div className="flex flex-col items-center gap-3">
-                        <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-                            <Camera className="w-7 h-7" />
+                        <div className="w-12 h-12 rounded-md bg-muted flex items-center justify-center text-foreground">
+                            <Camera className="w-6 h-6" />
                         </div>
                         <div>
                             <p className="text-sm font-medium">Drop a photo or click to upload</p>

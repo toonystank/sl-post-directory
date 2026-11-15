@@ -1,26 +1,38 @@
-import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
+import { hasDatabaseUrl, prisma } from "@/lib/prisma";
+import { autocompleteLocalOffices } from "@/lib/local-sqlite";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
+    const searchParams = request.nextUrl.searchParams;
+    const q = searchParams.get("q")?.trim() || "";
+    const mode = searchParams.get("mode") || "name"; // "name" | "division"
+
+    // If no query string, simply return empty to avoid full table scans
+    if (!q || q.length === 0) {
+        return NextResponse.json(
+            { suggestions: [] },
+            {
+                status: 200,
+                headers: {
+                    "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=86400",
+                },
+            }
+        );
+    }
+
+    if (!hasDatabaseUrl) {
+        return NextResponse.json(
+            { suggestions: autocompleteLocalOffices(q, mode) },
+            {
+                status: 200,
+                headers: {
+                    "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400",
+                },
+            }
+        );
+    }
+
     try {
-        const searchParams = request.nextUrl.searchParams;
-        const q = searchParams.get("q")?.trim();
-        const mode = searchParams.get("mode") || "name"; // "name" | "division"
-
-        // If no query string, simply return empty to avoid full table scans
-        if (!q || q.length === 0) {
-            return NextResponse.json(
-                { suggestions: [] },
-                {
-                    status: 200,
-                    headers: {
-                        "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=86400",
-                    },
-                }
-            );
-        }
-
         let suggestions: string[] = [];
 
         if (mode === "name") {
@@ -74,14 +86,13 @@ export async function GET(request: NextRequest) {
                 },
             }
         );
-    } catch (error) {
-        console.error("Error in /api/autocomplete:", error);
+    } catch {
         return NextResponse.json(
-            { error: "Internal Server Error" },
+            { suggestions: autocompleteLocalOffices(q, mode) },
             {
-                status: 500,
+                status: 200,
                 headers: {
-                    'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+                    "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
                 },
             }
         );

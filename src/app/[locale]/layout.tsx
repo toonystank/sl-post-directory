@@ -1,10 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
-import { Outfit } from "next/font/google";
+import { Archivo, Public_Sans, IBM_Plex_Mono, Noto_Sans_Sinhala, Noto_Sans_Tamil } from "next/font/google";
 import "../globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import AuthProvider from "@/context/AuthContext";
 import Navbar from "@/components/Navbar";
+import BottomTabBar from "@/components/shell/BottomTabBar";
+import SiteFooter from "@/components/shell/SiteFooter";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import NextTopLoader from "nextjs-toploader";
@@ -16,9 +18,42 @@ import { routing } from "@/i18n/routing";
 import { notFound } from "next/navigation";
 import { hasLocale } from "next-intl";
 
-const outfit = Outfit({
+// Display: Archivo with the width axis so headlines can be condensed (signage feel)
+const archivo = Archivo({
     subsets: ["latin"],
-    variable: "--font-outfit",
+    axes: ["wdth"],
+    variable: "--font-archivo",
+    display: "swap",
+});
+
+// UI / body text
+const publicSans = Public_Sans({
+    subsets: ["latin"],
+    variable: "--font-body",
+    display: "swap",
+});
+
+// Postcodes, phone numbers, data labels
+const plexMono = IBM_Plex_Mono({
+    subsets: ["latin"],
+    weight: ["400", "500", "600"],
+    variable: "--font-plex",
+    display: "swap",
+});
+
+// Sinhala / Tamil — not preloaded; unicode-range means they only download when needed
+const notoSinhala = Noto_Sans_Sinhala({
+    subsets: ["sinhala"],
+    variable: "--font-sinhala",
+    display: "swap",
+    preload: false,
+});
+
+const notoTamil = Noto_Sans_Tamil({
+    subsets: ["tamil"],
+    variable: "--font-tamil",
+    display: "swap",
+    preload: false,
 });
 
 export const metadata: Metadata = {
@@ -27,31 +62,32 @@ export const metadata: Metadata = {
         canonical: "/",
     },
     title: {
-        default: "Sri Lanka Postal Directory | Find Post Offices & Codes",
-        template: "%s | SL Postal Directory",
+        default: "Lanka Post Directory | Find Sri Lanka Post Offices & Postal Codes",
+        template: "%s | Lanka Post Directory",
     },
-    description: "Search the comprehensive Sri Lanka Postal Directory to find post offices, zip codes, operating hours, contact numbers, and locations across Sri Lanka.",
-    keywords: ["Sri Lanka Post Office", "Postal Codes Sri Lanka", "Zip Codes Sri Lanka", "SL Post Directory", "Post Office Opening Hours"],
+    description: "Search every post office in Sri Lanka — postal codes, opening hours, phone numbers and locations. Plus a postage calculator and guides.",
+    keywords: ["Sri Lanka Post Office", "Postal Codes Sri Lanka", "Zip Codes Sri Lanka", "Lanka Post Directory", "Post Office Opening Hours"],
+    applicationName: "Lanka Post Directory",
     appleWebApp: {
         capable: true,
         statusBarStyle: "default",
-        title: "SL Post Directory",
+        title: "Lanka Post",
     },
     formatDetection: {
         telephone: false,
     },
     openGraph: {
-        title: "Sri Lanka Postal Directory | Find Post Offices & Codes",
-        description: "Search the comprehensive Sri Lanka Postal Directory to find post offices, zip codes, operating hours, contact numbers, and locations across Sri Lanka.",
+        title: "Lanka Post Directory | Find Sri Lanka Post Offices & Postal Codes",
+        description: "Search every post office in Sri Lanka — postal codes, opening hours, phone numbers and locations.",
         url: "https://lankapost.vercel.app",
-        siteName: "SL Post Directory",
+        siteName: "Lanka Post Directory",
         locale: "en_US",
         type: "website",
     },
     twitter: {
         card: "summary_large_image",
-        title: "Sri Lanka Postal Directory",
-        description: "Search the comprehensive Sri Lanka Postal Directory to find post offices, zip codes, operating hours, contact numbers, and locations across Sri Lanka.",
+        title: "Lanka Post Directory",
+        description: "Search every post office in Sri Lanka — postal codes, opening hours, phone numbers and locations.",
     },
     other: {
         "google-adsense-account": "ca-pub-2503310431210239",
@@ -59,7 +95,13 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-    themeColor: "#0f172a",
+    themeColor: [
+        { media: "(prefers-color-scheme: light)", color: "#FBF7EF" },
+        { media: "(prefers-color-scheme: dark)", color: "#15120F" },
+    ],
+    viewportFit: "cover",
+    width: "device-width",
+    initialScale: 1,
 };
 
 export default async function RootLayout({
@@ -79,8 +121,16 @@ export default async function RootLayout({
 
     return (
         <html lang={locale} suppressHydrationWarning>
+            <head>
+                <script
+                    suppressHydrationWarning
+                    dangerouslySetInnerHTML={{
+                        __html: `(function(){try{var a=['bis_skin_checked','bis_register','bis_id','bis_size'];function c(r){for(var i=0;i<a.length;i++){var s='['+a[i]+']';var n=r.querySelectorAll?r.querySelectorAll(s):[];for(var j=0;j<n.length;j++)n[j].removeAttribute(a[i]);if(r.removeAttribute)r.removeAttribute(a[i]);}}c(document.documentElement);if(document.addEventListener)document.addEventListener('DOMContentLoaded',function(){c(document.documentElement);},true);var o=Element.prototype.setAttribute;Element.prototype.setAttribute=function(k,v){if(a.indexOf(k)!==-1)return;return o.call(this,k,v);};new MutationObserver(function(m){for(var i=0;i<m.length;i++){var t=m[i].target;if(t&&t.removeAttribute&&m[i].attributeName&&a.indexOf(m[i].attributeName)!==-1){t.removeAttribute(m[i].attributeName);}}}).observe(document.documentElement,{attributes:true,subtree:true,attributeFilter:a});}catch(e){}})();`,
+                    }}
+                />
+            </head>
 
-            <body className={`${outfit.variable} font-sans min-h-screen flex flex-col antialiased bg-background`} suppressHydrationWarning>
+            <body className={`${archivo.variable} ${publicSans.variable} ${plexMono.variable} ${notoSinhala.variable} ${notoTamil.variable} font-sans min-h-dvh flex flex-col antialiased bg-background`} suppressHydrationWarning>
                 <Script
                     src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`}
                     strategy="lazyOnload"
@@ -99,27 +149,19 @@ export default async function RootLayout({
                         <AdManager>
                             <ThemeProvider
                                 attribute="class"
-                                defaultTheme="dark"
+                                defaultTheme="system"
                                 enableSystem
                                 disableTransitionOnChange
                             >
                                 <ServiceWorkerRegister />
                                 <Navbar />
-                                <main className="flex-1">
+                                <main className="flex-1 pb-tabbar">
                                     {children}
                                 </main>
                                 <InstallPrompt />
-                                <footer className="border-t border-border/40 bg-card">
-                                    <div className="container mx-auto px-4 py-8 text-center text-sm text-muted-foreground">
-                                        <p className="mb-2">
-                                            <strong>Disclaimer:</strong> This project is not affiliated with, endorsed by, or a product of the Department of Posts - Sri Lanka. It is an independent open-source initiative.
-                                        </p>
-                                        <p>
-                                            © {new Date().getFullYear()} <a href="https://github.com/toonystank/sl-post-directory" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors underline underline-offset-4">ToonyStank</a>. All rights reserved.
-                                        </p>
-                                    </div>
-                                </footer>
+                                <SiteFooter />
                                 <AdBanner position="sticky-bottom" />
+                                <BottomTabBar />
                             </ThemeProvider>
                         </AdManager>
                     </AuthProvider>

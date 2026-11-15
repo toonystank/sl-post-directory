@@ -5,7 +5,11 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --font-sans: var(--font-inter);
+  /* Typography — Public Sans for UI, Archivo (condensed) for display, Plex Mono for codes.
+     Sinhala / Tamil fall through to Noto via unicode-range, so they only download when used. */
+  --font-sans: var(--font-body), var(--font-sinhala), var(--font-tamil), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-archivo), var(--font-sinhala), var(--font-tamil), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex), ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
@@ -34,99 +38,234 @@
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
 
+  /* Brand aliases */
+  --color-paper: hsl(var(--background));
+  --color-ink: hsl(var(--foreground));
+  --color-postal: hsl(var(--primary));
+  --color-pillar: hsl(var(--secondary));
+  --color-rule: hsl(var(--border));
+
+  /* Status (flat, no glow) */
+  --color-status-open: hsl(var(--status-open));
+  --color-status-closing: hsl(var(--status-closing));
+  --color-status-closed: hsl(var(--status-closed));
+  --color-status-holiday: hsl(var(--status-holiday));
+
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
+  --radius-sm: calc(var(--radius) - 3px);
 }
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* "Day Post" — paper, ink, postal red, pillar-box yellow */
+    --background: 40 60% 96%;          /* #FBF7EF paper */
+    --foreground: 30 13% 9%;           /* #1A1714 ink */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 43 100% 99%;               /* #FFFDF8 */
+    --card-foreground: 30 13% 9%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 43 100% 99%;
+    --popover-foreground: 30 13% 9%;
 
-    /* Command Center Light Theme */
-    --primary: 0 84% 45%; /* Vibrant Postal Red */
-    --primary-foreground: 0 0% 100%;
+    --primary: 358 78% 40%;            /* #B4161B postal red */
+    --primary-foreground: 40 60% 98%;
 
-    --secondary: 45 93% 47%; /* Gold Accent */
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 45 100% 48%;          /* #F5B700 pillar-box yellow */
+    --secondary-foreground: 30 13% 9%;
 
-    --muted: 220 14% 90%;
-    --muted-foreground: 220 10% 35%;
+    --muted: 38 35% 91%;               /* warm grey paper */
+    --muted-foreground: 28 9% 38%;     /* #6B6158 — AA on paper */
 
-    --accent: 0 84% 95%;
-    --accent-foreground: 0 84% 30%;
+    --accent: 40 45% 90%;
+    --accent-foreground: 30 13% 9%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 358 78% 40%;
+    --destructive-foreground: 40 60% 98%;
 
-    --border: 220 13% 85%;
-    --input: 220 13% 85%;
-    --ring: 0 84% 45%;
+    --border: 37 33% 84%;              /* #E4DACB rule */
+    --input: 30 10% 70%;
+    --ring: 358 78% 40%;
 
-    --radius: 0.5rem;
+    --status-open: 140 60% 30%;
+    --status-closing: 35 100% 34%;
+    --status-closed: 358 78% 40%;
+    --status-holiday: 255 30% 42%;
+
+    --radius: 0.375rem;
+    --tabbar-h: 60px;
+    --appbar-h: 56px;
   }
 
   .dark {
-    --background: 230 15% 5%; /* Deep Command Center Black/Charcoal */
-    --foreground: 0 0% 98%;
+    /* "Night Mail" — warm ink background, paper text */
+    --background: 30 15% 7%;           /* #15120F */
+    --foreground: 38 40% 92%;          /* #F3EDE2 */
 
-    --card: 230 15% 8%; /* Slightly lighter for cards */
-    --card-foreground: 0 0% 98%;
+    --card: 30 13% 10%;                /* #1E1A16 */
+    --card-foreground: 38 40% 92%;
 
-    --popover: 230 15% 8%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 30 13% 10%;
+    --popover-foreground: 38 40% 92%;
 
-    --primary: 0 84% 45%; /* Darker red so white text passes contrast inside buttons */
-    --primary-foreground: 0 0% 100%;
+    --primary: 358 72% 56%;            /* #E0393E — brighter red for dark */
+    --primary-foreground: 30 15% 7%;
 
-    --secondary: 45 93% 50%; /* Glowing Gold */
-    --secondary-foreground: 230 15% 5%;
+    --secondary: 45 100% 48%;
+    --secondary-foreground: 30 15% 7%;
 
-    --muted: 230 15% 15%;
-    --muted-foreground: 230 10% 65%;
+    --muted: 30 10% 15%;
+    --muted-foreground: 33 12% 64%;    /* #A69C90 */
 
-    --accent: 0 84% 15%; /* Red-tinted dark accent */
-    --accent-foreground: 0 84% 60%;
+    --accent: 30 10% 16%;
+    --accent-foreground: 38 40% 92%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 358 72% 56%;
+    --destructive-foreground: 30 15% 7%;
 
-    --border: 230 15% 15%;
-    --input: 230 15% 15%;
-    --ring: 0 84% 50%;
+    --border: 30 12% 20%;              /* #3A332C */
+    --input: 30 10% 30%;
+    --ring: 358 72% 56%;
+
+    --status-open: 140 50% 55%;
+    --status-closing: 38 95% 58%;
+    --status-closed: 358 72% 62%;
+    --status-holiday: 255 50% 72%;
   }
 
   * {
     @apply border-border;
   }
 
+  html {
+    -webkit-tap-highlight-color: transparent;
+    text-size-adjust: 100%;
+  }
+
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "ss01", "cv11";
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-heading);
+    font-stretch: 82%;
+    letter-spacing: -0.01em;
+  }
+
+  :lang(si), :lang(ta) {
+    line-height: 1.6;
+  }
+  :lang(si) h1, :lang(si) h2, :lang(si) h3,
+  :lang(ta) h1, :lang(ta) h2, :lang(ta) h3 {
+    letter-spacing: 0;
+    line-height: 1.3;
+  }
+
+  ::selection {
+    background: hsl(var(--secondary));
+    color: hsl(var(--secondary-foreground));
   }
 }
 
-/* Base utility for old pages we haven't ported to Tailwind yet */
+/* ---------- Brand utilities ---------- */
+
+/* Condensed display type for big headlines */
+@utility display {
+  font-family: var(--font-heading);
+  font-stretch: 78%;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  line-height: 0.95;
+}
+
+/* Small mono label: used sparingly (postcodes, data labels) */
+@utility label-mono {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+
+/* Perforated postage-stamp edge. Put a solid background on the element;
+   holes are cut with a mask so it works on any colour. */
+@utility stamp-edge {
+  --r: 5px;
+  -webkit-mask:
+    radial-gradient(var(--r), #0000 97%, #000) round calc(-1.5 * var(--r)) calc(-1.5 * var(--r)) / calc(3 * var(--r)) calc(3 * var(--r)),
+    linear-gradient(#000 0 0) no-repeat 50% / calc(100% - 3 * var(--r)) calc(100% - 3 * var(--r));
+  mask:
+    radial-gradient(var(--r), #0000 97%, #000) round calc(-1.5 * var(--r)) calc(-1.5 * var(--r)) / calc(3 * var(--r)) calc(3 * var(--r)),
+    linear-gradient(#000 0 0) no-repeat 50% / calc(100% - 3 * var(--r)) calc(100% - 3 * var(--r));
+}
+
+/* Air-mail envelope stripe */
+@utility airmail-stripe {
+  background: repeating-linear-gradient(
+    -45deg,
+    hsl(var(--primary)) 0 10px,
+    transparent 10px 16px,
+    hsl(var(--secondary)) 16px 26px,
+    transparent 26px 32px
+  );
+}
+
+/* Faint paper grain (desktop only — skip on mobile for perf) */
+@utility paper-grain {
+  @media (min-width: 768px) {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.1 0 0 0 0 0.08 0 0 0 0 0.05 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+}
+
+/* Native-feeling press feedback */
+@utility tap {
+  transition: transform 120ms ease, background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+  &:active {
+    transform: scale(0.97);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &:active { transform: none; }
+  }
+}
+
+/* Safe-area helpers for notched phones / Capacitor */
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+/* Space reserved at the bottom of mobile pages for the tab bar */
+@utility pb-tabbar {
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  @media (min-width: 768px) {
+    padding-bottom: 0;
+  }
+}
+@utility bottom-tabbar {
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  @media (min-width: 768px) {
+    bottom: 0;
+  }
+}
+
+/* Legacy class names still used by older pages/dashboard — now flat */
 .glass-panel {
-  @apply bg-card/70 backdrop-blur-xl border border-border/50 shadow-md transition-all;
+  @apply bg-card border border-border shadow-sm;
 }
 
 .btn {
-  @apply inline-flex items-center justify-center px-4 py-2 rounded-md font-medium transition-colors cursor-pointer;
+  @apply inline-flex items-center justify-center px-4 py-2 rounded-md font-semibold transition-colors cursor-pointer;
 }
 
 .btn-primary {
-  @apply bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm border border-primary/20;
+  @apply bg-primary text-primary-foreground hover:bg-primary/90;
 }
 
 .btn-secondary {
-  @apply bg-secondary text-secondary-foreground hover:bg-secondary/90 shadow-sm border border-secondary/20;
+  @apply bg-secondary text-secondary-foreground hover:bg-secondary/90;
 }
 
 /* Hide scrollbar for horizontal scroll areas */
@@ -139,54 +278,21 @@
   display: none;
 }
 
-/* Hero section animations — replaces framer-motion */
-@keyframes aurora-1 {
-  0%, 100% { transform: scale(1) translate(0%, 0%); }
-  25% { transform: scale(1.2) translate(20%, 15%); }
-  50% { transform: scale(0.9) translate(-10%, -15%); }
-  75% { transform: scale(1.05) translate(10%, 5%); }
-}
-
-@keyframes aurora-2 {
-  0%, 100% { transform: scale(0.9) translate(0%, 0%); }
-  25% { transform: scale(1.3) translate(-30%, -20%); }
-  50% { transform: scale(1) translate(10%, 20%); }
-  75% { transform: scale(1.1) translate(-15%, 5%); }
-}
-
-@keyframes aurora-3 {
-  0%, 100% { transform: scale(1) translate(-10%, 10%); }
-  25% { transform: scale(1.1) translate(20%, -15%); }
-  50% { transform: scale(0.9) translate(-5%, 5%); }
-  75% { transform: scale(1.05) translate(10%, -5%); }
-}
-
-@keyframes particle-float {
-  0%, 100% { transform: translateY(0) scale(1); opacity: 0.2; }
-  50% { transform: translateY(-30px) scale(1.5); opacity: 0.8; }
-}
-
 @keyframes fade-slide-up {
-  from { opacity: 0; transform: translateY(20px); }
+  from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.animate-aurora-1 {
-  animation: aurora-1 15s ease-in-out infinite;
-}
-
-.animate-aurora-2 {
-  animation: aurora-2 12s ease-in-out infinite;
-}
-
-.animate-aurora-3 {
-  animation: aurora-3 18s ease-in-out infinite;
-}
-
-.animate-particle {
-  animation: particle-float 3s ease-in-out infinite;
-}
-
 .animate-fade-slide-up {
-  animation: fade-slide-up 0.5s ease-out both;
+  animation: fade-slide-up 0.35s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-slide-up { animation: none; }
+}
+
+/* Long lists: let the browser skip off-screen rows */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 76px;
 }

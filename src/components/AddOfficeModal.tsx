@@ -13,7 +13,7 @@ import { useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function AddOfficeModal({ children }: { children: React.ReactNode }) {
-    const { data: session, status } = useSession();
+    const { status } = useSession();
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
@@ -50,7 +50,7 @@ export default function AddOfficeModal({ children }: { children: React.ReactNode
         const formData = new FormData(e.currentTarget);
         const data = Object.fromEntries(formData.entries());
 
-        const payload: Record<string, any> = { ...data, turnstileToken, type: "ADD" };
+        const payload: Record<string, FormDataEntryValue | string | null | undefined> = { ...data, turnstileToken, type: "ADD" };
 
         Object.keys(payload).forEach(key => {
             if (payload[key] === "") {
@@ -76,7 +76,7 @@ export default function AddOfficeModal({ children }: { children: React.ReactNode
                 setError(true);
                 setMessage(errData.error || "An error occurred. Please try again.");
             }
-        } catch (err) {
+        } catch {
             setError(true);
             setMessage("A network error occurred.");
         } finally {
@@ -93,32 +93,32 @@ export default function AddOfficeModal({ children }: { children: React.ReactNode
                         <Plus className="w-5 h-5 text-primary" /> Add a New Post Office
                     </DialogTitle>
                     <DialogDescription>
-                        Know a post office that isn't listed? Submit its details below. All submissions are verified by moderators.
+                        Know a post office that isn&apos;t listed? Submit its details below. All submissions are verified by moderators.
                     </DialogDescription>
                 </DialogHeader>
 
                 {message && !error ? (
                     <div className="p-8 text-center space-y-4">
-                        <div className="w-16 h-16 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <div className="w-16 h-16 bg-status-open/10 text-status-open border border-status-open/40 rounded-full flex items-center justify-center mx-auto mb-4">
                             <Send className="w-8 h-8" />
                         </div>
-                        <h3 className="text-xl font-bold text-foreground">Success!</h3>
+                        <h3 className="font-heading text-xl font-extrabold [font-stretch:82%] text-foreground">Success!</h3>
                         <p className="text-muted-foreground">{message}</p>
                     </div>
                 ) : (
                     <div className="space-y-6 mt-4">
                         {error && (
-                            <div className="p-4 bg-destructive/10 border border-destructive/20 text-destructive rounded-xl text-sm font-medium">
+                            <div className="p-4 bg-destructive/10 border border-destructive/30 text-destructive rounded-md text-sm font-medium">
                                 {message}
                             </div>
                         )}
 
                         <form onSubmit={handleSubmit} className="space-y-6 pb-4">
                             {status === "unauthenticated" && (
-                                <div className="space-y-4 bg-card/80 p-5 rounded-2xl border border-border shadow-sm">
+                                <div className="space-y-4 bg-card p-5 rounded-md border border-border">
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                         <div>
-                                            <h3 className="font-bold text-lg text-primary flex items-center gap-2">
+                                            <h3 className="font-heading font-extrabold text-lg text-primary flex items-center gap-2">
                                                 <Lock className="w-5 h-5" /> Sign up to Contribute
                                             </h3>
                                             <p className="text-sm text-muted-foreground">Create an account to track your edits.</p>
@@ -127,44 +127,42 @@ export default function AddOfficeModal({ children }: { children: React.ReactNode
                                             <Link href="/login">Already have an account?</Link>
                                         </Button>
                                     </div>
-                                    <Separator className="opacity-50" />
+                                    <Separator />
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-sm font-medium text-muted-foreground mb-1.5">Your Name</label>
-                                            <Input type="text" name="submitterName" required className="py-5 rounded-xl bg-background" placeholder="John Doe" />
+                                            <Input type="text" name="submitterName" required className="bg-background" placeholder="Kasun Perera" />
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-muted-foreground mb-1.5">Your Email</label>
-                                            <Input type="email" name="submitterEmail" required className="py-5 rounded-xl bg-background" placeholder="john@example.com" />
+                                            <Input type="email" name="submitterEmail" required className="bg-background" placeholder="you@example.com" />
                                         </div>
                                         <div className="md:col-span-2">
                                             <label className="block text-sm font-medium text-muted-foreground mb-1.5">Create a Password</label>
-                                            <Input type="password" name="submitterPassword" required className="py-5 rounded-xl bg-background" placeholder="••••••••" minLength={8} />
+                                            <Input type="password" name="submitterPassword" required className="bg-background" placeholder="••••••••" minLength={8} />
                                         </div>
                                     </div>
-
-
                                 </div>
                             )}
 
                             <div className="space-y-4">
-                                <h3 className="font-bold">Office Information</h3>
-                                <Separator className="opacity-50" />
+                                <h3 className="font-heading font-extrabold text-lg">Office Information</h3>
+                                <Separator />
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
                                         <label className="block text-sm font-medium text-muted-foreground mb-1.5">Office Name *</label>
-                                        <Input type="text" name="name" required placeholder="e.g. Colombo Main Post Office" className="py-5 rounded-xl" />
+                                        <Input type="text" name="name" required placeholder="e.g. Colombo Main Post Office" />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-muted-foreground mb-1.5">Postal Code *</label>
-                                        <Input type="text" name="postalCode" required placeholder="e.g. 00100" className="py-5 rounded-xl" />
+                                        <Input type="text" name="postalCode" required placeholder="e.g. 00100" />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-muted-foreground mb-1.5">Division</label>
                                         <Select name="field_Division">
-                                            <SelectTrigger className="w-full py-5 rounded-xl bg-background text-base">
+                                            <SelectTrigger className="w-full h-10 bg-card text-sm">
                                                 <SelectValue placeholder="Select Division" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -177,7 +175,7 @@ export default function AddOfficeModal({ children }: { children: React.ReactNode
                                     <div>
                                         <label className="block text-sm font-medium text-muted-foreground mb-1.5">Type</label>
                                         <Select name="field_Type" defaultValue="Post office">
-                                            <SelectTrigger className="w-full py-5 rounded-xl bg-background text-base">
+                                            <SelectTrigger className="w-full h-10 bg-card text-sm">
                                                 <SelectValue placeholder="Select Type" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -192,7 +190,7 @@ export default function AddOfficeModal({ children }: { children: React.ReactNode
                                     <div>
                                         <label className="block text-sm font-medium text-muted-foreground mb-1.5">Delivery Facility</label>
                                         <Select name="field_Delivery" defaultValue="No">
-                                            <SelectTrigger className="w-full py-5 rounded-xl bg-background text-base">
+                                            <SelectTrigger className="w-full h-10 bg-card text-sm">
                                                 <SelectValue placeholder="Select Delivery" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -203,7 +201,7 @@ export default function AddOfficeModal({ children }: { children: React.ReactNode
                                     </div>
                                     <div className="md:col-span-2">
                                         <label className="block text-sm font-medium text-muted-foreground mb-1.5">Notes or Reason (Optional)</label>
-                                        <Input type="text" name="reason" placeholder="e.g. This is a newly opened sub post office" className="py-5 rounded-xl" />
+                                        <Input type="text" name="reason" placeholder="e.g. This is a newly opened sub post office" />
                                     </div>
                                 </div>
                             </div>
@@ -218,7 +216,7 @@ export default function AddOfficeModal({ children }: { children: React.ReactNode
                                 </div>
                             )}
 
-                            <Button type="submit" disabled={loading} size="lg" className="w-full rounded-xl py-5 text-base font-semibold">
+                            <Button type="submit" disabled={loading} size="lg" className="w-full h-11 text-base">
                                 {loading ? "Submitting..." : "Submit New Office"}
                             </Button>
                         </form>

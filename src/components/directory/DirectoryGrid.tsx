@@ -1,9 +1,13 @@
+"use client";
+
 import React from "react";
-import { Loader2, Search } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import PillarBox from "@/components/brand/PillarBox";
 import { PostOffice, SearchMode } from "./types";
-import PostOfficeCard from "./PostOfficeCard";
-import { motion } from "framer-motion";
+import PostOfficeCard, { ROW_COLS } from "./PostOfficeCard";
 
 interface DirectoryGridProps {
     offices: PostOffice[];
@@ -24,43 +28,38 @@ export default function DirectoryGrid({
     offices, initialLoading, loading, hasActiveFilters, clearAll,
     nextCursor, total, query, activeLetter, searchMode, activeService, fetchOffices
 }: DirectoryGridProps) {
+    const t = useTranslations("Search");
+
     if (initialLoading) {
         return (
-            <div className="flex justify-center py-20">
-                <Loader2 className="w-10 h-10 animate-spin text-primary" />
+            <div className="divide-y divide-border border-t-2 border-foreground" aria-busy="true" aria-label={t("searching")}>
+                {Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className="py-4 flex items-center justify-between gap-4">
+                        <div className="flex-1 min-w-0 space-y-2">
+                            <div className="h-4 w-48 max-w-full bg-muted animate-pulse rounded-sm" />
+                            <div className="h-3 w-32 bg-muted animate-pulse rounded-sm" />
+                        </div>
+                        <div className="h-6 w-14 bg-muted animate-pulse rounded-sm shrink-0" />
+                    </div>
+                ))}
             </div>
         );
     }
 
     if (offices.length === 0) {
         return (
-            <div className="text-center py-20 bg-card/20 backdrop-blur-sm rounded-3xl border border-border/40 border-dashed shadow-sm">
-                <motion.div 
-                    animate={{ y: [0, -10, 0] }}
-                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                    className="relative w-24 h-24 mx-auto mb-6"
-                >
-                    <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl" />
-                    <div className="relative w-full h-full bg-card border border-border/50 rounded-2xl flex items-center justify-center shadow-lg">
-                        <motion.div
-                            animate={{ rotate: [-10, 10, -10], scale: [1, 1.1, 1] }}
-                            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-                        >
-                            <Search className="w-10 h-10 text-primary/80" />
-                        </motion.div>
-                    </div>
-                </motion.div>
-                <h3 className="text-xl font-bold mb-2 tracking-tight">No post offices found</h3>
-                <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
-                    Try adjusting your filters or search terms. Browse the alphabet sidebar to explore all locations.
+            <div className="rounded-md border-2 border-dashed border-foreground/30 bg-card/50 p-10 text-center">
+                <PillarBox className="w-20 mx-auto mb-4" />
+                <h3 className="font-heading text-2xl font-extrabold [font-stretch:82%] mb-1">
+                    {t("noResults")}
+                </h3>
+                <p className="text-sm text-muted-foreground max-w-md mx-auto mb-5">
+                    {t("noResultsBody")}
                 </p>
                 {hasActiveFilters && (
-                    <button
-                        onClick={clearAll}
-                        className="px-4 py-2 rounded-xl bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors"
-                    >
-                        Reset Filters
-                    </button>
+                    <Button variant="outline" onClick={clearAll}>
+                        {t("reset")}
+                    </Button>
                 )}
             </div>
         );
@@ -68,36 +67,45 @@ export default function DirectoryGrid({
 
     return (
         <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 items-start">
+            <div className={cn("hidden lg:grid items-center gap-x-4 border-b-2 border-foreground pb-2 label-mono", ROW_COLS)}>
+                <span>Name</span>
+                <span>Postcode</span>
+                <span>Division</span>
+                <span>Status</span>
+                <span>Phone</span>
+                <span />
+            </div>
+
+            <ul className="border-t-2 border-foreground lg:border-t-0">
                 {offices.map((po, index) => (
                     <PostOfficeCard key={po.id} office={po} index={index} />
                 ))}
-            </div>
+            </ul>
 
-            {/* Pagination Controls */}
-            <div className="mt-12 flex justify-center py-4">
-                {nextCursor !== null && (
+            <div className="mt-8 flex justify-center py-4">
+                {nextCursor !== null ? (
                     <Button
                         onClick={() => fetchOffices(query, activeLetter, searchMode, activeService, nextCursor, true)}
                         disabled={loading}
                         variant="outline"
                         size="lg"
-                        className="rounded-xl border-primary/20 hover:bg-primary/10 hover:border-primary/40 hover:text-primary transition-all duration-300 gap-2 min-w-[200px]"
+                        className="min-w-[200px]"
                     >
                         {loading ? (
                             <>
-                                <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                                <span>Loading...</span>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span>{t("loading")}</span>
                             </>
                         ) : (
-                            "Load More Results"
+                            t("loadMore")
                         )}
                     </Button>
-                )}
-                {nextCursor === null && offices.length > 0 && (
-                    <p className="text-sm font-medium text-muted-foreground opacity-60">
-                        End of directory — {total.toLocaleString()} locations
-                    </p>
+                ) : (
+                    offices.length > 0 && (
+                        <p className="font-mono text-xs text-muted-foreground">
+                            {t("endOf", { count: total.toLocaleString() })}
+                        </p>
+                    )
                 )}
             </div>
         </>

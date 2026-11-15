@@ -2,175 +2,128 @@
 
 import React, { useState } from "react";
 import { Link } from "@/navigation";
-import { Building2, Store, MapPin, Phone, Network, ChevronDown, ChevronUp, CheckCircle2 } from "lucide-react";
+import { ChevronRight, ChevronDown } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { PostOffice } from "./types";
 import AdBanner from "@/components/ads/AdBanner";
-import { useTranslations } from "next-intl";
 import { getPostOfficeStatus } from "@/lib/holidays";
-import { useLocale } from "next-intl";
-
-const statusConfig: Record<string, { color: string; bgColor: string; borderColor: string; dotClass: string }> = {
-    open: {
-        color: "text-emerald-400",
-        bgColor: "bg-emerald-500/10",
-        borderColor: "border-emerald-500/30",
-        dotClass: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]",
-    },
-    closed: {
-        color: "text-red-500",
-        bgColor: "bg-red-500/10",
-        borderColor: "border-red-500/30",
-        dotClass: "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]",
-    },
-    "counter-only": {
-        color: "text-amber-400",
-        bgColor: "bg-amber-500/10",
-        borderColor: "border-amber-500/30",
-        dotClass: "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]",
-    },
-    holiday: {
-        color: "text-purple-400",
-        bgColor: "bg-purple-500/10",
-        borderColor: "border-purple-500/30",
-        dotClass: "bg-purple-400 shadow-[0_0_8px_rgba(192,132,252,0.8)]",
-    },
-};
+import Postmark from "@/components/brand/Postmark";
+import StatusDot from "@/components/brand/StatusDot";
+import { cn } from "@/lib/utils";
 
 interface PostOfficeCardProps {
     office: PostOffice;
     index: number;
 }
 
+/** Desktop column template — shared with the header row in DirectoryGrid. */
+export const ROW_COLS = "lg:grid-cols-[minmax(0,2.2fr)_6.5rem_minmax(0,1.2fr)_8rem_minmax(0,1.1fr)_1.5rem]";
+
+/** Small perforated postcode tag for the dense desktop table. */
+function CodeTag({ code }: { code: string }) {
+    return (
+        <span className="inline-flex rounded-[3px] border-[1.5px] border-dashed border-foreground/70 px-1.5 py-0.5 font-mono text-[0.8rem] font-semibold tracking-wide">
+            {code}
+        </span>
+    );
+}
+
+/**
+ * One office in the results list.
+ * Mobile: name + type/division, postmark, status, chevron.
+ * Desktop (lg): dense table row.
+ */
 export default function PostOfficeCard({ office, index }: PostOfficeCardProps) {
     const [isExpanded, setIsExpanded] = useState(false);
-    
-    const fieldMap = Object.fromEntries(office.fields.map(f => [f.name, f.value]));
-    const type = fieldMap["Type"];
-    const phone = fieldMap["Phone"];
-    const division = fieldMap["Division"];
-    const delivery = fieldMap["Delivery"];
-    const is24Hour = fieldMap["Is24Hour"] === "true";
-    const isRealPostcode = office.postalCode && office.postalCode.length > 0;
-
     const locale = useLocale();
     const t = useTranslations("Status");
-    const currentStatus = getPostOfficeStatus(locale, is24Hour);
-    const style = statusConfig[currentStatus.status];
+    const ts = useTranslations("Search");
 
-    const showAdAfter = index > 0 && index % 5 === 0;
-    
-    const hasSubOffices = office.controlledOffices && office.controlledOffices.length > 0;
+    const fieldMap = Object.fromEntries(office.fields.map((f) => [f.name, f.value]));
+    const type = fieldMap["Type"];
+    const phone = fieldMap["Phone"] || fieldMap["Telephone"];
+    const division = fieldMap["Division"];
+    const is24Hour = fieldMap["Is24Hour"] === "true";
+    const hasCode = Boolean(office.postalCode);
+
+    const status = getPostOfficeStatus(locale, is24Hour);
+    const statusLabel = status.status === "holiday" ? t("holiday") : t(status.label);
+
+    const subs = office.controlledOffices ?? [];
+    const showAdAfter = index > 0 && index % 12 === 0;
 
     return (
         <React.Fragment>
-            <div className="group relative flex flex-col h-full bg-card/60 backdrop-blur-md border border-border/50 rounded-xl overflow-hidden transition-all duration-500 hover:border-primary/50 hover:shadow-[0_0_30px_-5px_rgba(220,38,38,0.15)]">
-                {/* Techy top border accent */}
-                <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary/50 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-700 origin-left" />
-                
-                <Link href={`/office/${office.slug}`} className="flex-1 flex flex-col p-5 relative z-10">
-                    {/* Header Row */}
-                    <div className="flex justify-between items-start mb-4">
-                        <div className="flex gap-3 items-center">
-                            <div className="w-12 h-12 rounded-lg bg-background/80 border border-border/60 flex items-center justify-center text-muted-foreground group-hover:text-primary group-hover:border-primary/40 transition-colors shadow-inner">
-                                {type === "Sub Post office" ? <Store className="w-6 h-6" /> : <Building2 className="w-6 h-6" />}
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-bold tracking-tight text-foreground group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors line-clamp-1">{office.name}</h3>
-                                {type && <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider">{type}</p>}
-                            </div>
-                        </div>
-                        
-                        <div className="flex flex-col items-end gap-1.5">
-                            {/* Status Indicator */}
-                            <div className={`px-2.5 py-1 rounded-sm text-[10px] uppercase tracking-widest font-bold border flex items-center gap-1.5 ${style.bgColor} ${style.color} ${style.borderColor}`}>
-                                <div className={`w-1.5 h-1.5 rounded-full ${style.dotClass}`} />
-                                {currentStatus.status === "holiday" ? t("holiday") : t(currentStatus.label)}
-                            </div>
-                            
-                            {isRealPostcode && (
-                                <div className="px-2 py-0.5 rounded-sm font-mono text-[10px] bg-background border border-border text-foreground tracking-wider">
-                                    {office.postalCode}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Meta Info Grid */}
-                    <div className="grid grid-cols-2 gap-3 mb-4">
-                        {division && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground bg-background/40 p-2 rounded-md border border-border/30">
-                                <MapPin className="w-4 h-4 text-primary/70 shrink-0" />
-                                <span className="truncate">{division}</span>
-                            </div>
-                        )}
-                        {phone && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground bg-background/40 p-2 rounded-md border border-border/30">
-                                <Phone className="w-4 h-4 text-primary/70 shrink-0" />
-                                <span className="truncate font-mono text-xs">{phone}</span>
-                            </div>
-                        )}
-                    </div>
-                    
-                    {/* RMSC & Hierarchy Indicators */}
-                    {(office.rmsc || office.controllingOffice) && (
-                        <div className="flex flex-col gap-2 mt-auto pt-4 border-t border-border/40">
-                            {office.rmsc && (
-                                <div className="flex items-center justify-between text-xs font-mono">
-                                    <span className="text-muted-foreground">RMSC/TPO:</span>
-                                    <span className="text-secondary tracking-wider font-semibold">{office.rmsc}</span>
-                                </div>
-                            )}
-                            
-                            {office.controllingOffice && (
-                                <div className="flex items-center justify-between text-xs font-mono">
-                                    <span className="text-muted-foreground">Controlled by:</span>
-                                    <span className="text-red-600 dark:text-red-400 tracking-wider truncate max-w-[150px]">{office.controllingOffice.name}</span>
-                                </div>
-                            )}
-                        </div>
+            {showAdAfter && (
+                <li className="py-2">
+                    <AdBanner position="in-feed" />
+                </li>
+            )}
+            <li className="cv-auto border-b border-border">
+                <Link
+                    href={`/office/${office.slug}`}
+                    className={cn(
+                        "tap group grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 py-3.5 lg:gap-x-4 lg:py-2.5",
+                        ROW_COLS,
+                        "hover:bg-muted/60 lg:-mx-2 lg:px-2 rounded-sm"
                     )}
+                >
+                    {/* Name + meta */}
+                    <span className="min-w-0">
+                        <span className="block truncate text-[1.02rem] font-semibold leading-snug group-hover:text-primary lg:text-[0.95rem]">
+                            {office.name}
+                        </span>
+                        <span className="mt-0.5 block truncate text-sm text-muted-foreground lg:text-xs">
+                            {[type, division].filter(Boolean).join(" · ")}
+                            <span className="lg:hidden">{is24Hour ? "" : ""}</span>
+                        </span>
+                        <span className="mt-1 block lg:hidden">
+                            <StatusDot status={status.status} label={statusLabel} />
+                        </span>
+                    </span>
+
+                    {/* Postcode */}
+                    <span className="lg:hidden">
+                        {hasCode && <Postmark code={office.postalCode} size="sm" rotate={-8} />}
+                    </span>
+                    <span className="hidden lg:block">{hasCode && <CodeTag code={office.postalCode} />}</span>
+
+                    {/* Desktop-only columns */}
+                    <span className="hidden lg:block truncate text-sm">{division || "—"}</span>
+                    <span className="hidden lg:block"><StatusDot status={status.status} label={statusLabel} /></span>
+                    <span className="hidden lg:block truncate font-mono text-[0.8rem]">{phone || "—"}</span>
+
+                    <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary" aria-hidden="true" />
                 </Link>
 
-                {/* Interactive Sub-Offices Accordion */}
-                {hasSubOffices && (
-                    <div className="border-t border-border/40 bg-background/30 backdrop-blur-sm z-20">
-                        <button 
-                            onClick={(e) => { e.preventDefault(); setIsExpanded(!isExpanded); }}
-                            className="w-full flex items-center justify-between p-3 text-xs font-mono uppercase tracking-widest text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:bg-primary/5 transition-colors"
+                {subs.length > 0 && (
+                    <div className="pb-2 lg:pl-0">
+                        <button
+                            onClick={() => setIsExpanded((v) => !v)}
+                            aria-expanded={isExpanded}
+                            className="tap -ml-1 inline-flex items-center gap-1 rounded px-1 py-1 text-xs font-semibold text-muted-foreground hover:text-primary"
                         >
-                            <span className="flex items-center gap-2">
-                                <Network className="w-4 h-4" />
-                                View {office.controlledOffices!.length} Sub-Offices
-                            </span>
-                            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                            <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", isExpanded && "rotate-180")} />
+                            {ts("subOffices", { count: subs.length })}
                         </button>
-                        <div 
-                            className={`grid transition-all duration-300 ease-in-out ${isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
-                        >
-                            <div className="overflow-hidden">
-                                <div className="p-3 pt-0 max-h-[200px] overflow-y-auto scrollbar-hide flex flex-col gap-1.5">
-                                    {office.controlledOffices!.map(sub => (
-                                        <Link 
-                                            key={sub.id} 
+                        {isExpanded && (
+                            <ul className="ml-1 mt-1 border-l-2 border-secondary pl-3">
+                                {subs.map((sub) => (
+                                    <li key={sub.id}>
+                                        <Link
                                             href={`/office/${sub.slug}`}
-                                            className="flex items-center justify-between p-2 rounded bg-background/50 border border-border/40 hover:border-primary/40 hover:bg-primary/10 transition-colors group/sub"
+                                            className="tap flex items-center justify-between gap-3 py-2 text-sm hover:text-primary"
                                         >
-                                            <span className="text-xs font-medium text-foreground group-hover/sub:text-red-600 dark:group-hover/sub:text-red-400 transition-colors truncate">
-                                                {sub.name}
-                                            </span>
-                                            <span className="text-[10px] font-mono text-muted-foreground">
-                                                {sub.postalCode}
-                                            </span>
+                                            <span className="truncate">{sub.name}</span>
+                                            <span className="font-mono text-xs text-muted-foreground">{sub.postalCode}</span>
                                         </Link>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
                     </div>
                 )}
-            </div>
-
-            {showAdAfter && <AdBanner position="in-feed" className="col-span-1 sm:col-span-2 xl:col-span-3" />}
+            </li>
         </React.Fragment>
     );
 }
