@@ -1,29 +1,33 @@
 "use client";
 
 import { useState, useEffect, useId, useMemo } from "react";
-import { Globe, MapPin, Banknote, Scale, AlertTriangle, Check } from "lucide-react";
+import { Globe, MapPin, Banknote, Scale, AlertTriangle, Check, Plane, Ship, Info } from "lucide-react";
 import Postmark from "@/components/brand/Postmark";
 import {
     DEFAULT_RATE_CONFIG,
     calculateAllDomesticServices,
+    calculateAllInternationalServices,
     calculateCodPostage,
+    calculateInternationalService,
     calculatePostage,
     formatWeightLabel,
     mergeWithDefaultConfig,
     type Destination,
+    type InternationalServiceId,
+    type InternationalTransport,
     type RateConfig,
 } from "@/lib/postage-rates";
 import { cn } from "@/lib/utils";
 
 const DOMESTIC_WEIGHT_PRESETS = [30, 100, 250, 500, 1000, 2000, 5000, 10000];
 const COD_WEIGHT_PRESETS = [250, 500, 1000, 2000, 5000, 10000, 20000];
-const EMS_WEIGHT_PRESETS = [250, 500, 1000, 2000, 5000, 10000];
+const INTL_WEIGHT_PRESETS = [20, 50, 100, 250, 500, 1000, 2000, 5000];
 const COD_AMOUNT_PRESETS = [1000, 2500, 5000, 10000, 25000, 50000];
 
 const MODE_OPTIONS: { id: Destination; label: string; icon: typeof MapPin }[] = [
     { id: "domestic", label: "Local", icon: MapPin },
     { id: "cod", label: "COD", icon: Banknote },
-    { id: "ems", label: "EMS", icon: Globe },
+    { id: "ems", label: "International", icon: Globe },
 ];
 
 function sanitizeDigits(value: string): string {
@@ -42,7 +46,11 @@ export default function PostageCalculator() {
     const [config, setConfig] = useState<RateConfig>(DEFAULT_RATE_CONFIG);
     const [destination, setDestination] = useState<Destination>("domestic");
     const [serviceId, setServiceId] = useState<string>("letter");
-    const [emsCountryCode, setEmsCountryCode] = useState<string>("IN");
+    const [emsCountryCode, setEmsCountryCode] = useState<string>("GB");
+    const [intlTransport, setIntlTransport] = useState<InternationalTransport>("air");
+    const [intlServiceId, setIntlServiceId] = useState<InternationalServiceId>("air_letter");
+    const [intlRegistered, setIntlRegistered] = useState(false);
+    const [showCountryWhyNote, setShowCountryWhyNote] = useState(false);
     const [weight, setWeight] = useState<string>("30");
     const [codAmount, setCodAmount] = useState<string>("2500");
     const [registered, setRegistered] = useState(false);
@@ -54,6 +62,7 @@ export default function PostageCalculator() {
     const emsCountryId = `${uid}-ems-country`;
     const regCheckboxId = `${uid}-registered`;
     const arCheckboxId = `${uid}-ar-receipt`;
+    const intlRegCheckboxId = `${uid}-intl-registered`;
 
     useEffect(() => {
         let active = true;
@@ -149,24 +158,50 @@ export default function PostageCalculator() {
         [config.emsZones, activeEmsCountry]
     );
 
-    const activeEmsResult = useMemo(
-        () => calculatePostage(config, "ems", emsCountryCode, weightGrams),
-        [config, emsCountryCode, weightGrams]
+    const intlQuotes = useMemo(
+        () =>
+            calculateAllInternationalServices(config, emsCountryCode, weightGrams, {
+                registered: intlRegistered,
+            }),
+        [config, emsCountryCode, weightGrams, intlRegistered]
     );
+
+    const filteredIntlQuotes = useMemo(
+        () => intlQuotes.filter((q) => q.service.transport === intlTransport),
+        [intlQuotes, intlTransport]
+    );
+
+    const activeIntlQuote = useMemo(
+        () =>
+            intlQuotes.find((q) => q.service.id === intlServiceId) ??
+            calculateInternationalService(config, emsCountryCode, intlServiceId, weightGrams, {
+                registered: intlRegistered,
+            }),
+        [intlQuotes, intlServiceId, config, emsCountryCode, weightGrams, intlRegistered]
+    );
+
+    const canIntlRegister = Boolean(activeIntlQuote.available && activeIntlQuote.service.supportsRegistration);
+    const foreignRegFeeAmount = config.extraFees.foreignRegisteredPost ?? 870;
 
     const weightPresets =
         destination === "cod"
             ? COD_WEIGHT_PRESETS
             : destination === "ems"
-                ? EMS_WEIGHT_PRESETS
+                ? INTL_WEIGHT_PRESETS
                 : DOMESTIC_WEIGHT_PRESETS;
 
     const handleModeChange = (mode: Destination) => {
         setDestination(mode);
-        // If user switches to COD with a tiny letter weight (e.g. 30g), keep it valid (courier 0-250g is valid),
-        // and if weight was empty reset to a sensible default.
         if (weightGrams <= 0) {
-            setWeight(mode === "domestic" ? "30" : "250");
+            setWeight(mode === "cod" ? "250" : "30");
+        }
+    };
+
+    const handleIntlTransportChange = (transport: InternationalTransport) => {
+        setIntlTransport(transport);
+        const currentMatches = activeIntlQuote.service.transport === transport;
+        if (!currentMatches) {
+            setIntlServiceId(transport === "air" ? "air_letter" : "sea_letter");
         }
     };
 
@@ -180,6 +215,7 @@ export default function PostageCalculator() {
                     subtitle: activeDomesticResult.error,
                     total: null as number | null,
                     error: activeDomesticResult.error,
+                    footerNote: undefined as string | undefined,
                     items: [] as { label: string; value: string }[],
                 };
             }
@@ -197,6 +233,7 @@ export default function PostageCalculator() {
                 subtitle: activeDomesticResult.tierLabel,
                 total: activeDomesticResult.totalCost,
                 error: undefined,
+                footerNote: undefined,
                 items,
             };
         }
@@ -209,6 +246,7 @@ export default function PostageCalculator() {
                     subtitle: codResult.error,
                     total: null as number | null,
                     error: codResult.error,
+                    footerNote: undefined,
                     items: [] as { label: string; value: string }[],
                 };
             }
@@ -217,6 +255,7 @@ export default function PostageCalculator() {
                 subtitle: `${codResult.tierLabel} · Collect Rs. ${collectAmountNum.toLocaleString()}`,
                 total: codResult.totalCost,
                 error: undefined,
+                footerNote: undefined,
                 items: [
                     { label: "Courier", value: `Rs. ${codResult.courierFee.toLocaleString()}` },
                     { label: "MO Fee", value: `Rs. ${codResult.moneyOrderFee.toLocaleString()}` },
@@ -225,22 +264,52 @@ export default function PostageCalculator() {
             };
         }
 
-        const title = activeEmsCountry ? `EMS · ${activeEmsCountry.name}` : "International EMS";
-        if (activeEmsResult.error) {
+        const isRegActive = activeIntlQuote.service.supportsRegistration && intlRegistered && activeIntlQuote.available;
+        const serviceLabel = isRegActive ? `Registered ${activeIntlQuote.service.shortName}` : activeIntlQuote.service.name;
+        const title = activeEmsCountry ? `${serviceLabel} · ${activeEmsCountry.name}` : serviceLabel;
+
+        if (!activeIntlQuote.available) {
             return {
                 title,
-                subtitle: activeEmsResult.error,
+                subtitle: activeIntlQuote.shortUnavailableTag ?? "Unavailable",
                 total: null as number | null,
-                error: activeEmsResult.error,
+                error: `${activeIntlQuote.shortUnavailableTag ?? "Unavailable"} for ${activeEmsCountry?.name ?? "country"}`,
+                footerNote: activeIntlQuote.unavailableReason,
                 items: [] as { label: string; value: string }[],
             };
         }
+
+        if (activeIntlQuote.result.error) {
+            return {
+                title,
+                subtitle: activeIntlQuote.result.error,
+                total: null as number | null,
+                error: activeIntlQuote.result.error,
+                footerNote: undefined,
+                items: [] as { label: string; value: string }[],
+            };
+        }
+
+        const groupLabel = activeEmsCountry?.group ? `Group ${activeEmsCountry.group}` : (activeEmsZone?.name ?? "Intl");
+        const subMeta =
+            activeIntlQuote.service.id === "ems"
+                ? `${activeEmsZone?.name ?? "EMS Zone"} · ${activeIntlQuote.result.tierLabel}`
+                : `${groupLabel} · ${activeIntlQuote.result.tierLabel}`;
+
+        const items: { label: string; value: string }[] = [
+            { label: "Base", value: `Rs. ${activeIntlQuote.result.baseCost.toLocaleString()}` },
+        ];
+        if (activeIntlQuote.result.registrationFee > 0) {
+            items.push({ label: "Foreign Reg", value: `+Rs. ${activeIntlQuote.result.registrationFee.toLocaleString()}` });
+        }
+
         return {
             title,
-            subtitle: `${activeEmsZone?.name ?? "Zone"} · ${activeEmsResult.tierLabel}`,
-            total: activeEmsResult.totalCost,
+            subtitle: subMeta,
+            total: activeIntlQuote.result.totalCost,
             error: undefined,
-            items: [{ label: "EMS Rate", value: `Rs. ${activeEmsResult.baseCost.toLocaleString()}` }],
+            footerNote: undefined,
+            items,
         };
     })();
 
@@ -346,8 +415,9 @@ export default function PostageCalculator() {
                                 ))}
                             </div>
                         ) : (
-                            <span className="text-muted-foreground">
-                                {weightGrams <= 0 ? "Enter a valid weight above 0g" : "Adjust weight or choose another service"}
+                            <span className="text-muted-foreground leading-snug">
+                                {banner.footerNote ??
+                                    (weightGrams <= 0 ? "Enter a valid weight above 0g" : "Adjust weight or choose another service")}
                             </span>
                         )}
                         {destination === "cod" && !codResult.error && (
@@ -638,44 +708,218 @@ export default function PostageCalculator() {
                 </div>
             )}
 
-            {/* 4C. International EMS Mode */}
+            {/* 4C. International Mail Mode (Air Mail, U-Packet, TDS, Air Parcel, EMS, Sea Mail) */}
             {destination === "ems" && (
-                <div className="flex flex-col gap-2 md:gap-3">
+                <div className="flex flex-col gap-1.5 md:gap-3">
                     <div>
-                        <label htmlFor={emsCountryId} className="label-mono block mb-1">
-                            Destination Country
-                        </label>
-                        <select
-                            id={emsCountryId}
-                            name="emsCountry"
-                            value={emsCountryCode}
-                            onChange={(e) => setEmsCountryCode(e.target.value)}
-                            className="h-11 w-full rounded-md border-[1.5px] border-input bg-card px-3 text-base font-medium text-foreground focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-[3px] focus-visible:ring-primary/25"
-                        >
-                            {sortedEmsCountries.map((c) => (
-                                <option key={c.code} value={c.code}>
-                                    {c.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                        <div className="flex items-center justify-between mb-1 gap-2">
+                            <label htmlFor={emsCountryId} className="label-mono">
+                                Destination Country
+                            </label>
+                            <button
+                                type="button"
+                                onClick={() => setShowCountryWhyNote((prev) => !prev)}
+                                aria-expanded={showCountryWhyNote}
+                                className="inline-flex items-center gap-1 font-mono text-[10px] md:text-[11px] font-semibold text-primary hover:underline"
+                            >
+                                <Info className="w-3 h-3 shrink-0" aria-hidden="true" />
+                                <span>{showCountryWhyNote ? "Hide coverage note" : "Country / service missing? Why"}</span>
+                            </button>
+                        </div>
 
-                    {activeEmsZone && (
-                        <div className="rounded-md border-[1.5px] border-border bg-card px-3 py-2 flex items-center justify-between gap-2 text-xs">
-                            <div>
-                                <span className="label-mono block">Tariff Zone</span>
-                                <span className="font-semibold text-foreground">{activeEmsZone.name}</span>
-                            </div>
-                            <div className="text-right font-mono">
-                                <span className="label-mono block">Max Weight</span>
-                                <span className="font-semibold text-foreground">
-                                    {formatWeightLabel(
-                                        activeEmsZone.tiers[activeEmsZone.tiers.length - 1]?.maxWeight ?? 30000
+                        <div className="grid grid-cols-[1fr_auto] gap-1.5 md:gap-2 items-center">
+                            <select
+                                id={emsCountryId}
+                                name="emsCountry"
+                                value={emsCountryCode}
+                                onChange={(e) => setEmsCountryCode(e.target.value)}
+                                className="h-10 md:h-11 w-full rounded-md border-[1.5px] border-input bg-card px-2.5 md:px-3 text-base font-medium text-foreground focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-[3px] focus-visible:ring-primary/25"
+                            >
+                                {sortedEmsCountries.map((c) => {
+                                    const suffix =
+                                        c.suspensionStatus === "suspended"
+                                            ? " (Suspended)"
+                                            : c.suspensionStatus === "restricted"
+                                                ? " (Note)"
+                                                : "";
+                                    return (
+                                        <option key={c.code} value={c.code}>
+                                            {c.name}
+                                            {suffix}
+                                        </option>
+                                    );
+                                })}
+                            </select>
+
+                            <div
+                                role="group"
+                                aria-label="International transport mode"
+                                className="grid grid-cols-2 h-10 md:h-11 rounded-md border-[1.5px] border-foreground bg-card p-0.5 shrink-0"
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => handleIntlTransportChange("air")}
+                                    aria-pressed={intlTransport === "air"}
+                                    className={cn(
+                                        "tap flex items-center justify-center gap-1 rounded-[4px] px-2.5 text-xs md:text-sm font-semibold transition-colors",
+                                        intlTransport === "air"
+                                            ? "bg-foreground text-background"
+                                            : "text-muted-foreground hover:text-foreground"
                                     )}
-                                </span>
+                                >
+                                    <Plane className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                                    <span>Air</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleIntlTransportChange("sea")}
+                                    aria-pressed={intlTransport === "sea"}
+                                    className={cn(
+                                        "tap flex items-center justify-center gap-1 rounded-[4px] px-2.5 text-xs md:text-sm font-semibold transition-colors",
+                                        intlTransport === "sea"
+                                            ? "bg-foreground text-background"
+                                            : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    <Ship className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                                    <span>Sea</span>
+                                </button>
                             </div>
                         </div>
+                    </div>
+
+                    {showCountryWhyNote && (
+                        <div className="rounded-md border border-foreground/30 bg-muted/40 px-2.5 py-1.5 text-[11px] leading-snug text-foreground space-y-0.5">
+                            <p className="font-semibold">Why a country or service may be unavailable:</p>
+                            <p className="text-muted-foreground">
+                                1) Direct air/sea dispatch required (e.g., Sea Mail suspended for Canada &amp; Maldives; unavailable for landlocked states).{" "}
+                                2) U-Packet &amp; TDS require bilateral UPU agreements.{" "}
+                                3) 19 EU states restrict commercial parcels €45–€150.{" "}
+                                4) Airspace/conflict suspensions apply to Israel, Lebanon, Russia &amp; Ukraine.
+                            </p>
+                        </div>
                     )}
+
+                    {(activeEmsCountry?.restrictionNote ||
+                        (intlTransport === "sea" && activeEmsCountry?.seaMailAvailable === false)) && (
+                        <p
+                            className={cn(
+                                "flex items-start gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] md:text-xs leading-snug",
+                                activeEmsCountry?.suspensionStatus === "suspended"
+                                    ? "border-destructive/60 bg-destructive/10 text-destructive"
+                                    : "border-secondary bg-secondary/20 text-foreground"
+                            )}
+                        >
+                            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
+                            <span>
+                                {intlTransport === "sea" && activeEmsCountry?.seaMailAvailable === false && activeEmsCountry.seaMailNote
+                                    ? activeEmsCountry.seaMailNote
+                                    : activeEmsCountry?.restrictionNote}
+                            </span>
+                        </p>
+                    )}
+
+                    <fieldset className="contents">
+                        <legend className="label-mono">
+                            {intlTransport === "air" ? "Air Mail Services · Live Prices" : "Sea Mail Services · Live Prices"}
+                        </legend>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 md:gap-2">
+                            {filteredIntlQuotes.map((quote) => {
+                                const isSelected = activeIntlQuote.service.id === quote.service.id;
+                                const isOver = quote.available && Boolean(quote.result.exceedsMaxWeight);
+                                return (
+                                    <button
+                                        key={quote.service.id}
+                                        type="button"
+                                        onClick={() => setIntlServiceId(quote.service.id)}
+                                        aria-pressed={isSelected}
+                                        className={cn(
+                                            "tap flex flex-col justify-between rounded-md border-[1.5px] px-2.5 py-1.5 md:py-2 text-left transition-colors min-h-[42px]",
+                                            isSelected
+                                                ? "border-foreground bg-secondary/35 shadow-[0_2px_0_0_hsl(var(--foreground))]"
+                                                : !quote.available || isOver
+                                                    ? "border-border/70 bg-muted/40 opacity-75 hover:border-foreground/40"
+                                                    : "border-border bg-card hover:border-foreground/50"
+                                        )}
+                                    >
+                                        <div className="flex items-center justify-between gap-1 w-full">
+                                            <span className="text-xs md:text-sm font-semibold text-foreground truncate">
+                                                {quote.service.shortName}
+                                            </span>
+                                            {isSelected && (
+                                                <Check className="w-3.5 h-3.5 shrink-0 text-foreground" aria-hidden="true" />
+                                            )}
+                                        </div>
+                                        <div className="flex items-baseline justify-between gap-1 w-full mt-0.5">
+                                            {!quote.available ? (
+                                                <span className="font-mono text-[10px] md:text-[11px] font-medium text-destructive truncate">
+                                                    {quote.shortUnavailableTag ?? "Unavailable"}
+                                                </span>
+                                            ) : isOver && quote.result.maxWeight ? (
+                                                <span className="font-mono text-[11px] font-medium text-destructive">
+                                                    Max {formatWeightLabel(quote.result.maxWeight)}
+                                                </span>
+                                            ) : quote.result.error ? (
+                                                <span className="font-mono text-[11px] text-muted-foreground">—</span>
+                                            ) : (
+                                                <span className="font-mono text-xs md:text-sm font-bold text-primary tabular-nums">
+                                                    Rs. {quote.result.totalCost.toLocaleString()}
+                                                </span>
+                                            )}
+                                            {quote.available && quote.service.supportsRegistration && intlRegistered && !quote.result.error && (
+                                                <span className="font-mono text-[10px] text-muted-foreground">Reg</span>
+                                            )}
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </fieldset>
+
+                    {/* Foreign Registered Mail (+Rs. 870) + Group / Limit Info */}
+                    <div className="grid grid-cols-2 gap-1.5 md:gap-2">
+                        <div
+                            className={cn(
+                                "flex items-center gap-2 rounded-md border-[1.5px] px-2.5 py-1.5 transition-colors min-h-[40px]",
+                                !canIntlRegister
+                                    ? "border-border/60 bg-muted/40 opacity-60"
+                                    : "border-border bg-card"
+                            )}
+                        >
+                            <input
+                                type="checkbox"
+                                id={intlRegCheckboxId}
+                                name="intlRegistered"
+                                checked={intlRegistered && canIntlRegister}
+                                disabled={!canIntlRegister}
+                                onChange={(e) => setIntlRegistered(e.target.checked)}
+                                className="h-4 w-4 shrink-0 rounded-sm border-foreground accent-primary cursor-pointer disabled:cursor-not-allowed"
+                            />
+                            <label
+                                htmlFor={intlRegCheckboxId}
+                                className={cn(
+                                    "flex-1 text-xs md:text-sm font-medium leading-tight select-none",
+                                    canIntlRegister ? "cursor-pointer text-foreground" : "cursor-not-allowed text-muted-foreground"
+                                )}
+                            >
+                                <span className="block">Registered</span>
+                                <span className="block font-mono text-[10px] md:text-[11px] text-muted-foreground">
+                                    {canIntlRegister ? `+Rs. ${foreignRegFeeAmount.toLocaleString()}` : "Tracked / N/A"}
+                                </span>
+                            </label>
+                        </div>
+
+                        <div className="rounded-md border-[1.5px] border-border bg-card px-2.5 py-1.5 flex flex-col justify-center min-h-[40px]">
+                            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground leading-none">
+                                {activeIntlQuote.service.id === "ems" ? "EMS Tariff Zone" : "Country Group"}
+                            </span>
+                            <span className="font-mono text-xs font-semibold text-foreground mt-0.5 truncate">
+                                {activeIntlQuote.service.id === "ems"
+                                    ? `${activeEmsZone?.name ?? "Zone"}`
+                                    : `Group ${activeEmsCountry?.group ?? "—"} · Max ${formatWeightLabel(activeIntlQuote.service.maxWeight)}`}
+                            </span>
+                        </div>
+                    </div>
                 </div>
             )}
 

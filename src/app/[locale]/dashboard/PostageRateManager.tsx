@@ -482,6 +482,17 @@ export default function PostageRateManager() {
                                                 />
                                             </div>
                                             <div>
+                                                <label htmlFor="fee-foreign-registered" className="text-sm font-medium block mb-1.5">
+                                                    Foreign Registered Post Fee (LKR)
+                                                </label>
+                                                <Input
+                                                    id="fee-foreign-registered"
+                                                    type="number"
+                                                    value={extraFees.foreignRegisteredPost ?? 870}
+                                                    onChange={(e) => setExtraFees({ ...extraFees, foreignRegisteredPost: Number(e.target.value) })}
+                                                />
+                                            </div>
+                                            <div>
                                                 <label htmlFor="fee-ar" className="text-sm font-medium block mb-1.5">
                                                     Acknowledgement Receipt / AR (LKR)
                                                 </label>

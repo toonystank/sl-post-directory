@@ -31,23 +31,58 @@ export interface EmsZone {
 }
 
 /**
- * Mapping between an ISO country code and an EMS zone.
+ * International tariff country groups (A-H) used by Sri Lanka Post for Airmail, U-Packet, TDS, and Parcel schedules.
+ */
+export type CountryGroup = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H";
+
+/**
+ * International transport mode (Air Mail vs. Sea / Surface Mail).
+ */
+export type InternationalTransport = "air" | "sea";
+
+/**
+ * Identifiers for all supported Sri Lanka Post international mail services.
+ */
+export type InternationalServiceId =
+    | "air_letter"
+    | "air_printed"
+    | "u_packet"
+    | "tds"
+    | "air_parcel"
+    | "ems"
+    | "sea_letter"
+    | "sea_printed"
+    | "sea_parcel";
+
+/**
+ * Mapping between an ISO country code, an EMS zone, Country Group, and service availability notes.
  */
 export interface EmsCountry {
     code: string; // e.g., "US", "GB"
     name: string; // e.g., "United States", "United Kingdom"
     zoneId: string;
+    group?: CountryGroup;
+    seaMailAvailable?: boolean;
+    seaMailNote?: string;
+    uPacketAvailable?: boolean;
+    uPacketNote?: string;
+    tdsAvailable?: boolean;
+    tdsNote?: string;
+    suspensionStatus?: "active" | "restricted" | "suspended";
+    restrictionNote?: string;
+    unavailableServices?: Partial<Record<InternationalServiceId, string>>;
 }
 
 /**
  * Additional flat fees and surcharges from the official SL Post tariff schedule.
  */
 export interface ExtraFees {
-    registeredPost: number;       // 60 LKR
-    arReceipt: number;            // 100 LKR (Acknowledgement / Pink receipt)
-    cod: number;                  // 50 LKR fixed COD service fee
-    vpp?: number;                 // 50 LKR Value Payable Parcel fee
-    postcard?: number;            // 40 LKR
+    registeredPost: number;        // 60 LKR (domestic)
+    foreignRegisteredPost?: number; // 870 LKR (international letter / printed matter registration)
+    arReceipt: number;             // 100 LKR (Acknowledgement / Pink receipt)
+    cod: number;                   // 50 LKR fixed COD service fee
+    vpp?: number;                  // 50 LKR Value Payable Parcel fee
+    postcard?: number;             // 40 LKR
     stampedEnvelopeSmall?: number; // 80 LKR
     stampedEnvelopeLarge?: number; // 90 LKR
 }
