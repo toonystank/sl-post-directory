@@ -4,8 +4,12 @@ import { useEffect, useState, useRef } from "react";
 import { MapPin } from "lucide-react";
 import { useAds } from "./AdManager";
 
+type WindowWithCapacitor = Window & {
+    Capacitor?: { isNativePlatform?: () => boolean };
+};
+
 function isNativePlatform(): boolean {
-    return typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.();
+    return typeof window !== 'undefined' && !!(window as WindowWithCapacitor).Capacitor?.isNativePlatform?.();
 }
 
 interface AdBannerProps {
@@ -35,7 +39,8 @@ export default function AdBanner({ position = "in-feed", className = "", style, 
                         adId: Capacitor.getPlatform() === 'ios' ? 'ca-app-pub-3940256099942544/2934735716' : 'ca-app-pub-3940256099942544/6300978111',
                         adSize: BannerAdSize.BANNER,
                         position: BannerAdPosition.BOTTOM_CENTER,
-                        margin: 0,
+                        // keep the native banner above the app's bottom tab bar
+                        margin: 60,
                         isTesting: true,
                     });
                 } catch (error) {
@@ -69,10 +74,10 @@ export default function AdBanner({ position = "in-feed", className = "", style, 
     // Native In-Feed placeholder
     if (isNative && position === "in-feed") {
         return (
-             <div className={`w-full bg-primary/5 border border-primary/20 rounded-xl p-4 flex flex-col items-center justify-center text-center space-y-2 mb-4 ${className}`} style={style}>
-                 <MapPin className="w-6 h-6 text-primary/40" />
-                 <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold">Advertisement</p>
-                 <p className="text-sm font-medium text-foreground/80">Support SL Post Directory</p>
+             <div className={`w-full border border-dashed border-foreground/30 rounded-md p-4 flex flex-col items-center justify-center text-center space-y-1 my-2 ${className}`} style={style}>
+                 <MapPin className="w-5 h-5 text-muted-foreground" />
+                 <p className="label-mono">Advertisement</p>
+                 <p className="text-sm font-medium text-foreground/80">Support Lanka Post Directory</p>
              </div>
         );
     }
@@ -81,7 +86,7 @@ export default function AdBanner({ position = "in-feed", className = "", style, 
     return (
         <div 
             className={`ad-container flex justify-center items-center overflow-hidden 
-                ${position === 'sticky-bottom' ? 'fixed bottom-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-md border-t border-border/50 py-2 min-h-[50px]' : 'w-full my-4 rounded-xl min-h-[250px] bg-primary/5'} 
+                ${position === 'sticky-bottom' ? 'fixed bottom-tabbar left-0 right-0 z-40 bg-background border-t border-border py-1 min-h-[50px]' : 'w-full my-4 rounded-md min-h-[250px] bg-muted/50'} 
                 ${className}`}
             style={style}
         >

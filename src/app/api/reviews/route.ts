@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -45,13 +45,21 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+    const postOfficeId = request.nextUrl.searchParams.get("postOfficeId");
+
+    if (!postOfficeId) {
+        return NextResponse.json({ error: "postOfficeId is required" }, { status: 400 });
+    }
+
+    if (!hasDatabaseUrl) {
+        return NextResponse.json([], {
+            headers: {
+                'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+            },
+        });
+    }
+
     try {
-        const postOfficeId = request.nextUrl.searchParams.get("postOfficeId");
-
-        if (!postOfficeId) {
-            return NextResponse.json({ error: "postOfficeId is required" }, { status: 400 });
-        }
-
         const reviews = await prisma.review.findMany({
             where: { postOfficeId },
             orderBy: { createdAt: "desc" },
@@ -63,8 +71,11 @@ export async function GET(request: NextRequest) {
                 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
             },
         });
-    } catch (error) {
-        console.error("Error fetching reviews:", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    } catch {
+        return NextResponse.json([], {
+            headers: {
+                'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+            },
+        });
     }
 }

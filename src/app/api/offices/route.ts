@@ -1,4 +1,5 @@
-import { prisma } from "@/lib/prisma";
+import { hasDatabaseUrl, prisma } from "@/lib/prisma";
+import { queryLocalOffices } from "@/lib/local-sqlite";
 import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -24,21 +25,33 @@ const OFFICE_SELECT = {
 };
 
 export async function GET(request: NextRequest) {
+    const searchParams = request.nextUrl.searchParams;
+    const query = searchParams.get("q") || "";
+    const letter = searchParams.get("letter") || "";
+    const mode = searchParams.get("mode") || "name"; // "name" | "division"
+    const service = searchParams.get("service") || "";
+
+    let cursor = parseInt(searchParams.get("cursor") || "0");
+    if (isNaN(cursor)) cursor = 0;
+
+    let limit = parseInt(searchParams.get("limit") || "12");
+    if (isNaN(limit)) limit = 12;
+    limit = Math.min(Math.max(limit, 1), 100); // Clamp between 1 and 100
+
+    if (!hasDatabaseUrl) {
+        return NextResponse.json(
+            queryLocalOffices({ q: query, letter, mode, service, cursor, limit }),
+            {
+                status: 200,
+                headers: {
+                    'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+                },
+            }
+        );
+    }
+
     try {
-        const searchParams = request.nextUrl.searchParams;
-        const query = searchParams.get("q") || "";
-        const letter = searchParams.get("letter") || "";
-        const mode = searchParams.get("mode") || "name"; // "name" | "division"
-        const service = searchParams.get("service") || "";
-
-        let cursor = parseInt(searchParams.get("cursor") || "0");
-        if (isNaN(cursor)) cursor = 0;
-
-        let limit = parseInt(searchParams.get("limit") || "12");
-        if (isNaN(limit)) limit = 12;
-        limit = Math.min(Math.max(limit, 1), 100); // Clamp between 1 and 100
-
-        let offices: any[] = [];
+        let offices: unknown[] = [];
         let total = 0;
 
         if (query && mode === "name") {
@@ -56,7 +69,7 @@ export async function GET(request: NextRequest) {
             // $1 = primaryTerm, $2 = limit, $3 = cursor
             // Additional params start from $4
             let paramIndex = 4;
-            const extraParams: any[] = [];
+            const extraParams: string[] = [];
 
             if (letter) {
                 whereClauses.push(`p.name ILIKE $${paramIndex} || '%'`);
@@ -200,8 +213,15 @@ export async function GET(request: NextRequest) {
                 },
             }
         );
-    } catch (error) {
-        console.error("Error in /api/offices:", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    } catch {
+        return NextResponse.json(
+            queryLocalOffices({ q: query, letter, mode, service, cursor, limit }),
+            {
+                status: 200,
+                headers: {
+                    'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+                },
+            }
+        );
     }
 }

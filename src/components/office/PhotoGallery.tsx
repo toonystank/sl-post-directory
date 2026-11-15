@@ -19,9 +19,9 @@ export default function PhotoGallery({ photos, officeName }: PhotoGalleryProps) 
 
     if (!photos || photos.length === 0) {
         return (
-            <div className="rounded-2xl border border-dashed border-border/50 p-8 text-center">
-                <div className="w-14 h-14 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-3">
-                    <ImageIcon className="w-7 h-7 text-muted-foreground/50" />
+            <div className="rounded-md border border-dashed border-border p-8 text-center bg-card">
+                <div className="w-12 h-12 rounded-md bg-muted flex items-center justify-center mx-auto mb-3">
+                    <ImageIcon className="w-6 h-6 text-muted-foreground" />
                 </div>
                 <p className="text-sm text-muted-foreground">No community photos yet.</p>
                 <p className="text-xs text-muted-foreground/70 mt-1">Be the first to upload a photo!</p>
@@ -36,7 +36,7 @@ export default function PhotoGallery({ photos, officeName }: PhotoGalleryProps) 
                     <button
                         key={idx}
                         onClick={() => setSelectedPhoto(photo)}
-                        className="group relative aspect-square rounded-xl overflow-hidden border border-border/30 hover:border-primary/40 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5"
+                        className="tap group relative aspect-square rounded-md overflow-hidden border border-border hover:border-foreground transition-colors"
                     >
                         <Image
                             src={`${photo.url}-/preview/400x400/-/quality/smart/`}

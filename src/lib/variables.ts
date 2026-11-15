@@ -1,10 +1,14 @@
-import { prisma } from "@/lib/prisma";
+import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 
 /**
  * Fetches all site variables from the database and returns them as a key-value map.
  * This function can be cached heavily by Next.js in Server Components.
  */
 export async function getVariablesMap(): Promise<Record<string, string>> {
+    if (!hasDatabaseUrl) {
+        return {};
+    }
+
     try {
         const variables = await prisma.siteVariable.findMany({
             select: { key: true, value: true }
@@ -15,8 +19,7 @@ export async function getVariablesMap(): Promise<Record<string, string>> {
             map[v.key] = v.value;
         }
         return map;
-    } catch (error) {
-        console.error("Failed to fetch site variables:", error);
+    } catch {
         return {};
     }
 }
@@ -46,7 +49,7 @@ export function replacePlaceholders(text: string, variables: Record<string, stri
                 obj = obj[parts[i]];
             }
             return obj !== undefined ? String(obj) : match;
-        } catch (e) {
+        } catch {
             return match;
         }
     });

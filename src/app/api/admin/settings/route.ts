@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
-import { prisma } from "@/lib/prisma";
+import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 
 // GET: Public — anyone needs to know if ads are enabled
 export async function GET() {
+    if (!hasDatabaseUrl) {
+        return NextResponse.json({ adsEnabled: true });
+    }
+
     try {
         const settings = await prisma.siteSettings.upsert({
             where: { id: "default" },

@@ -1,88 +1,116 @@
 import type { Metadata } from "next";
-import { prisma } from "@/lib/prisma";
+import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
+import { Building2, PenLine } from "lucide-react";
+import { hasDatabaseUrl, prisma } from "@/lib/prisma";
+import { getLocalOfficeBySlug } from "@/lib/local-sqlite";
+import { getPostOfficeStatus } from "@/lib/holidays";
+import { Link } from "@/navigation";
 import { CopyButton } from "@/components/CopyButton";
 import { BackButton } from "@/components/BackButton";
-import { Building2, Store, Hash, PenLine, Network } from "lucide-react";
-import Link from "next/link";
-import { notFound } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import PhotoUpload from "@/components/office/PhotoUpload";
+import Postmark from "@/components/brand/Postmark";
+import StatusDot from "@/components/brand/StatusDot";
 import PhotoGallery from "@/components/office/PhotoGallery";
-import { PhotoUploadClient } from "./PhotoUploadClient";
 import ReviewSection from "@/components/ReviewSection";
+import { PhotoUploadClient } from "./PhotoUploadClient";
+import OfficeActions from "./OfficeActions";
 
 export const revalidate = 86400; // Cache the post office page for 24 hours
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+async function findOfficeWithFields(slug: string) {
+    if (!hasDatabaseUrl) {
+        return getLocalOfficeBySlug(slug);
+    }
+    try {
+        return await prisma.postOffice.findUnique({
+            where: { slug },
+            include: { fields: true }
+        });
+    } catch {
+        return getLocalOfficeBySlug(slug);
+    }
+}
+
+async function findOfficeDetails(slug: string) {
+    if (!hasDatabaseUrl) {
+        return getLocalOfficeBySlug(slug);
+    }
+    try {
+        return await prisma.postOffice.findUnique({
+            where: { slug },
+            include: {
+                fields: true,
+                photos: {
+                    where: { status: "APPROVED" },
+                    orderBy: { createdAt: "desc" }
+                },
+                reviews: {
+                    where: { status: "APPROVED" },
+                    orderBy: { createdAt: "desc" },
+                    take: 20,
+                },
+                controllingOffice: { select: { id: true, slug: true, name: true, postalCode: true } },
+                controlledOffices: { select: { id: true, slug: true, name: true, postalCode: true } },
+            }
+        });
+    } catch {
+        return getLocalOfficeBySlug(slug);
+    }
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string; slug: string }> }): Promise<Metadata> {
     const { slug } = await params;
-    
-    const office = await prisma.postOffice.findUnique({
-        where: { slug },
-        include: { fields: true }
-    });
+
+    const office = await findOfficeWithFields(slug);
 
     if (!office) {
         return {
             title: "Post Office Not Found",
-        }
+        };
     }
 
-    const typeField = office.fields.find(f => f.name === 'Type')?.value || 'Post Office';
+    const typeField = office.fields.find((f) => f.name === "Type")?.value || "Post Office";
     const description = `Find contact numbers, opening hours, and location for ${office.name} (${typeField}). Postal Code: ${office.postalCode}, Sri Lanka. Check services, reviews, and community photos.`;
 
     return {
-        title: `${office.name} - Postal Code ${office.postalCode} | Sri Lanka Postal Directory`,
+        title: `${office.name} - Postal Code ${office.postalCode} | Lanka Post Directory`,
         description,
         alternates: {
             canonical: `https://lankapost.vercel.app/office/${office.slug}`,
         },
         openGraph: {
-            title: `${office.name} - Postal Code ${office.postalCode} | Sri Lanka Postal Directory`,
+            title: `${office.name} - Postal Code ${office.postalCode} | Lanka Post Directory`,
             description,
             url: `https://lankapost.vercel.app/office/${office.slug}`,
         },
-    }
+    };
 }
 
-export default async function OfficeDetails({ params }: { params: Promise<{ slug: string }> }) {
-    const { slug } = await params;
+export default async function OfficeDetails({ params }: { params: Promise<{ locale: string; slug: string }> }) {
+    const { locale, slug } = await params;
 
-    const office = await prisma.postOffice.findUnique({
-        where: { slug },
-        include: {
-            fields: true, // Include any dynamic fields
-            photos: {
-                where: { status: "APPROVED" },
-                orderBy: { createdAt: 'desc' }
-            },
-            reviews: {
-                where: { status: "APPROVED" },
-                orderBy: { createdAt: 'desc' },
-                take: 20,
-            },
-            controllingOffice: { select: { id: true, slug: true, name: true, postalCode: true } },
-            controlledOffices: { select: { id: true, slug: true, name: true, postalCode: true } },
-        }
-    });
+    const office = await findOfficeDetails(slug);
 
     if (!office) {
         notFound();
     }
 
-    const typeField = office.fields.find(f => f.name === 'Type');
-    const type = typeField?.value;
+    const t = await getTranslations("Office");
+    const tStatus = await getTranslations("Status");
 
-    const is24HourField = office.fields.find(f => f.name === 'Is24Hour');
-    const is24Hour = is24HourField?.value === 'true';
+    const type = office.fields.find((f) => f.name === "Type")?.value;
+    const division = office.fields.find((f) => f.name === "Division")?.value;
+    const is24Hour = office.fields.find((f) => f.name === "Is24Hour")?.value === "true";
+    const telephone = office.fields.find((f) => f.name === "Telephone" || f.name === "Phone")?.value;
+
+    const currentStatus = getPostOfficeStatus(locale, is24Hour);
+    const statusLabel = currentStatus.status === "holiday" ? tStatus("holiday") : tStatus(currentStatus.label);
 
     const avgRating = office.reviews.length > 0
         ? office.reviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / office.reviews.length
         : undefined;
 
-    const telephone = office.fields.find(f => f.name === 'Telephone' || f.name === 'Phone')?.value;
     const firstImage = office.photos.length > 0 ? office.photos[0].url : undefined;
 
     const jsonLd = {
@@ -146,8 +174,11 @@ export default async function OfficeDetails({ params }: { params: Promise<{ slug
         ]
     };
 
+    const detailFields = office.fields.filter((f) => f.name !== "Is24Hour");
+    const monoFieldNames = new Set(["Phone", "Telephone", "Short Code"]);
+
     return (
-        <article className="container mx-auto px-4 py-12 max-w-4xl min-h-[calc(100vh-4rem)]">
+        <article className="container mx-auto max-w-3xl px-4 py-4 md:py-10">
             <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -156,178 +187,188 @@ export default async function OfficeDetails({ params }: { params: Promise<{ slug
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
             />
-            <BackButton />
 
-            <Card className="relative overflow-hidden border-border/50 shadow-2xl bg-card/50 backdrop-blur-xl">
-                {/* Background Accent */}
-                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+            <div className="hidden md:block mb-4">
+                <BackButton />
+            </div>
 
-                <CardHeader className="relative z-10 pb-8 pt-10 px-8 md:px-12 border-b border-border/40">
-                    <div className="flex flex-col md:flex-row md:items-center gap-6 justify-between">
-                        <div className="flex items-center gap-5">
-                            <div className="p-4 bg-primary/10 text-primary rounded-2xl ring-1 ring-primary/20">
-                                {type === "Sub Post office" ? (
-                                    <Store className="w-10 h-10" />
-                                ) : (
-                                    <Building2 className="w-10 h-10" />
-                                )}
+            {/* Stamp-edged Hero Panel */}
+            <div className="stamp-edge bg-foreground p-[2px]">
+                <div className="stamp-edge bg-card">
+                    <div className="bg-secondary/25 px-5 py-6 md:px-8 md:py-8">
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="min-w-0">
+                                <h1 className="display text-4xl md:text-6xl break-words">{office.name}</h1>
+                                <p className="mt-2 text-base md:text-lg font-medium text-foreground/80">
+                                    {[type || t("typeDefault"), division].filter(Boolean).join(" · ")}
+                                </p>
                             </div>
-                            <div>
-                                <div className="flex flex-wrap items-center gap-2 mb-3">
-                                    <Badge variant="outline" className="uppercase tracking-wider text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 px-2 py-0.5 rounded-md font-semibold">
-                                        Official Listing
-                                    </Badge>
-                                    {is24Hour && (
-                                        <Badge variant="outline" className="uppercase tracking-wider text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 px-2 py-0.5 rounded-md font-semibold">
-                                            Open 24 Hours
-                                        </Badge>
-                                    )}
-                                </div>
-                                <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-2">
-                                    {office.name}
-                                </h1>
-                            </div>
+                            {office.postalCode && (
+                                <Postmark
+                                    code={office.postalCode}
+                                    size="md"
+                                    tone="red"
+                                    waves
+                                    rotate={-10}
+                                    label={(division || "SRI LANKA").toUpperCase()}
+                                    className="-mr-2 shrink-0"
+                                />
+                            )}
                         </div>
                     </div>
-                </CardHeader>
+                </div>
+            </div>
 
-                <CardContent className="relative z-10 p-8 md:p-12">
-                    {office.rmsc && (
-                        <div className="mb-8 w-full">
-                            <div className="flex flex-col items-center justify-center p-6 bg-gradient-to-br from-red-500/10 to-amber-500/10 border border-red-500/20 rounded-2xl">
-                                <h3 className="text-sm font-mono text-muted-foreground uppercase tracking-widest mb-1">RMSC / TPO Classification</h3>
-                                <p className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-500">{office.rmsc}</p>
-                            </div>
-                        </div>
-                    )}
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Core Info Cards */}
-                        <div className="group bg-background/50 border border-border/50 rounded-2xl p-6 flex flex-col items-start gap-4 hover:border-primary/50 transition-all hover:shadow-md hover:bg-card">
-                            <div className="flex items-center gap-3 text-muted-foreground mb-2">
-                                <div className="px-3 py-1 bg-primary/10 rounded-lg text-primary text-xs font-semibold uppercase tracking-wider border border-primary/20">
-                                    <span className="flex items-center gap-1.5"><Hash className="w-3.5 h-3.5" /> Postal Code</span>
-                                </div>
-                            </div>
-                            <div className="flex w-full justify-between items-center mt-auto">
-                                <p className="text-2xl font-bold tracking-tight">{office.postalCode}</p>
+            {/* Status Strip */}
+            <div className="flex items-center justify-between gap-3 border-b-2 border-foreground py-3 px-1">
+                <StatusDot status={currentStatus.status} label={statusLabel} variant="strip" />
+                <span className="font-mono text-xs text-muted-foreground">
+                    {is24Hour ? t("open24h") : "Mon–Fri 8:30–16:30 · Sat 9:00–13:00"}
+                </span>
+            </div>
+
+            {/* Action Row */}
+            <OfficeActions
+                name={office.name}
+                postalCode={office.postalCode}
+                phone={telephone}
+                latitude={office.latitude}
+                longitude={office.longitude}
+            />
+
+            {/* Details Definition List */}
+            <section className="pt-6">
+                <h2 className="sr-only">{t("details")}</h2>
+                <dl className="divide-y divide-border border-b-2 border-foreground">
+                    {office.postalCode && (
+                        <div className="flex items-center justify-between gap-4 py-3.5">
+                            <dt className="label-mono">{t("postalCode")}</dt>
+                            <dd className="flex items-center gap-2 font-mono text-base font-semibold">
+                                <span>{office.postalCode}</span>
                                 <CopyButton text={office.postalCode} />
-                            </div>
+                            </dd>
                         </div>
-
-
-
-                        {/* Dynamic Fields */}
-                        {office.fields.filter(f => f.name !== 'Type' && f.name !== 'Is24Hour').map((field) => (
-                            <div key={field.id} className="group bg-background/50 border border-border/50 rounded-2xl p-6 flex flex-col items-start gap-4 hover:border-primary/50 transition-all hover:shadow-md hover:bg-card">
-                                <div className="flex items-center gap-3 text-muted-foreground mb-2">
-                                    <div className="px-3 py-1 bg-blue-500/10 rounded-lg text-blue-400 text-xs font-semibold uppercase tracking-wider border border-blue-500/20">
-                                        {field.name}
-                                    </div>
-                                </div>
-                                <div className="flex w-full justify-between items-center mt-auto">
-                                    <p className="text-lg font-bold tracking-tight">{field.value}</p>
-                                    <CopyButton text={field.value} />
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Network Structure Section */}
-                    {(office.controllingOffice || (office.controlledOffices && office.controlledOffices.length > 0)) && (
-                        <>
-                            <Separator className="my-12 border-border/40" />
-                            <div className="space-y-6">
-                                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-6">
-                                    <div>
-                                        <h2 className="text-2xl font-bold tracking-tight mb-1 flex items-center gap-2">
-                                            <Network className="w-6 h-6 text-primary" /> Network Structure
-                                        </h2>
-                                        <p className="text-sm text-muted-foreground">The hierarchy of this post office in the postal network.</p>
-                                    </div>
-                                </div>
-                                
-                                {office.controllingOffice && (
-                                    <div className="bg-background/40 border border-border/50 rounded-2xl p-6">
-                                        <h3 className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-3">Controlled By</h3>
-                                        <Link href={`/office/${office.controllingOffice.slug}`} className="flex items-center justify-between bg-card/60 border border-border/40 hover:border-primary/50 hover:bg-card p-4 rounded-xl transition-all group">
-                                            <div className="flex items-center gap-4">
-                                                <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                                                    <Building2 className="w-5 h-5" />
-                                                </div>
-                                                <span className="font-semibold text-lg group-hover:text-primary transition-colors">{office.controllingOffice.name}</span>
-                                            </div>
-                                            <span className="font-mono text-muted-foreground bg-background px-3 py-1 rounded-md text-sm">{office.controllingOffice.postalCode}</span>
-                                        </Link>
-                                    </div>
-                                )}
-                                
-                                {office.controlledOffices && office.controlledOffices.length > 0 && (
-                                    <div className="bg-background/40 border border-border/50 rounded-2xl p-6">
-                                        <h3 className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-4">Controls {office.controlledOffices.length} Sub-Offices</h3>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                            {office.controlledOffices.map((sub: any) => (
-                                                <Link key={sub.id} href={`/office/${sub.slug}`} className="flex items-center justify-between bg-card/60 border border-border/40 hover:border-primary/50 hover:bg-card p-3 rounded-xl transition-all group">
-                                                    <span className="font-medium text-sm group-hover:text-primary transition-colors truncate">{sub.name}</span>
-                                                    <span className="font-mono text-xs text-muted-foreground bg-background px-2 py-0.5 rounded-md shrink-0">{sub.postalCode}</span>
-                                                </Link>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </>
                     )}
 
-                    {/* Community Photos Section */}
-                    <Separator className="my-12 opacity-50" />
-                    <div className="space-y-6">
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-6">
-                            <div>
-                                <h2 className="text-2xl font-bold tracking-tight mb-1">Community Photos</h2>
-                                <p className="text-sm text-muted-foreground">Photos uploaded by people visiting this post office.</p>
+                    {office.rmsc && (
+                        <div className="flex items-center justify-between gap-4 py-3.5">
+                            <dt className="label-mono">{t("rmsc")}</dt>
+                            <dd className="font-mono text-sm font-semibold text-primary text-right">{office.rmsc}</dd>
+                        </div>
+                    )}
+
+                    {detailFields.map((field) => {
+                        const isMono = monoFieldNames.has(field.name);
+                        return (
+                            <div key={field.id} className="flex items-center justify-between gap-4 py-3.5">
+                                <dt className="label-mono shrink-0">{field.name}</dt>
+                                <dd className={`flex items-center gap-2 text-right font-medium min-w-0 ${isMono ? "font-mono text-sm" : ""}`}>
+                                    <span className="break-words">{field.value}</span>
+                                    {isMono && <CopyButton text={field.value} />}
+                                </dd>
                             </div>
-                        </div>
-                        
-                        <PhotoGallery 
-                            photos={office.photos.map(p => ({ ...p, caption: p.caption ?? undefined }))} 
-                            officeName={office.name} 
-                        />
-                        
-                        <div className="mt-8 pt-8 border-t border-border/30">
-                            <h3 className="text-lg font-semibold mb-4">Add a Photo</h3>
-                            <PhotoUploadClient officeId={office.id} />
-                        </div>
+                        );
+                    })}
+                </dl>
+            </section>
+
+            {/* Postal Network Section */}
+            {(office.controllingOffice || (office.controlledOffices && office.controlledOffices.length > 0)) && (
+                <section className="border-b-2 border-foreground py-8 space-y-5">
+                    <div>
+                        <h2 className="font-heading text-xl font-extrabold [font-stretch:82%]">{t("network")}</h2>
+                        <p className="text-sm text-muted-foreground mt-1">{t("networkLede")}</p>
                     </div>
 
-                    {/* Reviews Section */}
-                    <Separator className="my-12 opacity-50" />
-                    <ReviewSection
-                        reviews={office.reviews.map(r => ({
-                            ...r,
-                            createdAt: r.createdAt.toISOString(),
-                        }))}
-                        officeId={office.id}
-                    />
-
-                    {/* Suggestion Section */}
-                    <Separator className="my-12 opacity-50" />
-
-                    <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-primary/5 p-6 rounded-2xl border border-primary/10">
+                    {office.controllingOffice && (
                         <div>
-                            <h3 className="text-lg font-bold mb-1 flex items-center gap-2">
-                                <PenLine className="w-5 h-5 text-primary" /> Do you work here?
-                            </h3>
-                            <p className="text-muted-foreground text-sm">Help keep this directory accurate by suggesting edits to the information above.</p>
+                            <h3 className="label-mono mb-2">{t("controlledBy")}</h3>
+                            <Link
+                                href={`/office/${office.controllingOffice.slug}`}
+                                className="tap flex items-center justify-between gap-4 rounded-md border-2 border-foreground bg-card px-4 py-3 hover:bg-muted"
+                            >
+                                <span className="flex items-center gap-3 min-w-0">
+                                    <Building2 className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+                                    <span className="font-semibold truncate">{office.controllingOffice.name}</span>
+                                </span>
+                                {office.controllingOffice.postalCode && (
+                                    <span className="font-mono text-sm text-muted-foreground shrink-0">
+                                        {office.controllingOffice.postalCode}
+                                    </span>
+                                )}
+                            </Link>
                         </div>
-                        <Button asChild size="lg" className="shrink-0 w-full md:w-auto rounded-xl">
+                    )}
+
+                    {office.controlledOffices && office.controlledOffices.length > 0 && (
+                        <div>
+                            <h3 className="label-mono mb-2">{t("controls", { count: office.controlledOffices.length })}</h3>
+                            <div className="divide-y divide-border rounded-md border border-foreground/30 bg-card overflow-hidden">
+                                {office.controlledOffices.map((sub) => (
+                                    <Link
+                                        key={sub.id}
+                                        href={`/office/${sub.slug}`}
+                                        className="tap flex items-center justify-between gap-3 px-4 py-2.5 text-sm font-medium hover:bg-muted"
+                                    >
+                                        <span className="truncate">{sub.name}</span>
+                                        <span className="font-mono text-xs text-muted-foreground shrink-0">{sub.postalCode}</span>
+                                    </Link>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </section>
+            )}
+
+            {/* Community Photos Section */}
+            <section className="border-b-2 border-foreground py-8 space-y-6">
+                <div>
+                    <h2 className="font-heading text-xl font-extrabold [font-stretch:82%]">{t("photos")}</h2>
+                    <p className="text-sm text-muted-foreground mt-1">{t("photosLede")}</p>
+                </div>
+
+                <PhotoGallery
+                    photos={office.photos.map((p) => ({ ...p, caption: p.caption ?? undefined }))}
+                    officeName={office.name}
+                />
+
+                <div>
+                    <h3 className="label-mono mb-3">{t("addPhoto")}</h3>
+                    <PhotoUploadClient officeId={office.id} />
+                </div>
+            </section>
+
+            {/* Reviews Section */}
+            <section className="border-b-2 border-foreground py-8">
+                <ReviewSection
+                    reviews={office.reviews.map((r) => ({
+                        ...r,
+                        createdAt: r.createdAt.toISOString(),
+                    }))}
+                    officeId={office.id}
+                />
+            </section>
+
+            {/* Suggest an Edit */}
+            <section className="pt-8 pb-4">
+                <div className="rounded-md border-2 border-foreground bg-card overflow-hidden">
+                    <div className="airmail-stripe h-1.5" aria-hidden="true" />
+                    <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h3 className="font-heading text-lg font-extrabold [font-stretch:82%] flex items-center gap-2">
+                                <PenLine className="w-4 h-4 text-primary" aria-hidden="true" />
+                                {t("workHere")}
+                            </h3>
+                            <p className="text-sm text-muted-foreground mt-0.5">{t("workHereBody")}</p>
+                        </div>
+                        <Button asChild size="lg" className="w-full sm:w-auto shrink-0">
                             <Link href={`/suggest/${office.id}`}>
-                                Suggest an Edit
+                                {t("suggestEdit")}
                             </Link>
                         </Button>
                     </div>
-                </CardContent>
-            </Card>
+                </div>
+            </section>
         </article>
     );
 }

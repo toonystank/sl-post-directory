@@ -1,11 +1,12 @@
 import React, { useRef, useState, useCallback, useEffect } from "react";
-import { Search, MapPin, Building2, Loader2, X } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
+import { Search, MapPin, Building2, Loader2, X, CornerDownLeft } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { SearchMode } from "./types";
 
 interface SearchBarProps {
     id: string;
+    /** Compact variant used when docked under the mobile app bar / in the sidebar */
     isSticky?: boolean;
     query: string;
     onQueryChange: (val: string, id: string) => void;
@@ -16,24 +17,25 @@ interface SearchBarProps {
     onSuggestionClick: (suggestion: string) => void;
     containerRef?: React.RefObject<HTMLDivElement | null>;
     sidebarRef?: React.RefObject<HTMLDivElement | null>;
+    inputRef?: React.Ref<HTMLInputElement>;
 }
 
 export default function SearchBar({
     id, isSticky = false, query, onQueryChange, searchMode, onSubmit,
-    onClear, loading, onSuggestionClick, containerRef, sidebarRef
+    onClear, loading, onSuggestionClick, containerRef, sidebarRef, inputRef
 }: SearchBarProps) {
+    const t = useTranslations("Search");
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [suggestionsLoading, setSuggestionsLoading] = useState(false);
-    
-    // We only show suggestions for the active search bar
     const [isActive, setIsActive] = useState(false);
+    const [highlight, setHighlight] = useState(-1);
 
     const suggestionCache = useRef<Record<string, string[]>>({});
     const suggestDebounce = useRef<NodeJS.Timeout | null>(null);
     const localContainerRef = useRef<HTMLDivElement>(null);
-
     const actualContainerRef = containerRef || localContainerRef;
+    const listId = `suggestions-${id}`;
 
     const fetchSuggestions = useCallback(async (val: string, mode: SearchMode) => {
         if (!val.trim()) {
@@ -41,14 +43,12 @@ export default function SearchBar({
             setShowSuggestions(false);
             return;
         }
-
         const cacheKey = `${mode}-${val.trim().toLowerCase()}`;
         if (suggestionCache.current[cacheKey]) {
             setSuggestions(suggestionCache.current[cacheKey]);
             setShowSuggestions(true);
             return;
         }
-
         setSuggestionsLoading(true);
         try {
             const res = await fetch(`/api/autocomplete?q=${encodeURIComponent(val)}&mode=${mode}`);
@@ -68,11 +68,9 @@ export default function SearchBar({
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
         onQueryChange(val, id);
-
+        setHighlight(-1);
         if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
-        suggestDebounce.current = setTimeout(() => {
-            fetchSuggestions(val, searchMode);
-        }, 150);
+        suggestDebounce.current = setTimeout(() => fetchSuggestions(val, searchMode), 150);
     };
 
     const handleSubmit = () => {
@@ -87,14 +85,30 @@ export default function SearchBar({
         onSuggestionClick(s);
     };
 
-    // Close suggestions on outside click
+    const open = showSuggestions && isActive && suggestions.length > 0;
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (open && e.key === "ArrowDown") {
+            e.preventDefault();
+            setHighlight((h) => Math.min(h + 1, suggestions.length - 1));
+        } else if (open && e.key === "ArrowUp") {
+            e.preventDefault();
+            setHighlight((h) => Math.max(h - 1, -1));
+        } else if (e.key === "Escape") {
+            setShowSuggestions(false);
+        } else if (e.key === "Enter") {
+            e.preventDefault();
+            if (open && highlight >= 0) handleSuggestClick(suggestions[highlight]);
+            else handleSubmit();
+        }
+    };
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             const target = event.target as Node;
-            const clickedInThis = actualContainerRef.current?.contains(target);
-            const clickedInSidebar = sidebarRef?.current?.contains(target);
-
-            if (!clickedInThis && !clickedInSidebar && isActive) {
+            const inThis = actualContainerRef.current?.contains(target);
+            const inSidebar = sidebarRef?.current?.contains(target);
+            if (!inThis && !inSidebar && isActive) {
                 setShowSuggestions(false);
                 setIsActive(false);
             }
@@ -103,73 +117,100 @@ export default function SearchBar({
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [actualContainerRef, sidebarRef, isActive]);
 
-    // Clear suggestions when search mode changes
     useEffect(() => {
         setSuggestions([]);
         setShowSuggestions(false);
     }, [searchMode]);
 
     return (
-        <div className="w-full relative" id={`search-container-${id}`} ref={actualContainerRef}>
-            <div className={`bg-background/90 backdrop-blur-md border shadow-sm flex items-center gap-2 focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/30 focus-within:shadow-[0_0_20px_hsl(var(--primary)/0.2)] transition-all duration-300 ${isSticky ? 'rounded-b-2xl p-2 px-3' : 'rounded-xl p-1.5'}`}>
-                <div className="flex-1 flex items-center pl-3">
-                    <Search className={`text-muted-foreground shrink-0 ${isSticky ? 'w-5 h-5 text-primary/80' : 'w-4 h-4'}`} />
-                    <Input
-                        type="text"
+        <div className="relative w-full" id={`search-container-${id}`} ref={actualContainerRef}>
+            <form
+                role="search"
+                onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}
+                className={cn(
+                    "flex items-stretch overflow-hidden rounded-md border-2 border-foreground bg-card transition-shadow",
+                    "focus-within:shadow-[3px_3px_0_0_hsl(var(--foreground))]",
+                    isSticky ? "h-11" : "h-14"
+                )}
+            >
+                <label htmlFor={`search-${id}`} className="flex flex-1 items-center gap-2.5 pl-3.5 min-w-0">
+                    <span className="sr-only">{t("submit")}</span>
+                    {searchMode === "name"
+                        ? <Building2 className="h-[1.1rem] w-[1.1rem] shrink-0 text-muted-foreground" aria-hidden="true" />
+                        : <MapPin className="h-[1.1rem] w-[1.1rem] shrink-0 text-muted-foreground" aria-hidden="true" />}
+                    <input
+                        id={`search-${id}`}
+                        ref={inputRef}
+                        type="search"
+                        inputMode="search"
+                        enterKeyHint="search"
+                        autoComplete="off"
                         value={query}
                         onChange={handleChange}
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                                e.preventDefault();
-                                handleSubmit();
-                            }
-                        }}
-                        placeholder={`Search ${searchMode === 'name' ? 'offices' : 'areas'}...`}
-                        className={`border-0 shadow-none focus-visible:ring-0 !ring-0 w-full bg-transparent dark:bg-transparent placeholder:text-muted-foreground/70 ${isSticky ? 'text-base py-4 font-medium' : 'text-sm py-3'}`}
+                        onKeyDown={handleKeyDown}
                         onFocus={() => {
                             setIsActive(true);
                             if (suggestions.length > 0 && query.trim()) setShowSuggestions(true);
                         }}
+                        placeholder={searchMode === "name" ? t("placeholderName") : t("placeholderArea")}
+                        role="combobox"
+                        aria-expanded={open}
+                        aria-controls={listId}
+                        aria-autocomplete="list"
+                        aria-activedescendant={open && highlight >= 0 ? `${listId}-${highlight}` : undefined}
+                        className={cn(
+                            "h-full w-full min-w-0 bg-transparent outline-none placeholder:text-muted-foreground/80 [&::-webkit-search-cancel-button]:hidden",
+                            isSticky ? "text-base" : "text-[1.05rem]"
+                        )}
                     />
-                </div>
-                <div className="flex items-center gap-1.5 pr-1">
-                    {loading && !suggestionsLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+                </label>
+                <div className="flex items-center gap-1 pr-1.5">
+                    {(loading || suggestionsLoading) && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden="true" />}
                     {query && (
-                        <button type="button" onClick={onClear} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors mr-1">
-                            <X className="w-4 h-4" />
+                        <button type="button" onClick={onClear} className="tap rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={t("clear")}>
+                            <X className="h-4 w-4" />
                         </button>
                     )}
-                    <Button
-                        size="sm"
-                        onClick={handleSubmit}
-                        className={`font-semibold shrink-0 transition-all ${isSticky ? 'h-10 px-4 rounded-xl' : 'h-8 px-3 rounded-lg text-xs'}`}
-                    >
-                        Search
-                    </Button>
                 </div>
-            </div>
+                <button
+                    type="submit"
+                    className={cn(
+                        "tap flex shrink-0 items-center justify-center gap-2 bg-primary font-semibold text-primary-foreground hover:bg-primary/90",
+                        isSticky ? "w-11" : "w-14 md:w-auto md:px-6"
+                    )}
+                    aria-label={t("submit")}
+                >
+                    <Search className="h-5 w-5" strokeWidth={2.4} />
+                    {!isSticky && <span className="hidden md:inline">{t("submit")}</span>}
+                </button>
+            </form>
 
-            {/* Autocomplete Dropdown */}
-            {showSuggestions && isActive && suggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 mx-1 lg:mx-0 bg-card border border-border/50 shadow-2xl rounded-xl overflow-hidden z-[60] animate-in fade-in slide-in-from-top-2">
-                    <ul className="py-1.5">
-                        {suggestions.map((s, i) => (
-                            <li key={i}>
-                                <button
-                                    onClick={() => handleSuggestClick(s)}
-                                    className="w-full text-left px-5 py-3 text-sm hover:focus-visible:ring-0 hover:bg-muted/50 focus:bg-muted/50 transition-colors focus:outline-none flex items-center gap-3"
-                                >
-                                    {searchMode === "name" ? (
-                                        <Building2 className="w-4 h-4 text-muted-foreground/60 shrink-0" />
-                                    ) : (
-                                        <MapPin className="w-4 h-4 text-muted-foreground/60 shrink-0" />
-                                    )}
-                                    <span className="truncate flex-1">{s}</span>
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
+            {open && (
+                <ul
+                    id={listId}
+                    role="listbox"
+                    className="absolute left-0 right-0 top-full z-[60] mt-1.5 overflow-hidden rounded-md border-2 border-foreground bg-card py-1 shadow-[4px_4px_0_0_hsl(var(--foreground))]"
+                >
+                    {suggestions.map((s, i) => (
+                        <li key={s + i} id={`${listId}-${i}`} role="option" aria-selected={highlight === i}>
+                            <button
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => handleSuggestClick(s)}
+                                className={cn(
+                                    "flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left text-[0.95rem] last:border-0",
+                                    highlight === i ? "bg-secondary/30" : "hover:bg-muted"
+                                )}
+                            >
+                                {searchMode === "name"
+                                    ? <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    : <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                                <span className="flex-1 truncate">{s}</span>
+                                <CornerDownLeft className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" aria-hidden="true" />
+                            </button>
+                        </li>
+                    ))}
+                </ul>
             )}
         </div>
     );

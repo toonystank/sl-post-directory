@@ -1,22 +1,23 @@
 "use client";
 
 import React, { useRef, useEffect, useState } from "react";
-import { Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Plus, SlidersHorizontal, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Plus, X } from "lucide-react";
-import HeroSection from "@/components/HeroSection";
+import { Button } from "@/components/ui/button";
 import AddOfficeModal from "@/components/AddOfficeModal";
 
-// Extracted Components
 import { useDirectoryState } from "./directory/useDirectoryState";
+import HomeHero from "./directory/HomeHero";
 import SearchBar from "./directory/SearchBar";
 import DirectorySidebar from "./directory/DirectorySidebar";
 import MobileFilters from "./directory/MobileFilters";
 import DirectoryGrid from "./directory/DirectoryGrid";
+import { useServiceLabel } from "./directory/filters";
 
 export default function SearchDirectory() {
     const t = useTranslations("Search");
+    const serviceLabel = useServiceLabel();
+
     const {
         query, setQuery,
         searchMode, setSearchMode,
@@ -24,27 +25,28 @@ export default function SearchDirectory() {
         activeService, setActiveService,
         offices, total, nextCursor,
         loading, initialLoading,
-        updateUrl, fetchOffices
+        updateUrl, fetchOffices,
     } = useDirectoryState();
 
-    const [isMobileExpanded, setIsMobileExpanded] = useState(false);
+    const [filtersOpen, setFiltersOpen] = useState(false);
     const [showStickySearch, setShowStickySearch] = useState(false);
-    const [isAlphabetExpanded, setIsAlphabetExpanded] = useState<boolean>(() => {
-        if (!activeLetter) return false;
-        return activeLetter.toUpperCase().charCodeAt(0) - 65 >= 12; // A=65
-    });
 
     const searchContainerRef = useRef<HTMLDivElement>(null);
     const stickySearchContainerRef = useRef<HTMLDivElement>(null);
-    const sidebarRef = useRef<HTMLDivElement>(null);
-    const primarySearchObserverRef = useRef<IntersectionObserver | null>(null);
-    const sidebarScrollPos = useRef<number>(0);
+    const heroInputRef = useRef<HTMLInputElement>(null);
 
     const hasActiveFilters = Boolean(query || activeLetter || activeService);
+    const activeFilterCount = (activeLetter ? 1 : 0) + (activeService ? 1 : 0);
 
     const submitSearch = () => {
         updateUrl(query, searchMode, activeLetter, activeService);
         fetchOffices(query, activeLetter, searchMode, activeService, 0, false);
+    };
+
+    const handleClearQuery = () => {
+        setQuery("");
+        updateUrl("", searchMode, activeLetter, activeService);
+        fetchOffices("", activeLetter, searchMode, activeService, 0, false);
     };
 
     const handleSuggestionClick = (suggestion: string) => {
@@ -89,169 +91,167 @@ export default function SearchDirectory() {
         fetchOffices("", null, searchMode, null, 0, false);
     };
 
-    // Intersection Observer for Sticky Search
-    useEffect(() => {
-        if (!searchContainerRef.current) return;
-        primarySearchObserverRef.current = new IntersectionObserver(
-            ([entry]) => setShowStickySearch(!entry.isIntersecting),
-            { root: null, threshold: 0, rootMargin: "-65px 0px 0px 0px" }
-        );
-        primarySearchObserverRef.current.observe(searchContainerRef.current);
-        return () => primarySearchObserverRef.current?.disconnect();
-    }, []);
-
-    // Save/Restore Sidebar scroll
-    const handleSidebarScroll = (e: React.UIEvent<HTMLDivElement>) => {
-        sidebarScrollPos.current = e.currentTarget.scrollTop;
+    const clearSheetFilters = () => {
+        setActiveLetter(null);
+        setActiveService(null);
+        updateUrl(query, searchMode, null, null);
+        fetchOffices(query, null, searchMode, null, 0, false);
     };
 
     useEffect(() => {
-        if (sidebarRef.current) sidebarRef.current.scrollTop = sidebarScrollPos.current;
-    }, [offices, loading, initialLoading]);
+        const el = searchContainerRef.current;
+        if (!el) return;
+        const observer = new IntersectionObserver(
+            ([entry]) => setShowStickySearch(!entry.isIntersecting),
+            { root: null, threshold: 0, rootMargin: "-60px 0px 0px 0px" }
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, []);
 
     return (
         <section className="relative w-full">
-            {/* ====== HERO SECTION ====== */}
-            <div ref={searchContainerRef}>
-                <HeroSection>
-                    <div className="w-full flex justify-center items-center flex-col">
-                        <SearchBar
-                            id="hero"
-                            query={query}
-                            onQueryChange={setQuery}
-                            searchMode={searchMode}
-                            onSubmit={submitSearch}
-                            onClear={() => {
-                                setQuery("");
-                                updateUrl("", searchMode, activeLetter, activeService);
-                                fetchOffices("", activeLetter, searchMode, activeService, 0, false);
-                            }}
-                            loading={loading}
-                            onSuggestionClick={handleSuggestionClick}
-                            containerRef={searchContainerRef}
-                        />
-                        <div className="w-full mt-4 text-left">
-                            <div className="flex items-center justify-between mb-3">
-                                <div className="flex flex-wrap gap-2">
-                                    <button
-                                        onClick={() => handleModeSwitch("name")}
-                                        className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 ${searchMode === "name" ? "bg-primary text-primary-foreground border-primary shadow-sm" : "bg-white dark:bg-card/60 shadow-sm backdrop-blur-md text-muted-foreground border-border/50 hover:bg-card hover:text-foreground hover:border-border hover:scale-105"}`}
-                                    >
-                                        {t("modeName")}
-                                    </button>
-                                    <button
-                                        onClick={() => handleModeSwitch("division")}
-                                        className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 ${searchMode === "division" ? "bg-secondary text-secondary-foreground border-secondary shadow-sm" : "bg-white dark:bg-card/60 shadow-sm backdrop-blur-md text-muted-foreground border-border/50 hover:bg-card hover:text-foreground hover:border-border hover:scale-105"}`}
-                                    >
-                                        {t("modeArea")}
-                                    </button>
-                                </div>
-                                <button
-                                    onClick={() => setIsMobileExpanded(!isMobileExpanded)}
-                                    className={`text-xs px-4 py-1.5 rounded-full font-bold uppercase tracking-wider border transition-all flex items-center gap-1 shadow-sm ${isMobileExpanded || activeLetter || activeService ? "bg-primary/20 text-primary border-primary/30 backdrop-blur-md" : "bg-white dark:bg-card/60 backdrop-blur-md text-muted-foreground border-border/50 hover:bg-card hover:text-foreground"}`}
-                                >
-                                    {isMobileExpanded ? t("hideFilters") : t("moreFilters")}
-                                </button>
-                            </div>
-                            <MobileFilters
-                                isMobileExpanded={isMobileExpanded}
-                                activeLetter={activeLetter}
-                                handleLetterFilter={handleLetterFilter}
-                                clearLetter={() => handleLetterFilter(activeLetter || "")}
-                                activeService={activeService}
-                                handleServiceFilter={handleServiceFilter}
-                                clearService={() => handleServiceFilter(activeService || "")}
-                            />
-                        </div>
-                    </div>
-                </HeroSection>
-            </div>
+            <HomeHero
+                searchRef={searchContainerRef}
+                searchMode={searchMode}
+                onModeChange={handleModeSwitch}
+                onPopular={handlePopularSearch}
+                onPostcodeTool={() => {
+                    heroInputRef.current?.focus();
+                    searchContainerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                }}
+                total={total}
+                activeQuery={query}
+                search={
+                    <SearchBar
+                        id="hero"
+                        inputRef={heroInputRef}
+                        query={query}
+                        onQueryChange={setQuery}
+                        searchMode={searchMode}
+                        onSubmit={submitSearch}
+                        onClear={handleClearQuery}
+                        loading={loading}
+                        onSuggestionClick={handleSuggestionClick}
+                        containerRef={searchContainerRef}
+                    />
+                }
+            />
 
-            <div className="container mx-auto px-4 py-8 md:py-10 relative z-20">
-                {/* ====== STICKY SEARCH BAR ====== */}
-                {showStickySearch && (
-                    <div ref={stickySearchContainerRef} className="fixed top-[64px] left-0 right-0 z-[60] lg:hidden animate-in slide-in-from-top-4 fade-in duration-300 drop-shadow-xl border-b border-border/50">
-                        <div className="bg-background/95 backdrop-blur-md px-4 py-2">
-                            <SearchBar
-                                id="sticky"
-                                isSticky
-                                query={query}
-                                onQueryChange={setQuery}
-                                searchMode={searchMode}
-                                onSubmit={submitSearch}
-                                onClear={() => {
-                                    setQuery("");
-                                    updateUrl("", searchMode, activeLetter, activeService);
-                                    fetchOffices("", activeLetter, searchMode, activeService, 0, false);
-                                }}
-                                loading={loading}
-                                onSuggestionClick={handleSuggestionClick}
-                                containerRef={stickySearchContainerRef}
-                            />
-                        </div>
-                    </div>
-                )}
+            {showStickySearch && (
+                <div
+                    ref={stickySearchContainerRef}
+                    className="fixed top-[calc(var(--appbar-h)+env(safe-area-inset-top))] inset-x-0 z-40 lg:hidden border-b-2 border-foreground bg-background px-3 py-2"
+                >
+                    <SearchBar
+                        id="sticky"
+                        isSticky
+                        query={query}
+                        onQueryChange={setQuery}
+                        searchMode={searchMode}
+                        onSubmit={submitSearch}
+                        onClear={handleClearQuery}
+                        loading={loading}
+                        onSuggestionClick={handleSuggestionClick}
+                        containerRef={stickySearchContainerRef}
+                    />
+                </div>
+            )}
 
-                <div className="flex flex-col lg:flex-row items-start">
-                    {/* ====== LEFT SIDEBAR ====== */}
+            <div className="container mx-auto px-4 py-6 md:py-10">
+                <div className="flex flex-col lg:flex-row items-start gap-8">
                     <DirectorySidebar
-                        sidebarRef={sidebarRef}
-                        handleSidebarScroll={handleSidebarScroll}
-                        showStickySearch={showStickySearch}
                         searchMode={searchMode}
                         handleModeSwitch={handleModeSwitch}
                         activeLetter={activeLetter}
                         handleLetterFilter={handleLetterFilter}
                         clearLetter={() => handleLetterFilter(activeLetter || "")}
-                        isAlphabetExpanded={isAlphabetExpanded}
-                        setIsAlphabetExpanded={setIsAlphabetExpanded}
                         activeService={activeService}
                         handleServiceFilter={handleServiceFilter}
                         clearService={() => handleServiceFilter(activeService || "")}
-                        hasActiveFilters={hasActiveFilters}
                         handlePopularSearch={handlePopularSearch}
-                        query={query}
-                        onQueryChange={(val) => setQuery(val)}
-                        onSubmit={submitSearch}
-                        onClear={() => {
-                            setQuery("");
-                            updateUrl("", searchMode, activeLetter, activeService);
-                            fetchOffices("", activeLetter, searchMode, activeService, 0, false);
-                        }}
-                        loading={loading}
-                        onSuggestionClick={handleSuggestionClick}
                     />
 
-                    {/* ====== RIGHT GRID SECTION ====== */}
                     <section className="flex-1 w-full min-w-0">
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 pb-4 border-b border-border/40 gap-4">
-                            <div>
-                                <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-1">
-                                    {activeLetter && query ? t("resultsForIn", { query, letter: activeLetter })
-                                        : activeLetter ? t("startingWith", { letter: activeLetter })
-                                        : query ? t("resultsFor", { query })
+                        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                            <div className="min-w-0">
+                                <h2 className="font-heading text-2xl md:text-3xl font-extrabold [font-stretch:82%] truncate">
+                                    {activeLetter && query
+                                        ? t("resultsForIn", { query, letter: activeLetter })
+                                        : activeLetter
+                                        ? t("startingWith", { letter: activeLetter })
+                                        : query
+                                        ? t("resultsFor", { query })
                                         : t("allOffices")}
                                 </h2>
-                                <p className="text-sm text-muted-foreground">
+                                <p className="mt-0.5 font-mono text-xs text-muted-foreground">
                                     {initialLoading ? t("searching") : t("found", { count: total.toLocaleString() })}
                                 </p>
                             </div>
-                            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto mt-2 md:mt-0">
-                                {hasActiveFilters && (
-                                    <button onClick={clearAll} className="text-xs font-medium text-destructive hover:bg-destructive/10 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shrink-0 border border-transparent hover:border-destructive/20">
-                                        <X className="w-3.5 h-3.5" /> {t("clearAll")}
-                                    </button>
-                                )}
-                                <div className="flex-1 min-w-[140px]">
-                                    <AddOfficeModal>
-                                        <Button variant="default" size="sm" className="rounded-xl font-medium shadow-sm w-full bg-primary hover:bg-primary/90 overflow-hidden">
-                                            <Plus className="w-4 h-4 mr-1.5 shrink-0" />
-                                            <span className="truncate">{t("addOffice")}</span>
-                                        </Button>
-                                    </AddOfficeModal>
-                                </div>
+
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="lg:hidden"
+                                    onClick={() => setFiltersOpen(true)}
+                                >
+                                    <SlidersHorizontal className="h-4 w-4" />
+                                    <span>{t("moreFilters")}</span>
+                                    {activeFilterCount > 0 && (
+                                        <span className="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 font-mono text-[0.7rem] font-semibold text-primary-foreground">
+                                            {activeFilterCount}
+                                        </span>
+                                    )}
+                                </Button>
+
+                                <AddOfficeModal>
+                                    <Button variant="default" size="sm">
+                                        <Plus className="h-4 w-4" />
+                                        <span>{t("addOffice")}</span>
+                                    </Button>
+                                </AddOfficeModal>
                             </div>
                         </div>
+
+                        {hasActiveFilters && (
+                            <div className="mb-4 flex flex-wrap items-center gap-2">
+                                {query && (
+                                    <button
+                                        onClick={handleClearQuery}
+                                        className="tap inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-foreground bg-secondary/40 px-3 py-1 text-xs font-semibold hover:bg-secondary/70"
+                                    >
+                                        <span>&ldquo;{query}&rdquo;</span>
+                                        <X className="h-3.5 w-3.5" aria-hidden="true" />
+                                    </button>
+                                )}
+                                {activeLetter && (
+                                    <button
+                                        onClick={() => handleLetterFilter(activeLetter)}
+                                        className="tap inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-foreground bg-secondary/40 px-3 py-1 font-mono text-xs font-semibold hover:bg-secondary/70"
+                                    >
+                                        <span>{activeLetter}</span>
+                                        <X className="h-3.5 w-3.5" aria-hidden="true" />
+                                    </button>
+                                )}
+                                {activeService && (
+                                    <button
+                                        onClick={() => handleServiceFilter(activeService)}
+                                        className="tap inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-foreground bg-secondary/40 px-3 py-1 text-xs font-semibold hover:bg-secondary/70"
+                                    >
+                                        <span>{serviceLabel(activeService)}</span>
+                                        <X className="h-3.5 w-3.5" aria-hidden="true" />
+                                    </button>
+                                )}
+                                <button
+                                    onClick={clearAll}
+                                    className="tap px-2 py-1 text-xs font-semibold text-primary hover:underline underline-offset-4"
+                                >
+                                    {t("clearAll")}
+                                </button>
+                            </div>
+                        )}
 
                         <DirectoryGrid
                             offices={offices}
@@ -270,6 +270,17 @@ export default function SearchDirectory() {
                     </section>
                 </div>
             </div>
+
+            <MobileFilters
+                open={filtersOpen}
+                onOpenChange={setFiltersOpen}
+                activeLetter={activeLetter}
+                handleLetterFilter={handleLetterFilter}
+                activeService={activeService}
+                handleServiceFilter={handleServiceFilter}
+                onClear={clearSheetFilters}
+                total={total}
+            />
         </section>
     );
 }

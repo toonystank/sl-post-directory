@@ -31,7 +31,7 @@ function StarRating({ rating, interactive, onChange }: { rating: number; interac
                 >
                     <Star
                         className={`w-5 h-5 ${star <= rating
-                            ? "fill-amber-400 text-amber-400"
+                            ? "fill-secondary text-secondary"
                             : "text-muted-foreground/30"
                             }`}
                     />
@@ -107,7 +107,7 @@ export default function ReviewSection({ reviews: initialReviews, officeId }: Rev
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold tracking-tight mb-1">Community Reviews</h2>
+                    <h2 className="font-heading text-xl font-extrabold [font-stretch:82%] mb-1">Community Reviews</h2>
                     <p className="text-sm text-muted-foreground">
                         {reviews.length > 0
                             ? `${reviews.length} review${reviews.length !== 1 ? "s" : ""} · ${avgRating.toFixed(1)} average rating`
@@ -122,16 +122,16 @@ export default function ReviewSection({ reviews: initialReviews, officeId }: Rev
                     {reviews.map((review) => (
                         <div
                             key={review.id}
-                            className="bg-background/50 border border-border/50 rounded-2xl p-5 hover:border-primary/30 transition-colors"
+                            className="bg-card border border-border rounded-md p-5"
                         >
                             <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold">
+                                    <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
                                         {review.authorName.charAt(0).toUpperCase()}
                                     </div>
                                     <div>
                                         <p className="text-sm font-semibold">{review.authorName}</p>
-                                        <p className="text-xs text-muted-foreground">{formatDate(review.createdAt)}</p>
+                                        <p className="text-xs font-mono text-muted-foreground">{formatDate(review.createdAt)}</p>
                                     </div>
                                 </div>
                                 <StarRating rating={review.rating} />
@@ -143,8 +143,8 @@ export default function ReviewSection({ reviews: initialReviews, officeId }: Rev
             )}
 
             {/* Submit Review Form */}
-            <div className="bg-card/50 border border-border/50 rounded-2xl p-6">
-                <h3 className="text-lg font-semibold mb-4">Write a Review</h3>
+            <div className="bg-card border border-border rounded-md p-6">
+                <h3 className="font-heading text-lg font-extrabold [font-stretch:82%] mb-4">Write a Review</h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-muted-foreground mb-2">Your Rating</label>
@@ -160,7 +160,7 @@ export default function ReviewSection({ reviews: initialReviews, officeId }: Rev
                             required
                             minLength={2}
                             maxLength={50}
-                            className="rounded-xl"
+                            className="rounded-md"
                         />
                     </div>
                     <div>
@@ -173,15 +173,15 @@ export default function ReviewSection({ reviews: initialReviews, officeId }: Rev
                             minLength={10}
                             maxLength={1000}
                             rows={3}
-                            className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+                            className="w-full rounded-md border-[1.5px] border-input bg-card px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-[3px] focus-visible:ring-primary/25 resize-none"
                         />
                     </div>
                     {message && (
-                        <div className={`p-3 rounded-xl text-sm font-medium ${error ? "bg-destructive/10 border border-destructive/20 text-destructive" : "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"}`}>
+                        <div className={`p-3 rounded-md text-sm font-medium ${error ? "bg-destructive/10 border border-destructive/30 text-destructive" : "bg-status-open/10 border border-status-open/40 text-status-open"}`}>
                             {message}
                         </div>
                     )}
-                    <Button type="submit" disabled={loading} className="rounded-xl w-full sm:w-auto">
+                    <Button type="submit" disabled={loading} className="w-full sm:w-auto">
                         {loading ? (
                             <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Submitting...</>
                         ) : (

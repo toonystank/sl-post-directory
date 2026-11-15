@@ -1,52 +1,62 @@
-import { prisma } from "@/lib/prisma";
-import { Info, ArrowLeft, Send, Edit } from "lucide-react";
-import Link from "next/link";
+import { hasDatabaseUrl, prisma } from "@/lib/prisma";
+import { getLocalOfficeById } from "@/lib/local-sqlite";
+import { ArrowLeft, Edit } from "lucide-react";
+import { Link } from "@/navigation";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import SuggestForm from "./SuggestForm";
+
+async function findOfficeForSuggest(officeId: string) {
+    if (!hasDatabaseUrl) {
+        return getLocalOfficeById(officeId);
+    }
+    try {
+        return await prisma.postOffice.findUnique({
+            where: { id: officeId },
+            include: {
+                fields: true,
+            }
+        });
+    } catch {
+        return getLocalOfficeById(officeId);
+    }
+}
 
 export default async function SuggestEditPage({ params }: { params: Promise<{ officeId: string }> }) {
     const { officeId } = await params;
 
-    const office = await prisma.postOffice.findUnique({
-        where: { id: officeId },
-        include: {
-            fields: true,
-        }
-    });
+    const office = await findOfficeForSuggest(officeId);
 
     if (!office) {
         notFound();
     }
 
     return (
-        <div className="container mx-auto px-4 py-12 max-w-3xl min-h-[calc(100vh-4rem)]">
-            <Button variant="ghost" asChild className="mb-8 hover:bg-primary/10 hover:text-primary transition-colors -ml-4">
+        <div className="container mx-auto px-4 py-6 md:py-12 max-w-3xl min-h-[calc(100vh-4rem)]">
+            <Button variant="ghost" asChild className="hidden md:inline-flex mb-6 -ml-3 text-muted-foreground hover:text-foreground">
                 <Link href={`/office/${office.slug}`}>
                     <ArrowLeft className="w-4 h-4 mr-2" /> Back to {office.name}
                 </Link>
             </Button>
 
-            <Card className="shadow-2xl border-border/50 bg-card/50 backdrop-blur-xl overflow-hidden">
-                <CardHeader className="border-b border-border/40 bg-card/80 px-8 pt-8 pb-6">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-primary/10 text-primary rounded-xl ring-1 ring-primary/20">
-                            <Edit className="w-6 h-6" />
+            <div className="border-2 border-foreground bg-card rounded-md overflow-hidden shadow-[4px_4px_0_0_hsl(var(--foreground))]">
+                <div className="airmail-stripe h-1.5" aria-hidden="true" />
+                <div className="border-b-2 border-foreground px-6 py-5 md:px-8">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-secondary/40 border border-foreground rounded-md text-foreground">
+                            <Edit className="w-5 h-5" />
                         </div>
                         <div>
-                            <CardTitle className="text-2xl md:text-3xl font-extrabold tracking-tight">Suggest Edits</CardTitle>
-                            <p className="text-sm text-muted-foreground mt-1">For: {office.name}</p>
+                            <h1 className="display text-2xl md:text-3xl">Suggest Edits</h1>
+                            <p className="text-sm text-muted-foreground mt-0.5">For: {office.name}</p>
                         </div>
                     </div>
-                </CardHeader>
+                </div>
 
-                <CardContent className="p-2 md:p-8">
+                <div className="p-5 md:p-8">
                     <SuggestForm office={office} />
-                </CardContent>
-            </Card>
+                </div>
+            </div>
         </div>
     );
 }

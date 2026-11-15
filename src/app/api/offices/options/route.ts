@@ -1,10 +1,22 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 
 // Cache for 24 hours just like the main directory
 export const revalidate = 86400;
 
 export async function GET() {
+    if (!hasDatabaseUrl) {
+        return NextResponse.json(
+            { divisions: [] },
+            {
+                status: 200,
+                headers: {
+                    'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+                },
+            }
+        );
+    }
+
     try {
         const divisions = await prisma.postOfficeField.groupBy({
             by: ['value'],
@@ -26,8 +38,15 @@ export async function GET() {
                 },
             }
         );
-    } catch (error) {
-        console.error("Error fetching divisions:", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    } catch {
+        return NextResponse.json(
+            { divisions: [] },
+            {
+                status: 200,
+                headers: {
+                    'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+                },
+            }
+        );
     }
 }

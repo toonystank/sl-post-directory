@@ -2,13 +2,12 @@
 
 import { signIn } from "next-auth/react";
 import { useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Mail, Lock, AlertCircle, LogIn, CheckCircle2 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { Mail, Lock, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Link, useRouter } from "@/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import Link from "next/link";
+import StampLogo from "@/components/brand/StampLogo";
 
 function LoginForm() {
     const [email, setEmail] = useState("");
@@ -38,7 +37,7 @@ function LoginForm() {
             if (res?.error) {
                 if (res.error === "2FA_REQUIRED") {
                     setShow2FA(true);
-                    setError(""); // Clear previous errors
+                    setError("");
                 } else {
                     setError(res.error);
                 }
@@ -46,7 +45,7 @@ function LoginForm() {
                 router.push("/dashboard");
                 router.refresh();
             }
-        } catch (err) {
+        } catch {
             setError("An unexpected error occurred. Please try again.");
         } finally {
             setLoading(false);
@@ -54,26 +53,32 @@ function LoginForm() {
     };
 
     return (
-        <CardContent className="p-8">
+        <div className="p-6 md:p-8">
+            <div className="mb-6">
+                <StampLogo size={36} />
+                <h1 className="display text-3xl mt-4">Welcome Back</h1>
+                <p className="text-sm text-muted-foreground mt-1">Sign in to manage contributions</p>
+            </div>
+
             {isVerified && !error && (
-                <div className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-3 text-emerald-500">
-                    <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+                <div className="mb-5 p-3.5 rounded-md bg-status-open/10 border border-status-open/40 flex items-center gap-3 text-status-open">
+                    <CheckCircle2 className="w-5 h-5 shrink-0" />
                     <p className="text-sm font-medium">Your email has been verified! You can now sign in.</p>
                 </div>
             )}
 
             {error && (
-                <div className="mb-6 p-4 rounded-xl bg-destructive/10 border border-destructive/20 flex items-center gap-3 text-destructive">
-                    <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                <div className="mb-5 p-3.5 rounded-md bg-destructive/10 border border-destructive/30 flex items-center gap-3 text-destructive">
+                    <AlertCircle className="w-5 h-5 shrink-0" />
                     <p className="text-sm font-medium">{error}</p>
                 </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-4">
                 {!show2FA ? (
                     <>
                         <div>
-                            <label className="block text-sm font-medium text-muted-foreground mb-1.5" htmlFor="email">
+                            <label className="label-mono block mb-1.5" htmlFor="email">
                                 Email Address
                             </label>
                             <div className="relative">
@@ -85,15 +90,15 @@ function LoginForm() {
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="pl-10 py-5 rounded-xl"
-                                    placeholder="admin@slpost.directory"
+                                    className="pl-10 h-11"
+                                    placeholder="you@example.com"
                                     required
                                 />
                             </div>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-muted-foreground mb-1.5" htmlFor="password">
+                            <label className="label-mono block mb-1.5" htmlFor="password">
                                 Password
                             </label>
                             <div className="relative">
@@ -105,7 +110,7 @@ function LoginForm() {
                                     type="password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="pl-10 py-5 rounded-xl"
+                                    className="pl-10 h-11"
                                     placeholder="••••••••"
                                     required
                                 />
@@ -115,7 +120,7 @@ function LoginForm() {
                         <Button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-5 rounded-xl mt-4 text-base font-semibold"
+                            className="w-full h-11 mt-2 text-base"
                             size="lg"
                         >
                             {loading ? "Signing in..." : "Sign In"}
@@ -123,17 +128,14 @@ function LoginForm() {
                     </>
                 ) : (
                     <div className="space-y-4">
-                        <div className="text-center mb-2">
-                            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-3">
-                                <Lock className="w-6 h-6 text-primary" />
-                            </div>
-                            <h2 className="text-lg font-semibold">Two-Factor Authentication</h2>
-                            <p className="text-sm text-muted-foreground mt-1">
+                        <div className="border-y border-border py-3">
+                            <h2 className="font-heading text-lg font-extrabold [font-stretch:82%]">Two-Factor Authentication</h2>
+                            <p className="text-sm text-muted-foreground mt-0.5">
                                 Enter the 6-digit code from your authenticator app
                             </p>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-muted-foreground mb-1.5" htmlFor="token">
+                            <label className="label-mono block mb-1.5" htmlFor="token">
                                 Authentication Code
                             </label>
                             <Input
@@ -142,8 +144,8 @@ function LoginForm() {
                                 inputMode="numeric"
                                 autoComplete="one-time-code"
                                 value={token}
-                                onChange={(e) => setToken(e.target.value.replace(/\D/g, ''))}
-                                className="py-5 rounded-xl text-center tracking-widest text-xl font-mono"
+                                onChange={(e) => setToken(e.target.value.replace(/\D/g, ""))}
+                                className="h-12 text-center tracking-widest text-xl font-mono"
                                 placeholder="000000"
                                 required
                                 maxLength={6}
@@ -151,11 +153,11 @@ function LoginForm() {
                             />
                         </div>
 
-                        <div className="flex flex-col gap-2 mt-4">
+                        <div className="flex flex-col gap-2 pt-1">
                             <Button
                                 type="submit"
                                 disabled={loading || token.length < 6}
-                                className="w-full py-5 rounded-xl text-base font-semibold"
+                                className="w-full h-11 text-base"
                                 size="lg"
                             >
                                 {loading ? "Verifying..." : "Verify Code"}
@@ -165,14 +167,14 @@ function LoginForm() {
                                 type="button"
                                 variant="ghost"
                                 disabled={loading}
-                                className="w-full rounded-xl text-sm"
+                                className="w-full text-sm"
                                 onClick={() => {
                                     setShow2FA(false);
                                     setToken("");
                                     setError("");
                                 }}
                             >
-                                ← Back to Sign In
+                                &larr; Back to Sign In
                             </Button>
                         </div>
                     </div>
@@ -180,34 +182,27 @@ function LoginForm() {
             </form>
 
             {!show2FA && (
-                <div className="mt-6 text-center text-sm text-muted-foreground">
-                    Don't have an account?{" "}
-                    <Link href="/register" className="text-primary hover:underline font-medium">
+                <div className="mt-6 pt-4 border-t border-border text-center text-sm text-muted-foreground">
+                    Don&apos;t have an account?{" "}
+                    <Link href="/register" className="text-primary hover:underline font-semibold">
                         Register
                     </Link>
                 </div>
             )}
-        </CardContent>
+        </div>
     );
 }
 
 export default function LoginPage() {
     return (
-        <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4">
-            <div className="w-full max-w-md">
-                <div className="text-center mb-8">
-                    <Badge variant="secondary" className="mb-4 bg-secondary/10 text-secondary border-secondary/20">
-                        <LogIn className="w-3 h-3 mr-1.5" /> Secure Access
-                    </Badge>
-                    <h1 className="text-3xl font-extrabold tracking-tight mb-2">Welcome Back</h1>
-                    <p className="text-muted-foreground">Sign in to the dashboard</p>
-                </div>
-
-                <Card className="shadow-2xl border-border/50 bg-card/50 backdrop-blur-xl">
-                    <Suspense fallback={<CardContent className="p-8"><p className="text-center text-muted-foreground">Loading form...</p></CardContent>}>
+        <div className="min-h-[calc(100dvh-var(--appbar-h))] md:min-h-[calc(100vh-8rem)] flex items-stretch md:items-center justify-center md:p-6">
+            <div className="w-full md:max-w-md flex flex-col rounded-none md:rounded-md md:border-2 border-foreground bg-card overflow-hidden md:shadow-[5px_5px_0_0_hsl(var(--foreground))]">
+                <div className="airmail-stripe h-2 shrink-0" aria-hidden="true" />
+                <div className="flex-1 flex flex-col justify-center">
+                    <Suspense fallback={<div className="p-8 text-center font-mono text-sm text-muted-foreground">Loading form...</div>}>
                         <LoginForm />
                     </Suspense>
-                </Card>
+                </div>
             </div>
         </div>
     );

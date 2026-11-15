@@ -5,14 +5,16 @@ import { useRouter, usePathname } from "@/navigation";
 import { Globe } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 
-const localeLabels: Record<string, { label: string; flag: string }> = {
-    en: { label: "English", flag: "🇬🇧" },
-    si: { label: "සිංහල", flag: "🇱🇰" },
-    ta: { label: "தமிழ்", flag: "🇱🇰" },
+type AppLocale = "en" | "si" | "ta";
+
+const localeLabels: Record<AppLocale, { label: string; short: string }> = {
+    en: { label: "English", short: "EN" },
+    si: { label: "සිංහල", short: "සිං" },
+    ta: { label: "தமிழ்", short: "த" },
 };
 
 export default function LanguageSwitcher() {
-    const locale = useLocale();
+    const locale = useLocale() as AppLocale;
     const router = useRouter();
     const pathname = usePathname();
     const [isOpen, setIsOpen] = useState(false);
@@ -28,8 +30,8 @@ export default function LanguageSwitcher() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    const handleSwitch = (newLocale: string) => {
-        router.replace(pathname, { locale: newLocale as any });
+    const handleSwitch = (newLocale: AppLocale) => {
+        router.replace(pathname, { locale: newLocale });
         setIsOpen(false);
     };
 
@@ -37,31 +39,30 @@ export default function LanguageSwitcher() {
         <div ref={ref} className="relative">
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-all duration-200 border border-transparent hover:border-border/50"
+                className="tap flex items-center gap-1.5 rounded-full border-2 border-foreground px-2.5 py-1 text-xs font-semibold hover:bg-muted"
                 aria-label="Switch language"
+                aria-expanded={isOpen}
             >
-                <Globe className="w-4 h-4" />
-                <span className="hidden sm:inline text-xs uppercase tracking-wider font-bold">
-                    {locale}
-                </span>
+                <Globe className="w-3.5 h-3.5" />
+                <span lang={locale}>{localeLabels[locale]?.short ?? locale.toUpperCase()}</span>
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 mt-2 w-44 rounded-xl border border-border/50 bg-card/95 backdrop-blur-xl shadow-xl shadow-black/20 py-1.5 z-[100] animate-in fade-in slide-in-from-top-2 duration-200">
-                    {Object.entries(localeLabels).map(([code, { label, flag }]) => (
+                <div className="absolute right-0 mt-2 w-44 rounded-md border-2 border-foreground bg-card py-1 shadow-[4px_4px_0_0_hsl(var(--foreground))] z-[100] animate-in fade-in slide-in-from-top-1 duration-150">
+                    {(Object.entries(localeLabels) as [AppLocale, { label: string; short: string }][]).map(([code, { label }]) => (
                         <button
                             key={code}
                             onClick={() => handleSwitch(code)}
+                            lang={code}
                             className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-3 transition-colors ${
                                 locale === code
-                                    ? "bg-primary/10 text-primary font-medium"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                                    ? "bg-secondary text-secondary-foreground font-semibold"
+                                    : "hover:bg-muted"
                             }`}
                         >
-                            <span className="text-base">{flag}</span>
                             <span>{label}</span>
                             {locale === code && (
-                                <span className="ml-auto text-xs text-primary">✓</span>
+                                <span className="ml-auto text-xs">✓</span>
                             )}
                         </button>
                     ))}

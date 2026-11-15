@@ -19,16 +19,17 @@ export function CopyButton({ text }: { text: string }) {
 
     return (
         <button
+            type="button"
             onClick={handleCopy}
             className={cn(
-                "p-2 rounded-xl transition-all",
+                "tap rounded-md border p-1.5 transition-colors",
                 copied
-                    ? "bg-emerald-500/10 text-emerald-500"
-                    : "bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                    ? "border-foreground bg-secondary text-secondary-foreground"
+                    : "border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground"
             )}
             aria-label="Copy to clipboard"
         >
-            {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
         </button>
     );
 }

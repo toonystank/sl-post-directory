@@ -58,8 +58,10 @@ export function useDirectoryState() {
 
             setTotal(data?.total || 0);
             setNextCursor(data?.nextCursor ?? null);
-        } catch (err) {
-            console.error("Failed to fetch offices:", err);
+        } catch {
+            setOffices([]);
+            setTotal(0);
+            setNextCursor(null);
         } finally {
             setLoading(false);
             setInitialLoading(false);
