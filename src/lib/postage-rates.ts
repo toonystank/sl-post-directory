@@ -1,4 +1,15 @@
-import { PostalService, EmsZone, EmsCountry, ExtraFees, WeightTier } from "./rate-types";
+import {
+    PostalService,
+    EmsZone,
+    EmsCountry,
+    ExtraFees,
+    WeightTier,
+    CountryGroup,
+    InternationalTransport,
+    InternationalServiceId,
+} from "./rate-types";
+
+export type { CountryGroup, InternationalTransport, InternationalServiceId };
 
 export type Destination = "domestic" | "cod" | "ems";
 
@@ -345,30 +356,371 @@ export const DEFAULT_RATE_CONFIG: RateConfig = {
         },
     ],
     emsCountries: [
-        { code: "IN", name: "India", zoneId: "zone_a" },
-        { code: "MV", name: "Maldives", zoneId: "zone_a" },
-        { code: "BD", name: "Bangladesh", zoneId: "zone_a" },
-        { code: "PK", name: "Pakistan", zoneId: "zone_a" },
-        { code: "AE", name: "United Arab Emirates", zoneId: "zone_b" },
-        { code: "QA", name: "Qatar", zoneId: "zone_b" },
-        { code: "SA", name: "Saudi Arabia", zoneId: "zone_b" },
-        { code: "SG", name: "Singapore", zoneId: "zone_b" },
-        { code: "MY", name: "Malaysia", zoneId: "zone_b" },
-        { code: "TH", name: "Thailand", zoneId: "zone_b" },
-        { code: "JP", name: "Japan", zoneId: "zone_d" },
-        { code: "KR", name: "South Korea", zoneId: "zone_d" },
-        { code: "CN", name: "China", zoneId: "zone_b" },
-        { code: "GB", name: "United Kingdom", zoneId: "zone_c" },
-        { code: "DE", name: "Germany", zoneId: "zone_c" },
-        { code: "FR", name: "France", zoneId: "zone_c" },
-        { code: "IT", name: "Italy", zoneId: "zone_c" },
-        { code: "AU", name: "Australia", zoneId: "zone_d" },
-        { code: "NZ", name: "New Zealand", zoneId: "zone_d" },
-        { code: "US", name: "United States", zoneId: "zone_d" },
-        { code: "CA", name: "Canada", zoneId: "zone_d" },
+        // South Asia (Group A / zone_a)
+        { code: "IN", name: "India", zoneId: "zone_a", group: "A", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
+        {
+            code: "MV",
+            name: "Maldives",
+            zoneId: "zone_a",
+            group: "A",
+            seaMailAvailable: false,
+            seaMailNote: "Sea Mail to Maldives suspended by SL Post since April 2024 (no bilateral surface vessel dispatch)",
+            uPacketAvailable: true,
+            tdsAvailable: true,
+        },
+        {
+            code: "BD",
+            name: "Bangladesh",
+            zoneId: "zone_a",
+            group: "A",
+            seaMailAvailable: false,
+            seaMailNote: "No direct surface mail container route from Colombo",
+            uPacketAvailable: false,
+            tdsAvailable: false,
+        },
+        { code: "PK", name: "Pakistan", zoneId: "zone_a", group: "A", seaMailAvailable: true, uPacketAvailable: false, tdsAvailable: false },
+        {
+            code: "NP",
+            name: "Nepal",
+            zoneId: "zone_a",
+            group: "A",
+            seaMailAvailable: false,
+            seaMailNote: "Landlocked country — Sea Mail not available",
+            uPacketAvailable: false,
+            tdsAvailable: false,
+        },
+
+        // Middle East (Group B & C / zone_b)
+        { code: "AE", name: "United Arab Emirates", zoneId: "zone_b", group: "B", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
+        {
+            code: "QA",
+            name: "Qatar",
+            zoneId: "zone_b",
+            group: "B",
+            seaMailAvailable: false,
+            seaMailNote: "No bilateral Sea Mail container service to Qatar",
+            uPacketAvailable: true,
+            tdsAvailable: true,
+            suspensionStatus: "restricted",
+            restrictionNote: "Subject to airline routing delays on Middle East corridors.",
+        },
+        { code: "SA", name: "Saudi Arabia", zoneId: "zone_b", group: "C", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
+        {
+            code: "OM",
+            name: "Oman",
+            zoneId: "zone_b",
+            group: "B",
+            seaMailAvailable: false,
+            seaMailNote: "No direct surface mail dispatch to Oman",
+            uPacketAvailable: true,
+            tdsAvailable: false,
+        },
+        {
+            code: "KW",
+            name: "Kuwait",
+            zoneId: "zone_b",
+            group: "C",
+            seaMailAvailable: false,
+            seaMailNote: "No direct surface mail dispatch to Kuwait",
+            uPacketAvailable: true,
+            tdsAvailable: false,
+        },
+        {
+            code: "BH",
+            name: "Bahrain",
+            zoneId: "zone_b",
+            group: "B",
+            seaMailAvailable: false,
+            seaMailNote: "No direct surface mail dispatch to Bahrain",
+            uPacketAvailable: true,
+            tdsAvailable: false,
+        },
+        {
+            code: "JO",
+            name: "Jordan",
+            zoneId: "zone_b",
+            group: "C",
+            seaMailAvailable: false,
+            seaMailNote: "No direct surface mail dispatch to Jordan",
+            uPacketAvailable: false,
+            tdsAvailable: false,
+        },
+        {
+            code: "IL",
+            name: "Israel",
+            zoneId: "zone_b",
+            group: "C",
+            seaMailAvailable: false,
+            seaMailNote: "Temporarily suspended by SL Post due to regional conflict and flight cancellations.",
+            uPacketAvailable: false,
+            tdsAvailable: false,
+            suspensionStatus: "suspended",
+            restrictionNote: "Temporarily suspended by SL Post due to regional conflict and flight cancellations.",
+            unavailableServices: {
+                air_letter: "Suspended (conflict & flight cancellations)",
+                air_printed: "Suspended (conflict & flight cancellations)",
+                u_packet: "Suspended (conflict & flight cancellations)",
+                tds: "Suspended (conflict & flight cancellations)",
+                air_parcel: "Suspended (conflict & flight cancellations)",
+                ems: "Suspended (conflict & flight cancellations)",
+                sea_letter: "Suspended (conflict & flight cancellations)",
+                sea_printed: "Suspended (conflict & flight cancellations)",
+                sea_parcel: "Suspended (conflict & flight cancellations)",
+            },
+        },
+        {
+            code: "LB",
+            name: "Lebanon",
+            zoneId: "zone_b",
+            group: "C",
+            seaMailAvailable: false,
+            seaMailNote: "Temporarily suspended by SL Post due to regional conflict and airline suspensions.",
+            uPacketAvailable: false,
+            tdsAvailable: false,
+            suspensionStatus: "suspended",
+            restrictionNote: "Temporarily suspended by SL Post due to regional conflict and airline suspensions.",
+            unavailableServices: {
+                air_letter: "Suspended (regional conflict)",
+                air_printed: "Suspended (regional conflict)",
+                u_packet: "Suspended (regional conflict)",
+                tds: "Suspended (regional conflict)",
+                air_parcel: "Suspended (regional conflict)",
+                ems: "Suspended (regional conflict)",
+                sea_letter: "Suspended (regional conflict)",
+                sea_printed: "Suspended (regional conflict)",
+                sea_parcel: "Suspended (regional conflict)",
+            },
+        },
+
+        // Southeast & East Asia (Group C & D / zone_b & zone_d)
+        { code: "SG", name: "Singapore", zoneId: "zone_b", group: "C", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
+        { code: "MY", name: "Malaysia", zoneId: "zone_b", group: "C", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
+        { code: "TH", name: "Thailand", zoneId: "zone_b", group: "C", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
+        { code: "ID", name: "Indonesia", zoneId: "zone_b", group: "C", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: false },
+        {
+            code: "PH",
+            name: "Philippines",
+            zoneId: "zone_b",
+            group: "D",
+            seaMailAvailable: false,
+            seaMailNote: "No direct surface mail consolidation to Philippines",
+            uPacketAvailable: true,
+            tdsAvailable: false,
+        },
+        {
+            code: "VN",
+            name: "Vietnam",
+            zoneId: "zone_b",
+            group: "C",
+            seaMailAvailable: false,
+            seaMailNote: "No direct surface mail consolidation to Vietnam",
+            uPacketAvailable: true,
+            tdsAvailable: false,
+        },
+        { code: "CN", name: "China", zoneId: "zone_b", group: "D", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
+        { code: "HK", name: "Hong Kong", zoneId: "zone_b", group: "C", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
+        { code: "JP", name: "Japan", zoneId: "zone_d", group: "D", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
+        { code: "KR", name: "South Korea", zoneId: "zone_d", group: "D", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
+
+        // Europe & UK (Group E & F / zone_c)
+        { code: "GB", name: "United Kingdom", zoneId: "zone_c", group: "F", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
+        {
+            code: "DE",
+            name: "Germany",
+            zoneId: "zone_c",
+            group: "E",
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: true,
+            suspensionStatus: "restricted",
+            restrictionNote: "EU Customs Rule: Commercial goods valued €45–€150 are restricted. Documents, gifts ≤€45 & parcels >€150 are accepted.",
+        },
+        {
+            code: "FR",
+            name: "France",
+            zoneId: "zone_c",
+            group: "E",
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: true,
+            suspensionStatus: "restricted",
+            restrictionNote: "EU Customs Rule: Commercial goods valued €45–€150 are restricted. Documents, gifts ≤€45 & parcels >€150 are accepted.",
+        },
+        {
+            code: "IT",
+            name: "Italy",
+            zoneId: "zone_c",
+            group: "E",
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: true,
+            suspensionStatus: "restricted",
+            restrictionNote: "EU Customs Rule: Commercial goods valued €45–€150 are restricted. Documents, gifts ≤€45 & parcels >€150 are accepted.",
+        },
+        { code: "NL", name: "Netherlands", zoneId: "zone_c", group: "E", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
+        {
+            code: "ES",
+            name: "Spain",
+            zoneId: "zone_c",
+            group: "E",
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: false,
+            suspensionStatus: "restricted",
+            restrictionNote: "EU Customs Rule: Commercial goods valued €45–€150 are restricted. Documents, gifts ≤€45 & parcels >€150 are accepted.",
+        },
+        {
+            code: "BE",
+            name: "Belgium",
+            zoneId: "zone_c",
+            group: "E",
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: false,
+            suspensionStatus: "restricted",
+            restrictionNote: "EU Customs Rule: Commercial goods valued €45–€150 are restricted. Documents, gifts ≤€45 & parcels >€150 are accepted.",
+        },
+        {
+            code: "SE",
+            name: "Sweden",
+            zoneId: "zone_c",
+            group: "F",
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: false,
+            suspensionStatus: "restricted",
+            restrictionNote: "EU Customs Rule: Commercial goods valued €45–€150 are restricted. Documents, gifts ≤€45 & parcels >€150 are accepted.",
+        },
+        {
+            code: "AT",
+            name: "Austria",
+            zoneId: "zone_c",
+            group: "E",
+            seaMailAvailable: false,
+            seaMailNote: "Landlocked destination — no Sea Mail route",
+            uPacketAvailable: true,
+            tdsAvailable: false,
+            suspensionStatus: "restricted",
+            restrictionNote: "EU Customs Rule: Commercial goods valued €45–€150 are restricted.",
+        },
+        {
+            code: "PL",
+            name: "Poland",
+            zoneId: "zone_c",
+            group: "E",
+            seaMailAvailable: false,
+            seaMailNote: "No direct surface mail route from SL Post",
+            uPacketAvailable: true,
+            tdsAvailable: false,
+            suspensionStatus: "restricted",
+            restrictionNote: "EU Customs Rule: Commercial goods valued €45–€150 are restricted.",
+        },
+        {
+            code: "CH",
+            name: "Switzerland",
+            zoneId: "zone_c",
+            group: "E",
+            seaMailAvailable: false,
+            seaMailNote: "Landlocked destination — no direct Sea Mail dispatch",
+            uPacketAvailable: true,
+            tdsAvailable: true,
+        },
+        {
+            code: "IE",
+            name: "Ireland",
+            zoneId: "zone_c",
+            group: "F",
+            seaMailAvailable: false,
+            seaMailNote: "No direct surface container dispatch to Ireland",
+            uPacketAvailable: true,
+            tdsAvailable: false,
+        },
+        {
+            code: "RU",
+            name: "Russia",
+            zoneId: "zone_c",
+            group: "E",
+            seaMailAvailable: false,
+            seaMailNote: "Suspended — no direct international airline or transit mail routing available.",
+            uPacketAvailable: false,
+            tdsAvailable: false,
+            suspensionStatus: "suspended",
+            restrictionNote: "Suspended — no direct international airline or transit mail routing available.",
+            unavailableServices: {
+                air_letter: "Suspended (no transit flights)",
+                air_printed: "Suspended (no transit flights)",
+                u_packet: "Suspended (no transit flights)",
+                tds: "Suspended (no transit flights)",
+                air_parcel: "Suspended (no transit flights)",
+                ems: "Suspended (no transit flights)",
+                sea_letter: "Suspended (no transit flights)",
+                sea_printed: "Suspended (no transit flights)",
+                sea_parcel: "Suspended (no transit flights)",
+            },
+        },
+        {
+            code: "UA",
+            name: "Ukraine",
+            zoneId: "zone_c",
+            group: "E",
+            seaMailAvailable: false,
+            seaMailNote: "Suspended due to airspace closure and armed conflict.",
+            uPacketAvailable: false,
+            tdsAvailable: false,
+            suspensionStatus: "suspended",
+            restrictionNote: "Suspended due to airspace closure and armed conflict.",
+            unavailableServices: {
+                air_letter: "Suspended (airspace closure)",
+                air_printed: "Suspended (airspace closure)",
+                u_packet: "Suspended (airspace closure)",
+                tds: "Suspended (airspace closure)",
+                air_parcel: "Suspended (airspace closure)",
+                ems: "Suspended (airspace closure)",
+                sea_letter: "Suspended (airspace closure)",
+                sea_printed: "Suspended (airspace closure)",
+                sea_parcel: "Suspended (airspace closure)",
+            },
+        },
+
+        // Oceania, Americas & Africa (Group C, E, F, G, H / zone_b, zone_c, zone_d)
+        { code: "AU", name: "Australia", zoneId: "zone_d", group: "F", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
+        { code: "NZ", name: "New Zealand", zoneId: "zone_d", group: "G", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
+        { code: "US", name: "United States", zoneId: "zone_d", group: "H", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
+        {
+            code: "CA",
+            name: "Canada",
+            zoneId: "zone_d",
+            group: "H",
+            seaMailAvailable: false,
+            seaMailNote: "Sea Mail to Canada suspended by SL Post since Sept 2023 (no surface container route)",
+            uPacketAvailable: true,
+            tdsAvailable: true,
+        },
+        {
+            code: "BR",
+            name: "Brazil",
+            zoneId: "zone_d",
+            group: "H",
+            seaMailAvailable: false,
+            seaMailNote: "No bilateral Sea Mail container route to South America",
+            uPacketAvailable: false,
+            tdsAvailable: false,
+        },
+        {
+            code: "ZA",
+            name: "South Africa",
+            zoneId: "zone_c",
+            group: "E",
+            seaMailAvailable: false,
+            seaMailNote: "No direct Sea Mail consolidation to South Africa",
+            uPacketAvailable: false,
+            tdsAvailable: false,
+        },
+        { code: "EG", name: "Egypt", zoneId: "zone_b", group: "C", seaMailAvailable: true, uPacketAvailable: false, tdsAvailable: false },
     ],
     extraFees: {
         registeredPost: 60,
+        foreignRegisteredPost: 870,
         arReceipt: 100,
         cod: 50,
         vpp: 50,
@@ -445,16 +797,44 @@ export function mergeWithDefaultConfig(loaded: Partial<RateConfig>): RateConfig 
     const hasCanonicalZones = Array.isArray(loaded.emsZones) && loaded.emsZones.some((z) => defaultZoneIds.has(z.id));
     const emsZones = hasCanonicalZones && loaded.emsZones!.length > 0 ? loaded.emsZones! : DEFAULT_RATE_CONFIG.emsZones;
 
-    const emsCountries =
-        hasCanonicalZones && Array.isArray(loaded.emsCountries) && loaded.emsCountries.length > 6
-            ? loaded.emsCountries
-            : DEFAULT_RATE_CONFIG.emsCountries;
+    let emsCountries: EmsCountry[];
+    if (hasCanonicalZones && Array.isArray(loaded.emsCountries) && loaded.emsCountries.length > 0) {
+        const loadedByCode = new Map(loaded.emsCountries.map((c) => [c.code.toUpperCase(), c]));
+        const defaultCodes = new Set(DEFAULT_RATE_CONFIG.emsCountries.map((c) => c.code));
+        emsCountries = DEFAULT_RATE_CONFIG.emsCountries.map((def) => {
+            const custom = loadedByCode.get(def.code);
+            if (!custom) return def;
+            return {
+                ...def,
+                ...custom,
+                group: custom.group ?? def.group,
+                seaMailAvailable: custom.seaMailAvailable ?? def.seaMailAvailable,
+                seaMailNote: custom.seaMailNote ?? def.seaMailNote,
+                uPacketAvailable: custom.uPacketAvailable ?? def.uPacketAvailable,
+                uPacketNote: custom.uPacketNote ?? def.uPacketNote,
+                tdsAvailable: custom.tdsAvailable ?? def.tdsAvailable,
+                tdsNote: custom.tdsNote ?? def.tdsNote,
+                suspensionStatus: custom.suspensionStatus ?? def.suspensionStatus,
+                restrictionNote: custom.restrictionNote ?? def.restrictionNote,
+                unavailableServices: custom.unavailableServices ?? def.unavailableServices,
+            };
+        });
+        for (const custom of loaded.emsCountries) {
+            if (!defaultCodes.has(custom.code.toUpperCase())) {
+                emsCountries.push(custom);
+            }
+        }
+    } else {
+        emsCountries = DEFAULT_RATE_CONFIG.emsCountries;
+    }
 
     const loadedExtra = loaded.extraFees;
     const extraFees: ExtraFees = {
         ...DEFAULT_RATE_CONFIG.extraFees,
         ...(loadedExtra || {}),
         registeredPost: loadedExtra?.registeredPost ?? DEFAULT_RATE_CONFIG.extraFees.registeredPost,
+        foreignRegisteredPost:
+            loadedExtra?.foreignRegisteredPost ?? DEFAULT_RATE_CONFIG.extraFees.foreignRegisteredPost,
         arReceipt: loadedExtra?.arReceipt ?? DEFAULT_RATE_CONFIG.extraFees.arReceipt,
         cod: !hasCanonicalService ? DEFAULT_RATE_CONFIG.extraFees.cod : (loadedExtra?.cod ?? DEFAULT_RATE_CONFIG.extraFees.cod),
     };
@@ -733,4 +1113,491 @@ export function calculateAllDomesticServices(
         service,
         result: calculatePostage(config, "domestic", service.id, weightGrams, options),
     }));
+}
+
+// =============================================================================
+// International Mail Services (Air Mail, U-Packet, TDS, Air Parcel, EMS, Sea Mail)
+// =============================================================================
+
+export interface InternationalServiceMeta {
+    id: InternationalServiceId;
+    name: string;
+    shortName: string;
+    transport: InternationalTransport;
+    maxWeight: number;
+    supportsRegistration: boolean;
+    description: string;
+}
+
+export interface InternationalServiceQuote {
+    service: InternationalServiceMeta;
+    available: boolean;
+    unavailableReason?: string;
+    shortUnavailableTag?: string;
+    result: PostageResult;
+}
+
+export const INTERNATIONAL_SERVICES: InternationalServiceMeta[] = [
+    {
+        id: "air_letter",
+        name: "Air Mail Letter",
+        shortName: "Air Letter",
+        transport: "air",
+        maxWeight: 2000,
+        supportsRegistration: true,
+        description: "Normal or registered international letter up to 2 kg",
+    },
+    {
+        id: "air_printed",
+        name: "Printed Matter / Open Packet",
+        shortName: "Printed Matter",
+        transport: "air",
+        maxWeight: 2000,
+        supportsRegistration: true,
+        description: "Books, printed papers & open packets up to 2 kg",
+    },
+    {
+        id: "u_packet",
+        name: "U-Packet (Tracked Small Packet)",
+        shortName: "U-Packet",
+        transport: "air",
+        maxWeight: 2000,
+        supportsRegistration: false,
+        description: "UPU tracked small packet for lightweight goods up to 2 kg",
+    },
+    {
+        id: "tds",
+        name: "TDS (Tracked Delivery Service)",
+        shortName: "TDS Tracked",
+        transport: "air",
+        maxWeight: 2000,
+        supportsRegistration: false,
+        description: "Priority tracked delivery service up to 2 kg",
+    },
+    {
+        id: "air_parcel",
+        name: "Air Mail Parcel",
+        shortName: "Air Parcel",
+        transport: "air",
+        maxWeight: 20000,
+        supportsRegistration: false,
+        description: "Standard international air parcel up to 20 kg",
+    },
+    {
+        id: "ems",
+        name: "International EMS (Speed Post)",
+        shortName: "EMS Express",
+        transport: "air",
+        maxWeight: 30000,
+        supportsRegistration: false,
+        description: "Express priority courier documents & merchandise up to 30 kg",
+    },
+    {
+        id: "sea_letter",
+        name: "Sea Mail Letter",
+        shortName: "Sea Letter",
+        transport: "sea",
+        maxWeight: 2000,
+        supportsRegistration: true,
+        description: "Surface maritime letter up to 2 kg",
+    },
+    {
+        id: "sea_printed",
+        name: "Sea Printed Matter / Small Packet",
+        shortName: "Sea Printed",
+        transport: "sea",
+        maxWeight: 2000,
+        supportsRegistration: true,
+        description: "Surface maritime printed papers & small packets up to 2 kg",
+    },
+    {
+        id: "sea_parcel",
+        name: "Sea Mail Parcel",
+        shortName: "Sea Parcel",
+        transport: "sea",
+        maxWeight: 20000,
+        supportsRegistration: false,
+        description: "Economy maritime parcel up to 20 kg",
+    },
+];
+
+interface GroupStepRate {
+    baseWeight: number;
+    stepWeight: number;
+    groups: Record<CountryGroup, { base: number; step: number }>;
+}
+
+const GROUP_STEP_TABLES: Partial<Record<InternationalServiceId, GroupStepRate>> = {
+    air_letter: {
+        baseWeight: 20,
+        stepWeight: 10,
+        groups: {
+            A: { base: 110, step: 35 },
+            B: { base: 120, step: 40 },
+            C: { base: 130, step: 40 },
+            D: { base: 140, step: 45 },
+            E: { base: 150, step: 50 },
+            F: { base: 160, step: 55 },
+            G: { base: 170, step: 60 },
+            H: { base: 210, step: 85 },
+        },
+    },
+    air_printed: {
+        baseWeight: 20,
+        stepWeight: 10,
+        groups: {
+            A: { base: 105, step: 35 },
+            B: { base: 115, step: 40 },
+            C: { base: 120, step: 40 },
+            D: { base: 130, step: 45 },
+            E: { base: 140, step: 50 },
+            F: { base: 150, step: 55 },
+            G: { base: 160, step: 60 },
+            H: { base: 205, step: 85 },
+        },
+    },
+    u_packet: {
+        baseWeight: 50,
+        stepWeight: 50,
+        groups: {
+            A: { base: 240, step: 170 },
+            B: { base: 270, step: 190 },
+            C: { base: 300, step: 210 },
+            D: { base: 330, step: 240 },
+            E: { base: 360, step: 270 },
+            F: { base: 390, step: 300 },
+            G: { base: 430, step: 340 },
+            H: { base: 480, step: 420 },
+        },
+    },
+    tds: {
+        baseWeight: 100,
+        stepWeight: 100,
+        groups: {
+            A: { base: 850, step: 320 },
+            B: { base: 950, step: 380 },
+            C: { base: 1100, step: 420 },
+            D: { base: 1250, step: 480 },
+            E: { base: 1450, step: 550 },
+            F: { base: 1650, step: 620 },
+            G: { base: 1850, step: 700 },
+            H: { base: 2100, step: 820 },
+        },
+    },
+    air_parcel: {
+        baseWeight: 500,
+        stepWeight: 500,
+        groups: {
+            A: { base: 2600, step: 750 },
+            B: { base: 3100, step: 900 },
+            C: { base: 3500, step: 1050 },
+            D: { base: 3900, step: 1250 },
+            E: { base: 4400, step: 1450 },
+            F: { base: 4900, step: 1650 },
+            G: { base: 5400, step: 1850 },
+            H: { base: 6100, step: 2200 },
+        },
+    },
+    sea_parcel: {
+        baseWeight: 1000,
+        stepWeight: 1000,
+        groups: {
+            A: { base: 2200, step: 600 },
+            B: { base: 2500, step: 700 },
+            C: { base: 2800, step: 800 },
+            D: { base: 3100, step: 900 },
+            E: { base: 3400, step: 1000 },
+            F: { base: 3700, step: 1100 },
+            G: { base: 4000, step: 1200 },
+            H: { base: 4400, step: 1350 },
+        },
+    },
+};
+
+const SURFACE_FIXED_TIERS: Partial<Record<InternationalServiceId, WeightTier[]>> = {
+    sea_letter: [
+        { maxWeight: 20, price: 130 },
+        { maxWeight: 50, price: 290 },
+        { maxWeight: 100, price: 460 },
+        { maxWeight: 250, price: 1180 },
+        { maxWeight: 500, price: 2260 },
+        { maxWeight: 1000, price: 4190 },
+        { maxWeight: 2000, price: 7780 },
+    ],
+    sea_printed: [
+        { maxWeight: 50, price: 240 },
+        { maxWeight: 100, price: 440 },
+        { maxWeight: 250, price: 990 },
+        { maxWeight: 500, price: 1930 },
+        { maxWeight: 1000, price: 3480 },
+        { maxWeight: 2000, price: 5920 },
+    ],
+};
+
+function resolveCountryGroup(country: EmsCountry): CountryGroup {
+    if (country.group) return country.group;
+    switch (country.zoneId) {
+        case "zone_a":
+            return "A";
+        case "zone_b":
+            return "B";
+        case "zone_c":
+            return "E";
+        default:
+            return "H";
+    }
+}
+
+function getServiceAvailability(
+    country: EmsCountry,
+    service: InternationalServiceMeta
+): { available: boolean; reason?: string; shortTag?: string } {
+    if (country.suspensionStatus === "suspended") {
+        return {
+            available: false,
+            reason:
+                country.unavailableServices?.[service.id] ??
+                country.restrictionNote ??
+                `${country.name} postal services are currently suspended by Sri Lanka Post.`,
+            shortTag: "Suspended",
+        };
+    }
+
+    const explicitReason = country.unavailableServices?.[service.id];
+    if (explicitReason) {
+        return {
+            available: false,
+            reason: explicitReason,
+            shortTag: "Unavailable",
+        };
+    }
+
+    if (service.transport === "sea" && country.seaMailAvailable === false) {
+        return {
+            available: false,
+            reason: country.seaMailNote ?? `No bilateral Sea Mail container route from Sri Lanka Post to ${country.name}.`,
+            shortTag: "No Sea Route",
+        };
+    }
+
+    if (service.id === "u_packet" && country.uPacketAvailable === false) {
+        return {
+            available: false,
+            reason: country.uPacketNote ?? `No bilateral UPU U-Packet e-commerce agreement with ${country.name}.`,
+            shortTag: "No U-Packet",
+        };
+    }
+
+    if (service.id === "tds" && !country.tdsAvailable) {
+        return {
+            available: false,
+            reason: country.tdsNote ?? `TDS Tracked service is only available to designated bilateral partner countries (not active for ${country.name}).`,
+            shortTag: "No TDS",
+        };
+    }
+
+    return { available: true };
+}
+
+function calculateStepBracket(
+    weightGrams: number,
+    baseWeight: number,
+    basePrice: number,
+    stepWeight: number,
+    stepPrice: number,
+    maxWeight: number
+): { price: number; tierLabel: string } {
+    if (weightGrams <= baseWeight) {
+        return {
+            price: basePrice,
+            tierLabel: `0g < W ≤ ${formatWeightLabel(baseWeight)}`,
+        };
+    }
+    const steps = Math.ceil((weightGrams - baseWeight) / stepWeight);
+    const prevUpper = baseWeight + (steps - 1) * stepWeight;
+    const upper = Math.min(maxWeight, baseWeight + steps * stepWeight);
+    return {
+        price: basePrice + steps * stepPrice,
+        tierLabel: `${formatWeightLabel(prevUpper)} < W ≤ ${formatWeightLabel(upper)}`,
+    };
+}
+
+/**
+ * Calculates postage and availability for a specific international service and destination country.
+ */
+export function calculateInternationalService(
+    config: RateConfig,
+    countryCode: string,
+    intlServiceId: InternationalServiceId,
+    weightGrams: number,
+    options: { registered?: boolean } = {}
+): InternationalServiceQuote {
+    const service = INTERNATIONAL_SERVICES.find((s) => s.id === intlServiceId) ?? INTERNATIONAL_SERVICES[0];
+    const country = config.emsCountries.find((c) => c.code === countryCode);
+
+    if (!country) {
+        return {
+            service,
+            available: false,
+            unavailableReason: "Selected destination country is not in the active tariff schedule.",
+            shortUnavailableTag: "Unlisted",
+            result: {
+                baseCost: 0,
+                registrationFee: 0,
+                arReceiptFee: 0,
+                codFee: 0,
+                totalCost: 0,
+                tierLabel: "",
+                maxWeight: service.maxWeight,
+                error: "Destination country not found",
+            },
+        };
+    }
+
+    const availability = getServiceAvailability(country, service);
+    if (!availability.available) {
+        return {
+            service,
+            available: false,
+            unavailableReason: availability.reason,
+            shortUnavailableTag: availability.shortTag,
+            result: {
+                baseCost: 0,
+                registrationFee: 0,
+                arReceiptFee: 0,
+                codFee: 0,
+                totalCost: 0,
+                tierLabel: "",
+                maxWeight: service.maxWeight,
+                error: availability.reason,
+            },
+        };
+    }
+
+    if (!Number.isFinite(weightGrams) || weightGrams <= 0) {
+        return {
+            service,
+            available: true,
+            result: {
+                baseCost: 0,
+                registrationFee: 0,
+                arReceiptFee: 0,
+                codFee: 0,
+                totalCost: 0,
+                tierLabel: "",
+                maxWeight: service.maxWeight,
+                error: "Enter weight > 0g",
+            },
+        };
+    }
+
+    if (service.id === "ems") {
+        const emsRes = calculatePostage(config, "ems", country.code, weightGrams);
+        return {
+            service,
+            available: true,
+            result: emsRes,
+        };
+    }
+
+    if (weightGrams > service.maxWeight) {
+        return {
+            service,
+            available: true,
+            result: {
+                baseCost: 0,
+                registrationFee: 0,
+                arReceiptFee: 0,
+                codFee: 0,
+                totalCost: 0,
+                tierLabel: "",
+                maxWeight: service.maxWeight,
+                exceedsMaxWeight: true,
+                error: `Max ${formatWeightLabel(service.maxWeight)}`,
+            },
+        };
+    }
+
+    const foreignRegFee =
+        options.registered && service.supportsRegistration
+            ? (config.extraFees.foreignRegisteredPost ?? 870)
+            : 0;
+
+    const surfaceTiers = SURFACE_FIXED_TIERS[service.id];
+    if (surfaceTiers) {
+        const matchedIdx = surfaceTiers.findIndex((t) => weightGrams <= t.maxWeight);
+        const tier = surfaceTiers[matchedIdx === -1 ? surfaceTiers.length - 1 : matchedIdx];
+        return {
+            service,
+            available: true,
+            result: {
+                baseCost: tier.price,
+                registrationFee: foreignRegFee,
+                arReceiptFee: 0,
+                codFee: 0,
+                totalCost: tier.price + foreignRegFee,
+                tierLabel: formatTierBracket(surfaceTiers, matchedIdx === -1 ? surfaceTiers.length - 1 : matchedIdx),
+                maxWeight: service.maxWeight,
+            },
+        };
+    }
+
+    const stepTable = GROUP_STEP_TABLES[service.id];
+    if (!stepTable) {
+        return {
+            service,
+            available: false,
+            unavailableReason: "Rate schedule not configured",
+            shortUnavailableTag: "Unavailable",
+            result: {
+                baseCost: 0,
+                registrationFee: 0,
+                arReceiptFee: 0,
+                codFee: 0,
+                totalCost: 0,
+                tierLabel: "",
+                maxWeight: service.maxWeight,
+                error: "Rate schedule not configured",
+            },
+        };
+    }
+
+    const group = resolveCountryGroup(country);
+    const { base, step } = stepTable.groups[group];
+    const { price, tierLabel } = calculateStepBracket(
+        weightGrams,
+        stepTable.baseWeight,
+        base,
+        stepTable.stepWeight,
+        step,
+        service.maxWeight
+    );
+
+    return {
+        service,
+        available: true,
+        result: {
+            baseCost: price,
+            registrationFee: foreignRegFee,
+            arReceiptFee: 0,
+            codFee: 0,
+            totalCost: price + foreignRegFee,
+            tierLabel,
+            maxWeight: service.maxWeight,
+        },
+    };
+}
+
+/**
+ * Evaluates all international mail services (Air Mail & Sea Mail) for a country and weight.
+ */
+export function calculateAllInternationalServices(
+    config: RateConfig,
+    countryCode: string,
+    weightGrams: number,
+    options: { registered?: boolean } = {}
+): InternationalServiceQuote[] {
+    return INTERNATIONAL_SERVICES.map((service) =>
+        calculateInternationalService(config, countryCode, service.id, weightGrams, options)
+    );
 }
