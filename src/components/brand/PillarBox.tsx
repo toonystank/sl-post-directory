@@ -1,3 +1,4 @@
+import * as React from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -8,41 +9,43 @@ import { cn } from "@/lib/utils";
  */
 export default function PillarBox({ className }: { className?: string }) {
     const pen = "#1A1714";
+    const rawId = React.useId();
+    const id = "pb-" + rawId.replace(/[^a-zA-Z0-9-]/g, "");
 
     return (
         <svg viewBox="0 0 240 330" className={cn("h-auto", className)} aria-hidden="true">
             <defs>
-                <linearGradient id="pb-front-red" x1="0" y1="0" x2="1" y2="0.9">
+                <linearGradient id={`${id}-front-red`} x1="0" y1="0" x2="1" y2="0.9">
                     <stop offset="0%" stopColor="#D42126" />
                     <stop offset="60%" stopColor="#C1181D" />
                     <stop offset="100%" stopColor="#A61217" />
                 </linearGradient>
-                <linearGradient id="pb-left-red" x1="0" y1="0" x2="1" y2="0.4">
+                <linearGradient id={`${id}-left-red`} x1="0" y1="0" x2="1" y2="0.4">
                     <stop offset="0%" stopColor="#770A0F" />
                     <stop offset="100%" stopColor="#941016" />
                 </linearGradient>
-                <linearGradient id="pb-right-red" x1="0" y1="0" x2="1" y2="0.8">
+                <linearGradient id={`${id}-right-red`} x1="0" y1="0" x2="1" y2="0.8">
                     <stop offset="0%" stopColor="#E6362F" />
                     <stop offset="55%" stopColor="#D3221E" />
                     <stop offset="100%" stopColor="#B8161B" />
                 </linearGradient>
-                <linearGradient id="pb-roof-front" x1="0.2" y1="0" x2="0.8" y2="1">
+                <linearGradient id={`${id}-roof-front`} x1="0.2" y1="0" x2="0.8" y2="1">
                     <stop offset="0%" stopColor="#EA463E" />
                     <stop offset="100%" stopColor="#C81B20" />
                 </linearGradient>
-                <linearGradient id="pb-roof-right" x1="0" y1="0" x2="1" y2="1">
+                <linearGradient id={`${id}-roof-right`} x1="0" y1="0" x2="1" y2="1">
                     <stop offset="0%" stopColor="#F55F55" />
                     <stop offset="100%" stopColor="#DF2E2A" />
                 </linearGradient>
-                <linearGradient id="pb-roof-left" x1="0" y1="0" x2="1" y2="1">
+                <linearGradient id={`${id}-roof-left`} x1="0" y1="0" x2="1" y2="1">
                     <stop offset="0%" stopColor="#AD171C" />
                     <stop offset="100%" stopColor="#800C11" />
                 </linearGradient>
-                <linearGradient id="pb-plinth-front" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={`${id}-plinth-front`} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#26221F" />
                     <stop offset="100%" stopColor="#181513" />
                 </linearGradient>
-                <linearGradient id="pb-plinth-right" x1="0" y1="0" x2="1" y2="1">
+                <linearGradient id={`${id}-plinth-right`} x1="0" y1="0" x2="1" y2="1">
                     <stop offset="0%" stopColor="#3B3530" />
                     <stop offset="100%" stopColor="#27231F" />
                 </linearGradient>
@@ -66,8 +69,8 @@ export default function PillarBox({ className }: { className?: string }) {
             {/* 3D Hexagonal Black Base Plinth */}
             <g strokeLinejoin="round">
                 <polygon points="41,252 63,262 63,307 41,296" fill="#141210" />
-                <polygon points="63,262 157,262 157,307 63,307" fill="url(#pb-plinth-front)" />
-                <polygon points="157,262 194,252 194,296 157,307" fill="url(#pb-plinth-right)" />
+                <polygon points="63,262 157,262 157,307 63,307" fill={`url(#${id}-plinth-front)`} />
+                <polygon points="157,262 194,252 194,296 157,307" fill={`url(#${id}-plinth-right)`} />
 
                 {/* Outer ink & subtle dark-mode rim */}
                 <polyline
@@ -115,9 +118,9 @@ export default function PillarBox({ className }: { className?: string }) {
 
             {/* 3D Hexagonal Pillar Shaft */}
             <g strokeLinejoin="round">
-                <polygon points="49,52 67,61 67,246 49,237" fill="url(#pb-left-red)" />
-                <polygon points="67,61 153,61 153,246 67,246" fill="url(#pb-front-red)" />
-                <polygon points="153,61 186,52 186,237 153,246" fill="url(#pb-right-red)" />
+                <polygon points="49,52 67,61 67,246 49,237" fill={`url(#${id}-left-red)`} />
+                <polygon points="67,61 153,61 153,246 67,246" fill={`url(#${id}-front-red)`} />
+                <polygon points="153,61 186,52 186,237 153,246" fill={`url(#${id}-right-red)`} />
 
                 {/* Outer ink contours & vertical bevel lines */}
                 <line x1="49" y1="52" x2="49" y2="237" stroke={pen} strokeWidth="1.6" opacity="0.82" />
@@ -251,9 +254,9 @@ export default function PillarBox({ className }: { className?: string }) {
                 <line x1="159" y1="51" x2="159" y2="59" stroke="#FF877E" strokeWidth="1.3" opacity="0.72" />
 
                 {/* Three sloped pyramidal roof planes converging to low-pitched apex (112, 22) */}
-                <polygon points="112,22 37,42 61,51" fill="url(#pb-roof-left)" />
-                <polygon points="112,22 61,51 159,51" fill="url(#pb-roof-front)" />
-                <polygon points="112,22 159,51 197,41" fill="url(#pb-roof-right)" />
+                <polygon points="112,22 37,42 61,51" fill={`url(#${id}-roof-left)`} />
+                <polygon points="112,22 61,51 159,51" fill={`url(#${id}-roof-front)`} />
+                <polygon points="112,22 159,51 197,41" fill={`url(#${id}-roof-right)`} />
 
                 {/* Crisp outer roof contour & ridge bevels */}
                 <polyline points="37,42 112,22 197,41" fill="none" stroke={pen} strokeWidth="1.5" opacity="0.72" />

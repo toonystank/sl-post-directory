@@ -5,7 +5,6 @@ import { Link } from "@/navigation";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { PostOffice } from "./types";
-import AdBanner from "@/components/ads/AdBanner";
 import { getPostOfficeStatus } from "@/lib/holidays";
 import Postmark from "@/components/brand/Postmark";
 import StatusDot from "@/components/brand/StatusDot";
@@ -33,7 +32,7 @@ function CodeTag({ code }: { code: string }) {
  * Mobile: name + type/division, postmark, status, chevron.
  * Desktop (lg): dense table row.
  */
-export default function PostOfficeCard({ office, index }: PostOfficeCardProps) {
+export default function PostOfficeCard({ office }: PostOfficeCardProps) {
     const [isExpanded, setIsExpanded] = useState(false);
     const locale = useLocale();
     const t = useTranslations("Status");
@@ -50,16 +49,9 @@ export default function PostOfficeCard({ office, index }: PostOfficeCardProps) {
     const statusLabel = status.status === "holiday" ? t("holiday") : t(status.label);
 
     const subs = office.controlledOffices ?? [];
-    const showAdAfter = index > 0 && index % 12 === 0;
 
     return (
-        <React.Fragment>
-            {showAdAfter && (
-                <li className="py-2">
-                    <AdBanner position="in-feed" />
-                </li>
-            )}
-            <li className="cv-auto border-b border-border">
+        <li className="cv-auto border-b border-border">
                 <Link
                     href={`/office/${office.slug}`}
                     className={cn(
@@ -124,6 +116,5 @@ export default function PostOfficeCard({ office, index }: PostOfficeCardProps) {
                     </div>
                 )}
             </li>
-        </React.Fragment>
     );
 }

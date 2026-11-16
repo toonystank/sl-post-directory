@@ -36,6 +36,7 @@ export default function Navbar() {
         : pathname.startsWith("/suggest") ? tApp("titleSuggest")
         : pathname.startsWith("/login") ? t("login")
         : pathname.startsWith("/register") ? tApp("titleRegister")
+        : pathname.startsWith("/privacy") ? tApp("titlePrivacy")
         : pathname.startsWith("/dashboard") ? t("dashboard")
         : "";
 

@@ -18,7 +18,7 @@ Sri Lanka Post is a member of the Universal Postal Union (UPU), which means your
 
 EMS is the fastest international service offered by Sri Lanka Post. Packages sent via EMS typically arrive within 3 to 7 business days depending on the destination country. This service includes built-in tracking and insurance, making it ideal for valuable or time-sensitive shipments.
 
-EMS is available to over 190 countries and comes with door-to-door delivery in most destinations. The maximum weight allowed is 30 kg, although this varies by destination country. Prices start from around LKR 1,500 for small documents and increase based on weight and destination zone.
+EMS is available to over 190 countries and comes with door-to-door delivery in most destinations. The maximum weight allowed is 30 kg, although this varies by destination country. Prices start from around LKR 2,750–3,200 for nearby Asian destinations and LKR 4,350–8,850 for Australia, the UK, Europe, and the US, increasing in 500 g steps by destination country.
 
 ### Registered Post (International)
 

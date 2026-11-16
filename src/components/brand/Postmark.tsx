@@ -1,3 +1,4 @@
+import * as React from "react";
 import { cn } from "@/lib/utils";
 
 interface PostmarkProps {
@@ -35,7 +36,9 @@ export default function Postmark({
     const color = tone === "red" ? "hsl(var(--primary))" : "hsl(var(--foreground))";
     const width = waves ? box * 1.75 : box;
     const showRingText = size !== "sm";
-    const id = `pm-${size}-${code}-${label}`.replace(/[^a-zA-Z0-9-]/g, "");
+    const rawId = React.useId();
+    const unique = rawId.replace(/[^a-zA-Z0-9-]/g, "");
+    const id = `pm-${size}-${code}-${label}-${unique}`.replace(/[^a-zA-Z0-9-]/g, "");
     const filterId = `${id}-ink`;
 
     const centerFontSize = showRingText

@@ -48,6 +48,66 @@ export interface RateConfig {
     extraFees: ExtraFees;
 }
 
+function round50(n: number): number {
+    return Math.round(n / 50) * 50;
+}
+
+/**
+ * Builds 0.5 kg EMS weight tiers from official tariff anchor points up to 20 kg or 30 kg.
+ */
+export function buildEmsTiers(
+    p250: number,
+    p500: number,
+    p1000: number,
+    p10k: number,
+    p20k: number,
+    p30k?: number,
+    overrides?: Record<number, number>
+): WeightTier[] {
+    const tiers: WeightTier[] = [
+        { maxWeight: 250, price: p250 },
+        { maxWeight: 500, price: p500 },
+        { maxWeight: 1000, price: p1000 },
+    ];
+    // 1.5kg (step 1) to 10kg (step 18)
+    const p2500Override = overrides?.[2500];
+    for (let step = 1; step <= 18; step++) {
+        const w = 1000 + step * 500;
+        let price: number;
+        if (overrides?.[w] !== undefined) {
+            price = overrides[w];
+        } else if (p2500Override !== undefined && w >= 2500) {
+            price = round50(p2500Override + ((w - 2500) / 7500) * (p10k - p2500Override));
+        } else {
+            price = round50(p1000 + (step / 18) * (p10k - p1000));
+        }
+        tiers.push({ maxWeight: w, price });
+    }
+    // 10.5kg (step 1) to 20kg (step 20)
+    const p10500Override = overrides?.[10500];
+    for (let step = 1; step <= 20; step++) {
+        const w = 10000 + step * 500;
+        let price: number;
+        if (overrides?.[w] !== undefined) {
+            price = overrides[w];
+        } else if (p10500Override !== undefined) {
+            price = round50(p10500Override + ((w - 10500) / 9500) * (p20k - p10500Override));
+        } else {
+            price = round50(p10k + (step / 20) * (p20k - p10k));
+        }
+        tiers.push({ maxWeight: w, price });
+    }
+    // 20.5kg (step 1) to 30kg (step 20) if max weight is 30kg
+    if (p30k !== undefined) {
+        for (let step = 1; step <= 20; step++) {
+            const w = 20000 + step * 500;
+            const price = overrides?.[w] ?? round50(p20k + (step / 20) * (p30k - p20k));
+            tiers.push({ maxWeight: w, price });
+        }
+    }
+    return tiers;
+}
+
 /**
  * Official Sri Lanka Post Domestic Postage Revision (effective February 9, 2026)
  * cross-verified against domesticpostagerevision2026-02-09.pdf and postage.lk.
@@ -158,9 +218,9 @@ export const DEFAULT_RATE_CONFIG: RateConfig = {
         },
         {
             id: "courier",
-            name: "SL Post Courier",
+            name: "SLP Courier (formerly Speed Post)",
             shortName: "SLP Courier",
-            description: "Tracked courier service up to 40 kg",
+            description: "Express tracked domestic courier (formerly Speed Post) up to 40 kg",
             supportsRegistration: false,
             supportsAr: false,
             tiers: [
@@ -182,46 +242,6 @@ export const DEFAULT_RATE_CONFIG: RateConfig = {
                 { maxWeight: 30000, price: 2100 },
                 { maxWeight: 35000, price: 2600 },
                 { maxWeight: 40000, price: 3100 },
-            ],
-        },
-        {
-            id: "speed_post",
-            name: "Inland Speed Post",
-            shortName: "Speed Post",
-            description: "Express tracked delivery up to 10 kg",
-            supportsRegistration: false,
-            supportsAr: false,
-            tiers: [
-                { maxWeight: 20, price: 65 },
-                { maxWeight: 40, price: 75 },
-                { maxWeight: 60, price: 85 },
-                { maxWeight: 80, price: 95 },
-                { maxWeight: 100, price: 105 },
-                { maxWeight: 150, price: 110 },
-                { maxWeight: 200, price: 115 },
-                { maxWeight: 250, price: 120 },
-                { maxWeight: 300, price: 150 },
-                { maxWeight: 400, price: 210 },
-                { maxWeight: 450, price: 240 },
-                { maxWeight: 500, price: 270 },
-                { maxWeight: 600, price: 330 },
-                { maxWeight: 700, price: 390 },
-                { maxWeight: 750, price: 420 },
-                { maxWeight: 800, price: 450 },
-                { maxWeight: 900, price: 510 },
-                { maxWeight: 1000, price: 570 },
-                { maxWeight: 1250, price: 620 },
-                { maxWeight: 1500, price: 670 },
-                { maxWeight: 1750, price: 720 },
-                { maxWeight: 2000, price: 770 },
-                { maxWeight: 3000, price: 870 },
-                { maxWeight: 4000, price: 970 },
-                { maxWeight: 5000, price: 1070 },
-                { maxWeight: 6000, price: 1170 },
-                { maxWeight: 7000, price: 1270 },
-                { maxWeight: 8000, price: 1370 },
-                { maxWeight: 9000, price: 1470 },
-                { maxWeight: 10000, price: 1570 },
             ],
         },
         {
@@ -293,78 +313,51 @@ export const DEFAULT_RATE_CONFIG: RateConfig = {
         {
             id: "zone_a",
             name: "Zone A - South Asia",
-            tiers: [
-                { maxWeight: 250, price: 4200 },
-                { maxWeight: 500, price: 5400 },
-                { maxWeight: 1000, price: 7800 },
-                { maxWeight: 1500, price: 9900 },
-                { maxWeight: 2000, price: 12000 },
-                { maxWeight: 3000, price: 16200 },
-                { maxWeight: 5000, price: 24600 },
-                { maxWeight: 10000, price: 45600 },
-                { maxWeight: 20000, price: 87600 },
-                { maxWeight: 30000, price: 129600 },
-            ],
+            tiers: buildEmsTiers(4550, 4900, 5550, 16750, 28450, 37900),
         },
         {
             id: "zone_b",
             name: "Zone B - Middle East & SE Asia",
-            tiers: [
-                { maxWeight: 250, price: 4800 },
-                { maxWeight: 500, price: 6200 },
-                { maxWeight: 1000, price: 9000 },
-                { maxWeight: 1500, price: 11750 },
-                { maxWeight: 2000, price: 14500 },
-                { maxWeight: 3000, price: 19900 },
-                { maxWeight: 5000, price: 30700 },
-                { maxWeight: 10000, price: 57700 },
-                { maxWeight: 20000, price: 111700 },
-                { maxWeight: 30000, price: 165700 },
-            ],
+            tiers: buildEmsTiers(5550, 5850, 6350, 15900, 25750, 33350),
         },
         {
             id: "zone_c",
             name: "Zone C - Europe & UK",
-            tiers: [
-                { maxWeight: 250, price: 5800 },
-                { maxWeight: 500, price: 7500 },
-                { maxWeight: 1000, price: 11200 },
-                { maxWeight: 1500, price: 14850 },
-                { maxWeight: 2000, price: 18500 },
-                { maxWeight: 3000, price: 25800 },
-                { maxWeight: 5000, price: 40400 },
-                { maxWeight: 10000, price: 76900 },
-                { maxWeight: 20000, price: 149900 },
-                { maxWeight: 30000, price: 222900 },
-            ],
+            tiers: buildEmsTiers(7350, 7950, 9000, 28400, 49200, 67750),
         },
         {
             id: "zone_d",
             name: "Zone D - Americas, East Asia & Oceania",
-            tiers: [
-                { maxWeight: 250, price: 6500 },
-                { maxWeight: 500, price: 8500 },
-                { maxWeight: 1000, price: 12800 },
-                { maxWeight: 1500, price: 16900 },
-                { maxWeight: 2000, price: 21000 },
-                { maxWeight: 3000, price: 29200 },
-                { maxWeight: 5000, price: 45600 },
-                { maxWeight: 10000, price: 86600 },
-                { maxWeight: 20000, price: 168600 },
-                { maxWeight: 30000, price: 250600 },
-            ],
+            tiers: buildEmsTiers(8850, 9800, 11700, 45800, 82900, 117800),
         },
     ],
     emsCountries: [
-        // South Asia (Group A / zone_a)
-        { code: "IN", name: "India", zoneId: "zone_a", group: "A", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
+        // South Asia (Group A & B / zone_a)
+        {
+            code: "IN",
+            name: "India",
+            zoneId: "zone_a",
+            group: "A",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 20000,
+            emsTiers: buildEmsTiers(4550, 4900, 5550, 16750, 28450, 37900),
+            airParcelRate: { first500g: 4200, additional500g: 520, maxWeight: 20000 },
+            seaParcelRate: { first1000g: 3850, additional1000g: 610, maxWeight: 20000 },
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: true,
+        },
         {
             code: "MV",
             name: "Maldives",
             zoneId: "zone_a",
             group: "A",
-            seaMailAvailable: false,
-            seaMailNote: "Sea Mail to Maldives suspended by SL Post since April 2024 (no bilateral surface vessel dispatch)",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 20000,
+            emsTiers: buildEmsTiers(4450, 4600, 4850, 9150, 13200, 15000),
+            airParcelRate: { first500g: 2850, additional500g: 270, maxWeight: 20000 },
+            seaParcelRate: { first1000g: 2800, additional1000g: 620, maxWeight: 20000 },
+            seaMailAvailable: true,
             uPacketAvailable: true,
             tdsAvailable: true,
         },
@@ -372,31 +365,69 @@ export const DEFAULT_RATE_CONFIG: RateConfig = {
             code: "BD",
             name: "Bangladesh",
             zoneId: "zone_a",
-            group: "A",
+            group: "B",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 20000,
+            emsTiers: buildEmsTiers(3150, 3400, 3800, 10900, 18100, 23000),
+            airParcelRate: { first500g: 2500, additional500g: 500, maxWeight: 20000 },
             seaMailAvailable: false,
             seaMailNote: "No direct surface mail container route from Colombo",
-            uPacketAvailable: false,
+            uPacketAvailable: true,
             tdsAvailable: false,
         },
-        { code: "PK", name: "Pakistan", zoneId: "zone_a", group: "A", seaMailAvailable: true, uPacketAvailable: false, tdsAvailable: false },
+        {
+            code: "PK",
+            name: "Pakistan",
+            zoneId: "zone_a",
+            group: "B",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(4600, 4850, 5300, 13350, 21550, 27500),
+            airParcelRate: { first500g: 2800, additional500g: 500, maxWeight: 30000 },
+            seaMailAvailable: false,
+            seaMailNote: "No bilateral Sea Mail parcel service to Pakistan",
+            uPacketAvailable: true,
+            tdsAvailable: false,
+        },
         {
             code: "NP",
             name: "Nepal",
             zoneId: "zone_a",
-            group: "A",
+            group: "B",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 20000,
+            emsTiers: buildEmsTiers(3200, 3400, 3850, 11350, 19000, 24350),
+            airParcelRate: { first500g: 2300, additional500g: 430, maxWeight: 20000 },
             seaMailAvailable: false,
             seaMailNote: "Landlocked country — Sea Mail not available",
-            uPacketAvailable: false,
+            uPacketAvailable: true,
             tdsAvailable: false,
         },
 
         // Middle East (Group B & C / zone_b)
-        { code: "AE", name: "United Arab Emirates", zoneId: "zone_b", group: "B", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
+        {
+            code: "AE",
+            name: "United Arab Emirates",
+            zoneId: "zone_b",
+            group: "B",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(5550, 5850, 6350, 15900, 25750, 33350),
+            airParcelRate: { first500g: 2800, additional500g: 550, maxWeight: 30000 },
+            seaParcelRate: { first1000g: 3050, additional1000g: 730, maxWeight: 30000 },
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: true,
+        },
         {
             code: "QA",
             name: "Qatar",
             zoneId: "zone_b",
             group: "B",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(5350, 5850, 6900, 25300, 45050, 62500),
+            airParcelRate: { first500g: 2900, additional500g: 590, maxWeight: 30000 },
             seaMailAvailable: false,
             seaMailNote: "No bilateral Sea Mail container service to Qatar",
             uPacketAvailable: true,
@@ -404,12 +435,29 @@ export const DEFAULT_RATE_CONFIG: RateConfig = {
             suspensionStatus: "restricted",
             restrictionNote: "Subject to airline routing delays on Middle East corridors.",
         },
-        { code: "SA", name: "Saudi Arabia", zoneId: "zone_b", group: "C", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
+        {
+            code: "SA",
+            name: "Saudi Arabia",
+            zoneId: "zone_b",
+            group: "C",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(6100, 6450, 7100, 19400, 32250, 42900),
+            airParcelRate: { first500g: 2850, additional500g: 790, maxWeight: 30000 },
+            seaMailAvailable: false,
+            seaMailNote: "No direct surface mail container route to Saudi Arabia",
+            uPacketAvailable: true,
+            tdsAvailable: true,
+        },
         {
             code: "OM",
             name: "Oman",
             zoneId: "zone_b",
             group: "B",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(5500, 5800, 6250, 15000, 23950, 30650),
+            airParcelRate: { first500g: 3150, additional500g: 510, maxWeight: 30000 },
             seaMailAvailable: false,
             seaMailNote: "No direct surface mail dispatch to Oman",
             uPacketAvailable: true,
@@ -420,6 +468,10 @@ export const DEFAULT_RATE_CONFIG: RateConfig = {
             name: "Kuwait",
             zoneId: "zone_b",
             group: "C",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(4200, 4550, 5150, 16300, 27950, 37350),
+            airParcelRate: { first500g: 3000, additional500g: 620, maxWeight: 30000 },
             seaMailAvailable: false,
             seaMailNote: "No direct surface mail dispatch to Kuwait",
             uPacketAvailable: true,
@@ -430,6 +482,10 @@ export const DEFAULT_RATE_CONFIG: RateConfig = {
             name: "Bahrain",
             zoneId: "zone_b",
             group: "B",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(5550, 5850, 6450, 16800, 27550, 36050),
+            airParcelRate: { first500g: 2900, additional500g: 610, maxWeight: 30000 },
             seaMailAvailable: false,
             seaMailNote: "No direct surface mail dispatch to Bahrain",
             uPacketAvailable: true,
@@ -440,9 +496,13 @@ export const DEFAULT_RATE_CONFIG: RateConfig = {
             name: "Jordan",
             zoneId: "zone_b",
             group: "C",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(5650, 6050, 6800, 20350, 34700, 46750),
+            airParcelRate: { first500g: 2900, additional500g: 770, maxWeight: 30000 },
             seaMailAvailable: false,
             seaMailNote: "No direct surface mail dispatch to Jordan",
-            uPacketAvailable: false,
+            uPacketAvailable: true,
             tdsAvailable: false,
         },
         {
@@ -450,60 +510,102 @@ export const DEFAULT_RATE_CONFIG: RateConfig = {
             name: "Israel",
             zoneId: "zone_b",
             group: "C",
-            seaMailAvailable: false,
-            seaMailNote: "Temporarily suspended by SL Post due to regional conflict and flight cancellations.",
-            uPacketAvailable: false,
+            emsMaxWeight: 20000,
+            maxParcelWeight: 20000,
+            emsTiers: buildEmsTiers(6600, 7000, 7750, 21500, 36050),
+            airParcelRate: { first500g: 4050, additional500g: 820, maxWeight: 20000 },
+            seaParcelRate: { first1000g: 5400, additional1000g: 1870, maxWeight: 20000 },
+            seaMailAvailable: true,
+            uPacketAvailable: true,
             tdsAvailable: false,
-            suspensionStatus: "suspended",
-            restrictionNote: "Temporarily suspended by SL Post due to regional conflict and flight cancellations.",
-            unavailableServices: {
-                air_letter: "Suspended (conflict & flight cancellations)",
-                air_printed: "Suspended (conflict & flight cancellations)",
-                u_packet: "Suspended (conflict & flight cancellations)",
-                tds: "Suspended (conflict & flight cancellations)",
-                air_parcel: "Suspended (conflict & flight cancellations)",
-                ems: "Suspended (conflict & flight cancellations)",
-                sea_letter: "Suspended (conflict & flight cancellations)",
-                sea_printed: "Suspended (conflict & flight cancellations)",
-                sea_parcel: "Suspended (conflict & flight cancellations)",
-            },
+            suspensionStatus: "restricted",
+            restrictionNote: "Subject to Middle East airline routing delays.",
         },
         {
             code: "LB",
             name: "Lebanon",
             zoneId: "zone_b",
             group: "C",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(4350, 4800, 5700, 21750, 38800, 53650),
+            airParcelRate: { first500g: 3450, additional500g: 820, maxWeight: 30000 },
             seaMailAvailable: false,
-            seaMailNote: "Temporarily suspended by SL Post due to regional conflict and airline suspensions.",
-            uPacketAvailable: false,
+            seaMailNote: "No direct surface mail dispatch to Lebanon",
+            uPacketAvailable: true,
             tdsAvailable: false,
-            suspensionStatus: "suspended",
-            restrictionNote: "Temporarily suspended by SL Post due to regional conflict and airline suspensions.",
-            unavailableServices: {
-                air_letter: "Suspended (regional conflict)",
-                air_printed: "Suspended (regional conflict)",
-                u_packet: "Suspended (regional conflict)",
-                tds: "Suspended (regional conflict)",
-                air_parcel: "Suspended (regional conflict)",
-                ems: "Suspended (regional conflict)",
-                sea_letter: "Suspended (regional conflict)",
-                sea_printed: "Suspended (regional conflict)",
-                sea_parcel: "Suspended (regional conflict)",
-            },
+            suspensionStatus: "restricted",
+            restrictionNote: "Air Mail & U-Packet active (June 2025 circular); EMS & Air Parcel subject to airline routing availability.",
         },
 
-        // Southeast & East Asia (Group C & D / zone_b & zone_d)
-        { code: "SG", name: "Singapore", zoneId: "zone_b", group: "C", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
-        { code: "MY", name: "Malaysia", zoneId: "zone_b", group: "C", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
-        { code: "TH", name: "Thailand", zoneId: "zone_b", group: "C", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
-        { code: "ID", name: "Indonesia", zoneId: "zone_b", group: "C", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: false },
+        // Southeast & East Asia (Group B, C & D / zone_b & zone_d)
+        {
+            code: "SG",
+            name: "Singapore",
+            zoneId: "zone_b",
+            group: "B",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(4600, 4850, 5300, 13850, 22600, 28850),
+            airParcelRate: { first500g: 3300, additional500g: 510, maxWeight: 30000 },
+            seaParcelRate: { first1000g: 3500, additional1000g: 640, maxWeight: 30000 },
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: true,
+        },
+        {
+            code: "MY",
+            name: "Malaysia",
+            zoneId: "zone_b",
+            group: "B",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(6250, 6550, 7100, 16900, 27050, 34950),
+            airParcelRate: { first500g: 3450, additional500g: 590, maxWeight: 30000 },
+            seaParcelRate: { first1000g: 4850, additional1000g: 1700, maxWeight: 30000 },
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: true,
+        },
+        {
+            code: "TH",
+            name: "Thailand",
+            zoneId: "zone_b",
+            group: "B",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(4350, 4600, 5100, 13600, 22300, 28750),
+            airParcelRate: { first500g: 3200, additional500g: 560, maxWeight: 30000 },
+            seaParcelRate: { first1000g: 4650, additional1000g: 1670, maxWeight: 30000 },
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: true,
+        },
+        {
+            code: "ID",
+            name: "Indonesia",
+            zoneId: "zone_b",
+            group: "B",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(4700, 5000, 5650, 17700, 31650, 41500, { 1500: 6300, 2000: 6950, 2500: 8050, 10500: 20200 }),
+            airParcelRate: { first500g: 3900, additional500g: 920, maxWeight: 30000 },
+            seaMailAvailable: false,
+            seaMailNote: "No bilateral Sea Mail parcel route to Indonesia",
+            uPacketAvailable: true,
+            tdsAvailable: false,
+        },
         {
             code: "PH",
             name: "Philippines",
             zoneId: "zone_b",
-            group: "D",
-            seaMailAvailable: false,
-            seaMailNote: "No direct surface mail consolidation to Philippines",
+            group: "C",
+            emsMaxWeight: 20000,
+            maxParcelWeight: 20000,
+            emsTiers: buildEmsTiers(4700, 5100, 5800, 18800, 32500),
+            airParcelRate: { first500g: 2700, additional500g: 810, maxWeight: 20000 },
+            seaParcelRate: { first1000g: 3850, additional1000g: 1640, maxWeight: 20000 },
+            seaMailAvailable: true,
             uPacketAvailable: true,
             tdsAvailable: false,
         },
@@ -511,24 +613,112 @@ export const DEFAULT_RATE_CONFIG: RateConfig = {
             code: "VN",
             name: "Vietnam",
             zoneId: "zone_b",
-            group: "C",
+            group: "B",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(4350, 4600, 5100, 13600, 22300, 28750),
+            airParcelRate: { first500g: 3200, additional500g: 560, maxWeight: 30000 },
             seaMailAvailable: false,
             seaMailNote: "No direct surface mail consolidation to Vietnam",
             uPacketAvailable: true,
             tdsAvailable: false,
         },
-        { code: "CN", name: "China", zoneId: "zone_b", group: "D", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
-        { code: "HK", name: "Hong Kong", zoneId: "zone_b", group: "C", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
-        { code: "JP", name: "Japan", zoneId: "zone_d", group: "D", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
-        { code: "KR", name: "South Korea", zoneId: "zone_d", group: "D", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
+        {
+            code: "CN",
+            name: "China",
+            zoneId: "zone_b",
+            group: "C",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(2750, 3450, 4700, 27750, 52600, 75200),
+            airParcelRate: { first500g: 3900, additional500g: 1020, maxWeight: 30000 },
+            seaParcelRate: { first1000g: 4850, additional1000g: 1490, maxWeight: 30000 },
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: true,
+        },
+        {
+            code: "HK",
+            name: "Hong Kong",
+            zoneId: "zone_b",
+            group: "C",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(4900, 5200, 5850, 19300, 30700, 39900, { 1500: 6450, 2000: 7050, 2500: 10200 }),
+            airParcelRate: { first500g: 5050, additional500g: 720, maxWeight: 30000 },
+            seaParcelRate: { first1000g: 5300, additional1000g: 920, maxWeight: 30000 },
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: true,
+        },
+        {
+            code: "TW",
+            name: "Taiwan",
+            zoneId: "zone_b",
+            group: "C",
+            emsMaxWeight: 20000,
+            maxParcelWeight: 20000,
+            emsTiers: buildEmsTiers(4150, 4500, 5200, 17750, 30950),
+            airParcelRate: { first500g: 3700, additional500g: 770, maxWeight: 20000 },
+            seaMailAvailable: false,
+            seaMailNote: "No bilateral Sea Mail service to Taiwan",
+            uPacketAvailable: true,
+            tdsAvailable: false,
+        },
+        {
+            code: "JP",
+            name: "Japan",
+            zoneId: "zone_d",
+            group: "D",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(4850, 5300, 6250, 23250, 41400, 57250),
+            airParcelRate: { first500g: 4000, additional500g: 1000, maxWeight: 30000 },
+            seaParcelRate: { first1000g: 4300, additional1000g: 830, maxWeight: 30000 },
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: true,
+        },
+        {
+            code: "KR",
+            name: "South Korea",
+            zoneId: "zone_d",
+            group: "D",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 20000,
+            emsTiers: buildEmsTiers(4750, 5200, 6000, 20550, 36000, 49200),
+            airParcelRate: { first500g: 4250, additional500g: 890, maxWeight: 20000 },
+            seaParcelRate: { first1000g: 5400, additional1000g: 1730, maxWeight: 20000 },
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: true,
+        },
 
-        // Europe & UK (Group E & F / zone_c)
-        { code: "GB", name: "United Kingdom", zoneId: "zone_c", group: "F", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
+        // Europe & UK (Group D & E / zone_c)
+        {
+            code: "GB",
+            name: "United Kingdom",
+            zoneId: "zone_c",
+            group: "E",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(7750, 8350, 9500, 30100, 52250, 72150),
+            airParcelRate: { first500g: 6650, additional500g: 1510, maxWeight: 30000 },
+            seaParcelRate: { first1000g: 7050, additional1000g: 1850, maxWeight: 30000 },
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: true,
+        },
         {
             code: "DE",
             name: "Germany",
             zoneId: "zone_c",
             group: "E",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(7350, 7950, 9000, 28400, 49200, 67750),
+            airParcelRate: { first500g: 6650, additional500g: 1150, maxWeight: 30000 },
+            seaParcelRate: { first1000g: 7200, additional1000g: 1190, maxWeight: 30000 },
             seaMailAvailable: true,
             uPacketAvailable: true,
             tdsAvailable: true,
@@ -540,6 +730,11 @@ export const DEFAULT_RATE_CONFIG: RateConfig = {
             name: "France",
             zoneId: "zone_c",
             group: "E",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(5250, 5950, 7300, 31750, 58150, 82250),
+            airParcelRate: { first500g: 5300, additional500g: 1150, maxWeight: 30000 },
+            seaParcelRate: { first1000g: 5300, additional1000g: 1080, maxWeight: 30000 },
             seaMailAvailable: true,
             uPacketAvailable: true,
             tdsAvailable: true,
@@ -551,18 +746,41 @@ export const DEFAULT_RATE_CONFIG: RateConfig = {
             name: "Italy",
             zoneId: "zone_c",
             group: "E",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(6050, 6600, 7650, 26850, 47450, 65800),
+            airParcelRate: { first500g: 4550, additional500g: 1130, maxWeight: 30000 },
+            seaParcelRate: { first1000g: 6000, additional1000g: 2260, maxWeight: 30000 },
             seaMailAvailable: true,
             uPacketAvailable: true,
             tdsAvailable: true,
             suspensionStatus: "restricted",
             restrictionNote: "EU Customs Rule: Commercial goods valued €45–€150 are restricted. Documents, gifts ≤€45 & parcels >€150 are accepted.",
         },
-        { code: "NL", name: "Netherlands", zoneId: "zone_c", group: "E", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
+        {
+            code: "NL",
+            name: "Netherlands",
+            zoneId: "zone_c",
+            group: "E",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(5550, 6100, 7250, 27250, 48700, 67950),
+            airParcelRate: { first500g: 4600, additional500g: 1160, maxWeight: 30000 },
+            seaParcelRate: { first1000g: 5600, additional1000g: 1860, maxWeight: 30000 },
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: true,
+        },
         {
             code: "ES",
             name: "Spain",
             zoneId: "zone_c",
             group: "E",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(5650, 6300, 7500, 29250, 52700, 73900),
+            airParcelRate: { first500g: 5000, additional500g: 1250, maxWeight: 30000 },
+            seaParcelRate: { first1000g: 5900, additional1000g: 1850, maxWeight: 30000 },
             seaMailAvailable: true,
             uPacketAvailable: true,
             tdsAvailable: false,
@@ -574,7 +792,12 @@ export const DEFAULT_RATE_CONFIG: RateConfig = {
             name: "Belgium",
             zoneId: "zone_c",
             group: "E",
-            seaMailAvailable: true,
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(5350, 5950, 7050, 27050, 48550, 67750),
+            airParcelRate: { first500g: 6500, additional500g: 1190, maxWeight: 30000 },
+            seaMailAvailable: false,
+            seaMailNote: "No direct surface mail consolidation to Belgium",
             uPacketAvailable: true,
             tdsAvailable: false,
             suspensionStatus: "restricted",
@@ -584,7 +807,12 @@ export const DEFAULT_RATE_CONFIG: RateConfig = {
             code: "SE",
             name: "Sweden",
             zoneId: "zone_c",
-            group: "F",
+            group: "D",
+            emsMaxWeight: 20000,
+            maxParcelWeight: 20000,
+            emsTiers: buildEmsTiers(8550, 9100, 10150, 28700, 48650),
+            airParcelRate: { first500g: 5650, additional500g: 1110, maxWeight: 20000 },
+            seaParcelRate: { first1000g: 8600, additional1000g: 1870, maxWeight: 20000 },
             seaMailAvailable: true,
             uPacketAvailable: true,
             tdsAvailable: false,
@@ -595,7 +823,12 @@ export const DEFAULT_RATE_CONFIG: RateConfig = {
             code: "AT",
             name: "Austria",
             zoneId: "zone_c",
-            group: "E",
+            group: "D",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(5650, 6200, 7200, 25200, 44400, 61400),
+            airParcelRate: { first500g: 4750, additional500g: 1010, maxWeight: 30000 },
+            seaParcelRate: { first1000g: 7650, additional1000g: 1720, maxWeight: 30000 },
             seaMailAvailable: false,
             seaMailNote: "Landlocked destination — no Sea Mail route",
             uPacketAvailable: true,
@@ -607,9 +840,13 @@ export const DEFAULT_RATE_CONFIG: RateConfig = {
             code: "PL",
             name: "Poland",
             zoneId: "zone_c",
-            group: "E",
-            seaMailAvailable: false,
-            seaMailNote: "No direct surface mail route from SL Post",
+            group: "D",
+            emsMaxWeight: 20000,
+            maxParcelWeight: 20000,
+            emsTiers: buildEmsTiers(4850, 5350, 6350, 24150, 43150),
+            airParcelRate: { first500g: 4800, additional500g: 1120, maxWeight: 20000 },
+            seaParcelRate: { first1000g: 7050, additional1000g: 2660, maxWeight: 20000 },
+            seaMailAvailable: true,
             uPacketAvailable: true,
             tdsAvailable: false,
             suspensionStatus: "restricted",
@@ -620,8 +857,12 @@ export const DEFAULT_RATE_CONFIG: RateConfig = {
             name: "Switzerland",
             zoneId: "zone_c",
             group: "E",
-            seaMailAvailable: false,
-            seaMailNote: "Landlocked destination — no direct Sea Mail dispatch",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(7450, 8000, 9100, 28700, 49700, 68500),
+            airParcelRate: { first500g: 4450, additional500g: 1130, maxWeight: 30000 },
+            seaParcelRate: { first1000g: 7300, additional1000g: 1770, maxWeight: 30000 },
+            seaMailAvailable: true,
             uPacketAvailable: true,
             tdsAvailable: true,
         },
@@ -629,9 +870,97 @@ export const DEFAULT_RATE_CONFIG: RateConfig = {
             code: "IE",
             name: "Ireland",
             zoneId: "zone_c",
-            group: "F",
+            group: "E",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(6350, 6950, 8150, 29550, 52600, 73400),
+            airParcelRate: { first500g: 4400, additional500g: 1220, maxWeight: 30000 },
+            seaParcelRate: { first1000g: 5300, additional1000g: 1840, maxWeight: 30000 },
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: false,
+        },
+        {
+            code: "DK",
+            name: "Denmark",
+            zoneId: "zone_c",
+            group: "E",
+            emsMaxWeight: 20000,
+            maxParcelWeight: 20000,
+            emsTiers: buildEmsTiers(6750, 7300, 8400, 27350, 47750),
+            airParcelRate: { first500g: 5000, additional500g: 1080, maxWeight: 20000 },
+            seaParcelRate: { first1000g: 6050, additional1000g: 1820, maxWeight: 20000 },
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: false,
+        },
+        {
+            code: "FI",
+            name: "Finland",
+            zoneId: "zone_c",
+            group: "D",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(6350, 6900, 7900, 25900, 45150, 62100),
+            airParcelRate: { first500g: 5900, additional500g: 1090, maxWeight: 30000 },
+            seaParcelRate: { first1000g: 7050, additional1000g: 1950, maxWeight: 30000 },
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: false,
+        },
+        {
+            code: "NO",
+            name: "Norway",
+            zoneId: "zone_c",
+            group: "E",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(8650, 9250, 10350, 29950, 50950, 69750),
+            airParcelRate: { first500g: 6800, additional500g: 1240, maxWeight: 30000 },
+            seaParcelRate: { first1000g: 12150, additional1000g: 6090, maxWeight: 30000 },
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: false,
+        },
+        {
+            code: "GR",
+            name: "Greece",
+            zoneId: "zone_c",
+            group: "D",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 20000,
+            emsTiers: buildEmsTiers(5700, 6200, 7100, 23300, 40500, 55500),
+            airParcelRate: { first500g: 3900, additional500g: 1010, maxWeight: 20000 },
+            seaParcelRate: { first1000g: 4350, additional1000g: 1420, maxWeight: 20000 },
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: false,
+        },
+        {
+            code: "PT",
+            name: "Portugal",
+            zoneId: "zone_c",
+            group: "E",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(4500, 5150, 6400, 28600, 52550, 74250),
+            airParcelRate: { first500g: 5600, additional500g: 1330, maxWeight: 30000 },
             seaMailAvailable: false,
-            seaMailNote: "No direct surface container dispatch to Ireland",
+            seaMailNote: "No direct surface mail consolidation to Portugal",
+            uPacketAvailable: true,
+            tdsAvailable: false,
+        },
+        {
+            code: "TR",
+            name: "Turkey",
+            zoneId: "zone_c",
+            group: "D",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(4800, 5300, 6200, 22500, 39850, 54950),
+            airParcelRate: { first500g: 5250, additional500g: 1170, maxWeight: 30000 },
+            seaMailAvailable: false,
+            seaMailNote: "No direct surface mail consolidation to Turkey",
             uPacketAvailable: true,
             tdsAvailable: false,
         },
@@ -639,60 +968,89 @@ export const DEFAULT_RATE_CONFIG: RateConfig = {
             code: "RU",
             name: "Russia",
             zoneId: "zone_c",
-            group: "E",
-            seaMailAvailable: false,
-            seaMailNote: "Suspended — no direct international airline or transit mail routing available.",
-            uPacketAvailable: false,
+            group: "D",
+            emsMaxWeight: 20000,
+            maxParcelWeight: 20000,
+            emsTiers: buildEmsTiers(4450, 5000, 6050, 31250, 64300, 82700, { 1500: 7150, 2000: 8200, 2500: 12500, 10500: 44750 }),
+            airParcelRate: { first500g: 6550, additional500g: 1460, maxWeight: 20000 },
+            seaParcelRate: { first1000g: 9850, additional1000g: 2520, maxWeight: 20000 },
+            seaMailAvailable: true,
+            uPacketAvailable: true,
             tdsAvailable: false,
-            suspensionStatus: "suspended",
-            restrictionNote: "Suspended — no direct international airline or transit mail routing available.",
-            unavailableServices: {
-                air_letter: "Suspended (no transit flights)",
-                air_printed: "Suspended (no transit flights)",
-                u_packet: "Suspended (no transit flights)",
-                tds: "Suspended (no transit flights)",
-                air_parcel: "Suspended (no transit flights)",
-                ems: "Suspended (no transit flights)",
-                sea_letter: "Suspended (no transit flights)",
-                sea_printed: "Suspended (no transit flights)",
-                sea_parcel: "Suspended (no transit flights)",
-            },
+            suspensionStatus: "restricted",
+            restrictionNote: "Subject to transit airline routing schedules.",
         },
         {
             code: "UA",
             name: "Ukraine",
             zoneId: "zone_c",
-            group: "E",
-            seaMailAvailable: false,
-            seaMailNote: "Suspended due to airspace closure and armed conflict.",
-            uPacketAvailable: false,
+            group: "D",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(6650, 7150, 8050, 24400, 41850, 57100),
+            airParcelRate: { first500g: 6150, additional500g: 1060, maxWeight: 30000 },
+            seaParcelRate: { first1000g: 8400, additional1000g: 3000, maxWeight: 30000 },
+            seaMailAvailable: true,
+            uPacketAvailable: true,
             tdsAvailable: false,
-            suspensionStatus: "suspended",
-            restrictionNote: "Suspended due to airspace closure and armed conflict.",
-            unavailableServices: {
-                air_letter: "Suspended (airspace closure)",
-                air_printed: "Suspended (airspace closure)",
-                u_packet: "Suspended (airspace closure)",
-                tds: "Suspended (airspace closure)",
-                air_parcel: "Suspended (airspace closure)",
-                ems: "Suspended (airspace closure)",
-                sea_letter: "Suspended (airspace closure)",
-                sea_printed: "Suspended (airspace closure)",
-                sea_parcel: "Suspended (airspace closure)",
-            },
+            suspensionStatus: "restricted",
+            restrictionNote: "Air Mail & U-Packet active (June 2025 circular); EMS & Air Parcel subject to airspace restrictions.",
         },
 
-        // Oceania, Americas & Africa (Group C, E, F, G, H / zone_b, zone_c, zone_d)
-        { code: "AU", name: "Australia", zoneId: "zone_d", group: "F", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
-        { code: "NZ", name: "New Zealand", zoneId: "zone_d", group: "G", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
-        { code: "US", name: "United States", zoneId: "zone_d", group: "H", seaMailAvailable: true, uPacketAvailable: true, tdsAvailable: true },
+        // Oceania, Americas & Africa
+        {
+            code: "AU",
+            name: "Australia",
+            zoneId: "zone_d",
+            group: "E",
+            emsMaxWeight: 20000,
+            maxParcelWeight: 20000,
+            emsTiers: buildEmsTiers(4350, 5200, 6850, 36400, 68450),
+            airParcelRate: { first500g: 4450, additional500g: 1360, maxWeight: 20000 },
+            seaParcelRate: { first1000g: 4250, additional1000g: 1070, maxWeight: 20000 },
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: true,
+        },
+        {
+            code: "NZ",
+            name: "New Zealand",
+            zoneId: "zone_d",
+            group: "F",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(4100, 5100, 7050, 42100, 80350, 116350),
+            airParcelRate: { first500g: 5250, additional500g: 1630, maxWeight: 30000 },
+            seaParcelRate: { first1000g: 6100, additional1000g: 2200, maxWeight: 30000 },
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: true,
+        },
+        {
+            code: "US",
+            name: "United States",
+            zoneId: "zone_d",
+            group: "H",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(8850, 9800, 11700, 45800, 82900, 117800),
+            airParcelRate: { first500g: 5250, additional500g: 2360, maxWeight: 30000 },
+            seaParcelRate: { first1000g: 4200, additional1000g: 1630, maxWeight: 30000 },
+            seaMailAvailable: true,
+            uPacketAvailable: true,
+            tdsAvailable: true,
+        },
         {
             code: "CA",
             name: "Canada",
             zoneId: "zone_d",
             group: "H",
-            seaMailAvailable: false,
-            seaMailNote: "Sea Mail to Canada suspended by SL Post since Sept 2023 (no surface container route)",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(4750, 5950, 8250, 49900, 95400, 138650),
+            airParcelRate: { first500g: 5850, additional500g: 2210, maxWeight: 30000 },
+            seaParcelRate: { first1000g: 5500, additional1000g: 1830, maxWeight: 30000 },
+            seaMailAvailable: true,
             uPacketAvailable: true,
             tdsAvailable: true,
         },
@@ -701,22 +1059,43 @@ export const DEFAULT_RATE_CONFIG: RateConfig = {
             name: "Brazil",
             zoneId: "zone_d",
             group: "H",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(6200, 7100, 8900, 41500, 76900, 110100),
+            airParcelRate: { first500g: 5350, additional500g: 2050, maxWeight: 30000 },
             seaMailAvailable: false,
             seaMailNote: "No bilateral Sea Mail container route to South America",
-            uPacketAvailable: false,
+            uPacketAvailable: true,
             tdsAvailable: false,
         },
         {
             code: "ZA",
             name: "South Africa",
             zoneId: "zone_c",
-            group: "E",
-            seaMailAvailable: false,
-            seaMailNote: "No direct Sea Mail consolidation to South Africa",
-            uPacketAvailable: false,
+            group: "D",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(5050, 5750, 7150, 32000, 58900, 83500),
+            airParcelRate: { first500g: 4200, additional500g: 1050, maxWeight: 30000 },
+            seaParcelRate: { first1000g: 4500, additional1000g: 1280, maxWeight: 30000 },
+            seaMailAvailable: true,
+            uPacketAvailable: true,
             tdsAvailable: false,
         },
-        { code: "EG", name: "Egypt", zoneId: "zone_b", group: "C", seaMailAvailable: true, uPacketAvailable: false, tdsAvailable: false },
+        {
+            code: "EG",
+            name: "Egypt",
+            zoneId: "zone_b",
+            group: "C",
+            emsMaxWeight: 30000,
+            maxParcelWeight: 30000,
+            emsTiers: buildEmsTiers(4800, 5250, 6050, 21300, 37500, 51450),
+            airParcelRate: { first500g: 4050, additional500g: 1010, maxWeight: 30000 },
+            seaMailAvailable: false,
+            seaMailNote: "No direct Sea Mail consolidation to Egypt",
+            uPacketAvailable: true,
+            tdsAvailable: false,
+        },
     ],
     extraFees: {
         registeredPost: 60,
@@ -773,11 +1152,13 @@ export function mergeWithDefaultConfig(loaded: Partial<RateConfig>): RateConfig 
             if (!custom || !Array.isArray(custom.tiers) || custom.tiers.length === 0) {
                 return def;
             }
+            const isLegacyCourierName = def.id === "courier" && custom.name === "SL Post Courier";
             return {
                 ...def,
                 ...custom,
-                shortName: custom.shortName || def.shortName,
-                description: custom.description || def.description,
+                name: isLegacyCourierName ? def.name : custom.name,
+                shortName: isLegacyCourierName ? def.shortName : (custom.shortName || def.shortName),
+                description: isLegacyCourierName ? def.description : (custom.description || def.description),
                 flatRate: custom.flatRate ?? def.flatRate,
                 supportsRegistration: custom.supportsRegistration ?? def.supportsRegistration,
                 supportsAr: custom.supportsAr ?? def.supportsAr,
@@ -785,9 +1166,15 @@ export function mergeWithDefaultConfig(loaded: Partial<RateConfig>): RateConfig 
             };
         });
 
-        // Append any extra custom services created by an admin
+        // Append any extra custom services created by an admin (drop retired speed_post/sp)
         for (const s of loadedServices) {
-            if (!defaultById.has(s.id) && Array.isArray(s.tiers) && s.tiers.length > 0) {
+            if (
+                !defaultById.has(s.id) &&
+                s.id !== "speed_post" &&
+                s.id !== "sp" &&
+                Array.isArray(s.tiers) &&
+                s.tiers.length > 0
+            ) {
                 domesticServices.push(s);
             }
         }
@@ -804,19 +1191,25 @@ export function mergeWithDefaultConfig(loaded: Partial<RateConfig>): RateConfig 
         emsCountries = DEFAULT_RATE_CONFIG.emsCountries.map((def) => {
             const custom = loadedByCode.get(def.code);
             if (!custom) return def;
+            const hasCustomEmsTiers = Array.isArray(custom.emsTiers) && custom.emsTiers.length > 0;
             return {
                 ...def,
                 ...custom,
-                group: custom.group ?? def.group,
-                seaMailAvailable: custom.seaMailAvailable ?? def.seaMailAvailable,
-                seaMailNote: custom.seaMailNote ?? def.seaMailNote,
-                uPacketAvailable: custom.uPacketAvailable ?? def.uPacketAvailable,
-                uPacketNote: custom.uPacketNote ?? def.uPacketNote,
-                tdsAvailable: custom.tdsAvailable ?? def.tdsAvailable,
-                tdsNote: custom.tdsNote ?? def.tdsNote,
-                suspensionStatus: custom.suspensionStatus ?? def.suspensionStatus,
-                restrictionNote: custom.restrictionNote ?? def.restrictionNote,
-                unavailableServices: custom.unavailableServices ?? def.unavailableServices,
+                group: hasCustomEmsTiers ? (custom.group ?? def.group) : def.group,
+                emsMaxWeight: custom.emsMaxWeight ?? def.emsMaxWeight,
+                maxParcelWeight: custom.maxParcelWeight ?? def.maxParcelWeight,
+                emsTiers: hasCustomEmsTiers ? custom.emsTiers : def.emsTiers,
+                airParcelRate: custom.airParcelRate ?? def.airParcelRate,
+                seaParcelRate: custom.seaParcelRate ?? def.seaParcelRate,
+                seaMailAvailable: hasCustomEmsTiers ? (custom.seaMailAvailable ?? def.seaMailAvailable) : def.seaMailAvailable,
+                seaMailNote: hasCustomEmsTiers ? (custom.seaMailNote ?? def.seaMailNote) : def.seaMailNote,
+                uPacketAvailable: hasCustomEmsTiers ? (custom.uPacketAvailable ?? def.uPacketAvailable) : def.uPacketAvailable,
+                uPacketNote: hasCustomEmsTiers ? (custom.uPacketNote ?? def.uPacketNote) : def.uPacketNote,
+                tdsAvailable: hasCustomEmsTiers ? (custom.tdsAvailable ?? def.tdsAvailable) : def.tdsAvailable,
+                tdsNote: hasCustomEmsTiers ? (custom.tdsNote ?? def.tdsNote) : def.tdsNote,
+                suspensionStatus: hasCustomEmsTiers ? (custom.suspensionStatus ?? def.suspensionStatus) : def.suspensionStatus,
+                restrictionNote: hasCustomEmsTiers ? (custom.restrictionNote ?? def.restrictionNote) : def.restrictionNote,
+                unavailableServices: hasCustomEmsTiers ? (custom.unavailableServices ?? def.unavailableServices) : def.unavailableServices,
             };
         });
         for (const custom of loaded.emsCountries) {
@@ -1014,19 +1407,27 @@ export function calculatePostage(
                 error: "Invalid EMS destination selected",
             };
         }
-        const zone = config.emsZones.find((z) => z.id === country.zoneId);
-        if (!zone) {
-            return {
-                baseCost: 0,
-                registrationFee: 0,
-                arReceiptFee: 0,
-                codFee: 0,
-                totalCost: 0,
-                tierLabel: "",
-                error: "Zone not configured for this country",
-            };
+        if (country.emsTiers && country.emsTiers.length > 0) {
+            tiers = country.emsMaxWeight
+                ? country.emsTiers.filter((t) => t.maxWeight <= country.emsMaxWeight!)
+                : country.emsTiers;
+        } else {
+            const zone = config.emsZones.find((z) => z.id === country.zoneId);
+            if (!zone) {
+                return {
+                    baseCost: 0,
+                    registrationFee: 0,
+                    arReceiptFee: 0,
+                    codFee: 0,
+                    totalCost: 0,
+                    tierLabel: "",
+                    error: "Zone not configured for this country",
+                };
+            }
+            tiers = country.emsMaxWeight
+                ? zone.tiers.filter((t) => t.maxWeight <= country.emsMaxWeight!)
+                : zone.tiers;
         }
-        tiers = zone.tiers;
     }
 
     if (!tiers || tiers.length === 0) {
@@ -1185,7 +1586,7 @@ export const INTERNATIONAL_SERVICES: InternationalServiceMeta[] = [
     },
     {
         id: "ems",
-        name: "International EMS (Speed Post)",
+        name: "International EMS (Expedited Mail)",
         shortName: "EMS Express",
         transport: "air",
         maxWeight: 30000,
@@ -1227,6 +1628,60 @@ interface GroupStepRate {
     groups: Record<CountryGroup, { base: number; step: number }>;
 }
 
+/**
+ * Official Tracked Delivery Service (TDS) rates w.e.f. 01.10.2025 (TDPostage.pdf).
+ */
+const TDS_GROUP_TIERS: Record<CountryGroup, WeightTier[]> = {
+    A: [
+        { maxWeight: 250, price: 1260 },
+        { maxWeight: 500, price: 2130 },
+        { maxWeight: 1000, price: 3900 },
+        { maxWeight: 2000, price: 7420 },
+    ],
+    B: [
+        { maxWeight: 250, price: 1380 },
+        { maxWeight: 500, price: 2380 },
+        { maxWeight: 1000, price: 4390 },
+        { maxWeight: 2000, price: 8410 },
+    ],
+    C: [
+        { maxWeight: 250, price: 1500 },
+        { maxWeight: 500, price: 2620 },
+        { maxWeight: 1000, price: 4860 },
+        { maxWeight: 2000, price: 9360 },
+    ],
+    D: [
+        { maxWeight: 250, price: 1620 },
+        { maxWeight: 500, price: 2865 },
+        { maxWeight: 1000, price: 5360 },
+        { maxWeight: 2000, price: 10350 },
+    ],
+    E: [
+        { maxWeight: 250, price: 1740 },
+        { maxWeight: 500, price: 3100 },
+        { maxWeight: 1000, price: 5830 },
+        { maxWeight: 2000, price: 11290 },
+    ],
+    F: [
+        { maxWeight: 250, price: 1860 },
+        { maxWeight: 500, price: 3340 },
+        { maxWeight: 1000, price: 6300 },
+        { maxWeight: 2000, price: 12240 },
+    ],
+    G: [
+        { maxWeight: 250, price: 2000 },
+        { maxWeight: 500, price: 3620 },
+        { maxWeight: 1000, price: 6870 },
+        { maxWeight: 2000, price: 13370 },
+    ],
+    H: [
+        { maxWeight: 250, price: 2570 },
+        { maxWeight: 500, price: 4765 },
+        { maxWeight: 1000, price: 9160 },
+        { maxWeight: 2000, price: 17950 },
+    ],
+};
+
 const GROUP_STEP_TABLES: Partial<Record<InternationalServiceId, GroupStepRate>> = {
     air_letter: {
         baseWeight: 20,
@@ -1261,27 +1716,13 @@ const GROUP_STEP_TABLES: Partial<Record<InternationalServiceId, GroupStepRate>> 
         stepWeight: 50,
         groups: {
             A: { base: 240, step: 170 },
-            B: { base: 270, step: 190 },
-            C: { base: 300, step: 210 },
-            D: { base: 330, step: 240 },
-            E: { base: 360, step: 270 },
-            F: { base: 390, step: 300 },
-            G: { base: 430, step: 340 },
+            B: { base: 260, step: 195 },
+            C: { base: 280, step: 215 },
+            D: { base: 300, step: 240 },
+            E: { base: 330, step: 260 },
+            F: { base: 350, step: 285 },
+            G: { base: 380, step: 310 },
             H: { base: 480, step: 420 },
-        },
-    },
-    tds: {
-        baseWeight: 100,
-        stepWeight: 100,
-        groups: {
-            A: { base: 850, step: 320 },
-            B: { base: 950, step: 380 },
-            C: { base: 1100, step: 420 },
-            D: { base: 1250, step: 480 },
-            E: { base: 1450, step: 550 },
-            F: { base: 1650, step: 620 },
-            G: { base: 1850, step: 700 },
-            H: { base: 2100, step: 820 },
         },
     },
     air_parcel: {
@@ -1317,20 +1758,21 @@ const GROUP_STEP_TABLES: Partial<Record<InternationalServiceId, GroupStepRate>> 
 const SURFACE_FIXED_TIERS: Partial<Record<InternationalServiceId, WeightTier[]>> = {
     sea_letter: [
         { maxWeight: 20, price: 130 },
-        { maxWeight: 50, price: 290 },
-        { maxWeight: 100, price: 460 },
-        { maxWeight: 250, price: 1180 },
-        { maxWeight: 500, price: 2260 },
-        { maxWeight: 1000, price: 4190 },
+        { maxWeight: 50, price: 240 },
+        { maxWeight: 100, price: 440 },
+        { maxWeight: 250, price: 1020 },
+        { maxWeight: 500, price: 1980 },
+        { maxWeight: 1000, price: 3920 },
         { maxWeight: 2000, price: 7780 },
     ],
     sea_printed: [
-        { maxWeight: 50, price: 240 },
-        { maxWeight: 100, price: 440 },
-        { maxWeight: 250, price: 990 },
-        { maxWeight: 500, price: 1930 },
-        { maxWeight: 1000, price: 3480 },
-        { maxWeight: 2000, price: 5920 },
+        { maxWeight: 20, price: 120 },
+        { maxWeight: 50, price: 230 },
+        { maxWeight: 100, price: 410 },
+        { maxWeight: 250, price: 970 },
+        { maxWeight: 500, price: 1900 },
+        { maxWeight: 1000, price: 3760 },
+        { maxWeight: 2000, price: 7480 },
     ],
 };
 
@@ -1454,6 +1896,15 @@ export function calculateInternationalService(
         };
     }
 
+    const effectiveMaxWeight =
+        service.id === "ems"
+            ? (country.emsMaxWeight ?? service.maxWeight)
+            : service.id === "air_parcel"
+                ? (country.airParcelRate?.maxWeight ?? country.maxParcelWeight ?? service.maxWeight)
+                : service.id === "sea_parcel"
+                    ? (country.seaParcelRate?.maxWeight ?? country.maxParcelWeight ?? service.maxWeight)
+                    : service.maxWeight;
+
     const availability = getServiceAvailability(country, service);
     if (!availability.available) {
         return {
@@ -1468,7 +1919,7 @@ export function calculateInternationalService(
                 codFee: 0,
                 totalCost: 0,
                 tierLabel: "",
-                maxWeight: service.maxWeight,
+                maxWeight: effectiveMaxWeight,
                 error: availability.reason,
             },
         };
@@ -1485,7 +1936,7 @@ export function calculateInternationalService(
                 codFee: 0,
                 totalCost: 0,
                 tierLabel: "",
-                maxWeight: service.maxWeight,
+                maxWeight: effectiveMaxWeight,
                 error: "Enter weight > 0g",
             },
         };
@@ -1500,7 +1951,7 @@ export function calculateInternationalService(
         };
     }
 
-    if (weightGrams > service.maxWeight) {
+    if (weightGrams > effectiveMaxWeight) {
         return {
             service,
             available: true,
@@ -1511,9 +1962,9 @@ export function calculateInternationalService(
                 codFee: 0,
                 totalCost: 0,
                 tierLabel: "",
-                maxWeight: service.maxWeight,
+                maxWeight: effectiveMaxWeight,
                 exceedsMaxWeight: true,
-                error: `Max ${formatWeightLabel(service.maxWeight)}`,
+                error: `Max ${formatWeightLabel(effectiveMaxWeight)}`,
             },
         };
     }
@@ -1522,6 +1973,75 @@ export function calculateInternationalService(
         options.registered && service.supportsRegistration
             ? (config.extraFees.foreignRegisteredPost ?? 870)
             : 0;
+
+    if (service.id === "tds") {
+        const group = resolveCountryGroup(country);
+        const tdsTiers = TDS_GROUP_TIERS[group];
+        const matchedIdx = tdsTiers.findIndex((t) => weightGrams <= t.maxWeight);
+        const idx = matchedIdx === -1 ? tdsTiers.length - 1 : matchedIdx;
+        const tier = tdsTiers[idx];
+        return {
+            service,
+            available: true,
+            result: {
+                baseCost: tier.price,
+                registrationFee: 0,
+                arReceiptFee: 0,
+                codFee: 0,
+                totalCost: tier.price,
+                tierLabel: formatTierBracket(tdsTiers, idx),
+                maxWeight: effectiveMaxWeight,
+            },
+        };
+    }
+
+    if (service.id === "air_parcel" && country.airParcelRate) {
+        const { price, tierLabel } = calculateStepBracket(
+            weightGrams,
+            500,
+            country.airParcelRate.first500g,
+            500,
+            country.airParcelRate.additional500g,
+            effectiveMaxWeight
+        );
+        return {
+            service,
+            available: true,
+            result: {
+                baseCost: price,
+                registrationFee: 0,
+                arReceiptFee: 0,
+                codFee: 0,
+                totalCost: price,
+                tierLabel,
+                maxWeight: effectiveMaxWeight,
+            },
+        };
+    }
+
+    if (service.id === "sea_parcel" && country.seaParcelRate) {
+        const { price, tierLabel } = calculateStepBracket(
+            weightGrams,
+            1000,
+            country.seaParcelRate.first1000g,
+            1000,
+            country.seaParcelRate.additional1000g,
+            effectiveMaxWeight
+        );
+        return {
+            service,
+            available: true,
+            result: {
+                baseCost: price,
+                registrationFee: 0,
+                arReceiptFee: 0,
+                codFee: 0,
+                totalCost: price,
+                tierLabel,
+                maxWeight: effectiveMaxWeight,
+            },
+        };
+    }
 
     const surfaceTiers = SURFACE_FIXED_TIERS[service.id];
     if (surfaceTiers) {
@@ -1537,7 +2057,7 @@ export function calculateInternationalService(
                 codFee: 0,
                 totalCost: tier.price + foreignRegFee,
                 tierLabel: formatTierBracket(surfaceTiers, matchedIdx === -1 ? surfaceTiers.length - 1 : matchedIdx),
-                maxWeight: service.maxWeight,
+                maxWeight: effectiveMaxWeight,
             },
         };
     }
@@ -1556,7 +2076,7 @@ export function calculateInternationalService(
                 codFee: 0,
                 totalCost: 0,
                 tierLabel: "",
-                maxWeight: service.maxWeight,
+                maxWeight: effectiveMaxWeight,
                 error: "Rate schedule not configured",
             },
         };
@@ -1570,7 +2090,7 @@ export function calculateInternationalService(
         base,
         stepTable.stepWeight,
         step,
-        service.maxWeight
+        effectiveMaxWeight
     );
 
     return {
@@ -1583,7 +2103,7 @@ export function calculateInternationalService(
             codFee: 0,
             totalCost: price + foreignRegFee,
             tierLabel,
-            maxWeight: service.maxWeight,
+            maxWeight: effectiveMaxWeight,
         },
     };
 }

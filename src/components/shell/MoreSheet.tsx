@@ -139,14 +139,23 @@ export default function MoreSheet({ open, onOpenChange }: MoreSheetProps) {
                     <div className="airmail-stripe -mx-4 -mt-4 mb-3 h-1.5 rounded-t-md" aria-hidden="true" />
                     <p className="font-semibold mb-1">{t("aboutTitle")}</p>
                     <p className="text-muted-foreground leading-relaxed">{t("disclaimer")}</p>
-                    <a
-                        href="https://github.com/toonystank/sl-post-directory"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-3 inline-flex items-center gap-1.5 font-semibold underline underline-offset-4"
-                    >
-                        <Github className="h-4 w-4" /> {t("openSource")}
-                    </a>
+                    <div className="mt-3 flex flex-wrap items-center gap-4">
+                        <a
+                            href="https://github.com/toonystank/sl-post-directory"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 font-semibold underline underline-offset-4"
+                        >
+                            <Github className="h-4 w-4" /> {t("openSource")}
+                        </a>
+                        <Link
+                            href="/privacy"
+                            onClick={close}
+                            className="inline-flex items-center gap-1.5 font-semibold underline underline-offset-4"
+                        >
+                            {t("privacy")}
+                        </Link>
+                    </div>
                 </section>
                 <p className="mt-4 text-center text-xs text-muted-foreground">
                     <Check className="inline h-3 w-3 mr-1" />

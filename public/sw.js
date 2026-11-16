@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sl-post-dir-v1';
+const CACHE_NAME = 'sl-post-dir-v2';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -26,6 +26,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  if (!event.request.url.startsWith(self.location.origin)) return;
   
   // Exclude API calls and internal Next.js hot-reloading from caching aggressively
   if (event.request.url.includes('/api/') || event.request.url.includes('/_next/')) {

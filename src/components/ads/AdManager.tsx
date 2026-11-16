@@ -2,6 +2,9 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import Script from "next/script";
+import { usePathname } from "@/navigation";
+
+const NON_CONTENT_PREFIXES = ["/login", "/register", "/dashboard", "/suggest"];
 
 interface AdContextType {
     adsEnabled: boolean;
@@ -14,14 +17,24 @@ export function useAds() {
     return useContext(AdContext);
 }
 
+type WindowWithCapacitor = Window & {
+    Capacitor?: { isNativePlatform?: () => boolean };
+};
+
 function isNativePlatform(): boolean {
-    return typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.();
+    return typeof window !== 'undefined' && !!(window as WindowWithCapacitor).Capacitor?.isNativePlatform?.();
 }
 
 export default function AdManager({ children }: { children: React.ReactNode }) {
+    const pathname = usePathname() || "/";
     const [adsEnabled, setAdsEnabled] = useState(true);
     const [loading, setLoading] = useState(true);
     const [isNative, setIsNative] = useState(false);
+
+    const isExcludedRoute = NON_CONTENT_PREFIXES.some(
+        (p) => pathname === p || pathname.startsWith(`${p}/`)
+    );
+    const effectiveAdsEnabled = adsEnabled && !isExcludedRoute;
 
     useEffect(() => {
         let isMounted = true;
@@ -58,7 +71,7 @@ export default function AdManager({ children }: { children: React.ReactNode }) {
 
         // Use requestIdleCallback when available, fallback to setTimeout
         const scheduleInit = typeof window !== 'undefined' && 'requestIdleCallback' in window
-            ? (cb: () => void) => (window as any).requestIdleCallback(cb)
+            ? (cb: () => void) => window.requestIdleCallback(cb)
             : (cb: () => void) => setTimeout(cb, 1000);
         scheduleInit(init);
 
@@ -68,9 +81,9 @@ export default function AdManager({ children }: { children: React.ReactNode }) {
     }, []);
 
     return (
-        <AdContext.Provider value={{ adsEnabled, loading }}>
-            {/* Conditionally load AdSense script only when ads are enabled */}
-            {adsEnabled && !isNative && (
+        <AdContext.Provider value={{ adsEnabled: effectiveAdsEnabled, loading }}>
+            {/* Conditionally load AdSense script only when ads are enabled on content pages */}
+            {effectiveAdsEnabled && !isNative && (
                 <Script
                     async
                     src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2503310431210239"

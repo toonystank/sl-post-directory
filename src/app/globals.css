@@ -212,6 +212,38 @@
   );
 }
 
+/* Classic "Par Avion" blue/red airmail border */
+@utility par-avion-stripe {
+  background: repeating-linear-gradient(
+    -45deg,
+    #D7263D 0 10px,
+    #fff 10px 16px,
+    #1D4E9E 16px 26px,
+    #fff 26px 32px
+  );
+}
+
+/* EMS (UPU) blue + orange */
+@utility ems-stripe {
+  background: repeating-linear-gradient(
+    -45deg,
+    #FF6600 0 10px,
+    #fff 10px 16px,
+    #0035AD 16px 26px,
+    #fff 26px 32px
+  );
+}
+
+/* Service colour resolver: set --svc / --svc-dark / --svc-accent inline (see lib/service-colors),
+   then use text-[var(--c)], bg-[var(--c)], border-[var(--c)] etc. */
+@utility svc {
+  --c: var(--svc);
+  --ca: var(--svc-accent);
+  &:is(.dark *) {
+    --c: var(--svc-dark);
+  }
+}
+
 /* Faint paper grain (desktop only — skip on mobile for perf) */
 @utility paper-grain {
   @media (min-width: 768px) {

@@ -49,7 +49,7 @@ export interface LocalOfficeRecord {
 }
 
 interface SqliteRow {
-    id: string;
+    id: string | number;
     name: string;
     postalCode: string;
     createdAt: number | string | null;
@@ -138,12 +138,13 @@ export function loadLocalOffices(): LocalOfficeRecord[] {
 
         const usedSlugs = new Set<string>();
         const offices: LocalOfficeRecord[] = rows.map((row) => {
-            const baseSlug = createBaseSlug(row.name) || row.id.toLowerCase();
+            const rowId = String(row.id);
+            const baseSlug = createBaseSlug(row.name) || rowId.toLowerCase();
             let slug = baseSlug;
             if (usedSlugs.has(slug)) {
-                const withPostal = `${baseSlug}-${row.postalCode || row.id.slice(0, 6)}`;
+                const withPostal = `${baseSlug}-${row.postalCode || rowId.slice(0, 6)}`;
                 slug = usedSlugs.has(withPostal)
-                    ? `${withPostal}-${row.id.slice(0, 6)}`
+                    ? `${withPostal}-${rowId.slice(0, 6)}`
                     : withPostal;
             }
             usedSlugs.add(slug);
@@ -152,7 +153,7 @@ export function loadLocalOffices(): LocalOfficeRecord[] {
             const updatedMs = Number(row.updatedAt);
 
             return {
-                id: row.id,
+                id: rowId,
                 name: row.name,
                 slug,
                 postalCode: row.postalCode || "",
@@ -164,14 +165,14 @@ export function loadLocalOffices(): LocalOfficeRecord[] {
                 updatedAt: Number.isFinite(updatedMs) && updatedMs > 0 ? new Date(updatedMs) : new Date(),
                 fields: [
                     {
-                        id: `${row.id}-type`,
-                        officeId: row.id,
+                        id: `${rowId}-type`,
+                        officeId: rowId,
                         name: "Type",
                         value: "Post Office",
                     },
                     {
-                        id: `${row.id}-hours`,
-                        officeId: row.id,
+                        id: `${rowId}-hours`,
+                        officeId: rowId,
                         name: "Working Hours",
                         value: "8:00 AM - 4:00 PM (Weekdays)",
                     },
@@ -369,5 +370,5 @@ export function getLocalOfficeBySlug(slug: string): LocalOfficeRecord | null {
 
 export function getLocalOfficeById(id: string): LocalOfficeRecord | null {
     const allOffices = loadLocalOffices();
-    return allOffices.find((o) => o.id === id) ?? null;
+    return allOffices.find((o) => String(o.id) === String(id)) ?? null;
 }

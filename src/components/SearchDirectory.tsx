@@ -34,13 +34,21 @@ export default function SearchDirectory() {
     const searchContainerRef = useRef<HTMLDivElement>(null);
     const stickySearchContainerRef = useRef<HTMLDivElement>(null);
     const heroInputRef = useRef<HTMLInputElement>(null);
+    const resultsSectionRef = useRef<HTMLElement>(null);
 
     const hasActiveFilters = Boolean(query || activeLetter || activeService);
     const activeFilterCount = (activeLetter ? 1 : 0) + (activeService ? 1 : 0);
 
+    const scrollToResults = () => {
+        requestAnimationFrame(() => {
+            resultsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+    };
+
     const submitSearch = () => {
         updateUrl(query, searchMode, activeLetter, activeService);
         fetchOffices(query, activeLetter, searchMode, activeService, 0, false);
+        scrollToResults();
     };
 
     const handleClearQuery = () => {
@@ -53,6 +61,7 @@ export default function SearchDirectory() {
         setQuery(suggestion);
         updateUrl(suggestion, searchMode, activeLetter, activeService);
         fetchOffices(suggestion, activeLetter, searchMode, activeService, 0, false);
+        scrollToResults();
     };
 
     const handleModeSwitch = (mode: typeof searchMode) => {
@@ -81,6 +90,7 @@ export default function SearchDirectory() {
         setActiveService(null);
         updateUrl(term, searchMode, null, null);
         fetchOffices(term, null, searchMode, null, 0, false);
+        scrollToResults();
     };
 
     const clearAll = () => {
@@ -115,11 +125,6 @@ export default function SearchDirectory() {
                 searchRef={searchContainerRef}
                 searchMode={searchMode}
                 onModeChange={handleModeSwitch}
-                onPopular={handlePopularSearch}
-                onPostcodeTool={() => {
-                    heroInputRef.current?.focus();
-                    searchContainerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-                }}
                 total={total}
                 activeQuery={query}
                 search={
@@ -172,7 +177,7 @@ export default function SearchDirectory() {
                         handlePopularSearch={handlePopularSearch}
                     />
 
-                    <section className="flex-1 w-full min-w-0">
+                    <section ref={resultsSectionRef} className="flex-1 w-full min-w-0 scroll-mt-28 lg:scroll-mt-8">
                         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                             <div className="min-w-0">
                                 <h2 className="font-heading text-2xl md:text-3xl font-extrabold [font-stretch:82%] truncate">

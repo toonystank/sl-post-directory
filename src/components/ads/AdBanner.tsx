@@ -19,7 +19,7 @@ interface AdBannerProps {
     adSlot?: string;
 }
 
-export default function AdBanner({ position = "in-feed", className = "", style, adSlot }: AdBannerProps) {
+export default function AdBanner({ position = "in-feed", className = "", style }: AdBannerProps) {
     const [isNative, setIsNative] = useState<boolean | null>(null);
     const hasRequestedNativeBanner = useRef(false);
     const { adsEnabled, loading } = useAds();
@@ -82,24 +82,7 @@ export default function AdBanner({ position = "in-feed", className = "", style, 
         );
     }
 
-    // ====== WEB VIEW (ADSENSE) ======
-    return (
-        <div 
-            className={`ad-container flex justify-center items-center overflow-hidden 
-                ${position === 'sticky-bottom' ? 'fixed bottom-tabbar left-0 right-0 z-40 bg-background border-t border-border py-1 min-h-[50px]' : 'w-full my-4 rounded-md min-h-[250px] bg-muted/50'} 
-                ${className}`}
-            style={style}
-        >
-            <ins 
-                className="adsbygoogle"
-                style={{ display: 'block', textAlign: 'center', width: position === 'sticky-bottom' ? '100%' : '100%', height: position === 'sticky-bottom' ? '50px' : 'auto' }}
-                data-ad-client="pub-2503310431210239"
-                data-ad-slot={adSlot || "1234567890"}
-                data-ad-format={position === 'sticky-bottom' ? "horizontal" : "auto"}
-                data-full-width-responsive="true"
-            />
-            
-            <script dangerouslySetInnerHTML={{ __html: `(adsbygoogle = window.adsbygoogle || []).push({});` }} />
-        </div>
-    );
+    // Web ads are handled exclusively via AdSense Auto Ads (loaded in AdManager)
+    // to avoid sticky/in-list placements near navigation elements.
+    return null;
 }
