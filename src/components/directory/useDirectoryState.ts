@@ -18,6 +18,12 @@ export function useDirectoryState() {
     const [initialLoading, setInitialLoading] = useState(true);
 
     const isRestoringRef = useRef(false);
+    const lastFetchedRef = useRef<{
+        q: string;
+        mode: SearchMode;
+        letter: string | null;
+        service: string | null;
+    } | null>(null);
 
     const updateUrl = useCallback((q: string, mode: SearchMode, letter: string | null, service: string | null) => {
         const params = new URLSearchParams();
@@ -31,8 +37,12 @@ export function useDirectoryState() {
     }, [router]);
 
     const fetchOffices = useCallback(async (searchQuery: string, letter: string | null, mode: SearchMode, service: string | null, cursor: number, append: boolean) => {
-        if (cursor === 0) setInitialLoading(true);
-        else setLoading(true);
+        if (cursor === 0) {
+            lastFetchedRef.current = { q: searchQuery, mode, letter, service };
+            setInitialLoading(true);
+        } else {
+            setLoading(true);
+        }
 
         try {
             const params = new URLSearchParams();
@@ -68,18 +78,35 @@ export function useDirectoryState() {
         }
     }, []);
 
-    // Session cache & scrolling restoration
+    const urlQuery = searchParams.get("q") || "";
+    const urlMode = (searchParams.get("mode") as SearchMode) || "name";
+    const urlLetter = searchParams.get("letter") || null;
+    const urlService = searchParams.get("service") || null;
+
+    // Sync state with URL params (including resetting when navigating to "/" via desktop/mobile tabs)
     useEffect(() => {
-        const q = searchParams.get("q") || "";
-        const mode = (searchParams.get("mode") as SearchMode) || "name";
-        const letter = searchParams.get("letter") || null;
-        const service = searchParams.get("service") || null;
+        setQuery(urlQuery);
+        setSearchMode(urlMode);
+        setActiveLetter(urlLetter);
+        setActiveService(urlService);
+
+        const last = lastFetchedRef.current;
+        if (
+            last &&
+            last.q === urlQuery &&
+            last.mode === urlMode &&
+            last.letter === urlLetter &&
+            last.service === urlService
+        ) {
+            return;
+        }
 
         const cached = sessionStorage.getItem("directory-cache-v3");
-        if (cached) {
+        if (cached && !last) {
             try {
                 const data = JSON.parse(cached);
-                if (data.q === q && data.mode === mode && data.letter === letter && data.service === service) {
+                if (data.q === urlQuery && data.mode === urlMode && data.letter === urlLetter && data.service === urlService) {
+                    lastFetchedRef.current = { q: urlQuery, mode: urlMode, letter: urlLetter, service: urlService };
                     setOffices(data.offices);
                     setTotal(data.total);
                     setNextCursor(data.nextCursor);
@@ -95,8 +122,8 @@ export function useDirectoryState() {
                 }
             } catch { }
         }
-        fetchOffices(q, letter, mode, service, 0, false);
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+        fetchOffices(urlQuery, urlLetter, urlMode, urlService, 0, false);
+    }, [urlQuery, urlMode, urlLetter, urlService, fetchOffices]);
 
     useEffect(() => {
         let timeoutId: NodeJS.Timeout | null = null;
