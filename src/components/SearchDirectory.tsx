@@ -65,9 +65,14 @@ export default function SearchDirectory() {
     };
 
     const handleModeSwitch = (mode: typeof searchMode) => {
+        if (mode === searchMode && !query && !activeLetter && !activeService) return;
         setSearchMode(mode);
-        updateUrl(query, mode, activeLetter, activeService);
-        if (query) fetchOffices(query, activeLetter, mode, activeService, 0, false);
+        setQuery("");
+        setActiveLetter(null);
+        setActiveService(null);
+        setFiltersOpen(false);
+        updateUrl("", mode, null, null);
+        fetchOffices("", null, mode, null, 0, false);
     };
 
     const handleLetterFilter = (letter: string) => {

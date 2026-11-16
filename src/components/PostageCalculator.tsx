@@ -325,19 +325,45 @@ export default function PostageCalculator({ initialMode = "ems" }: { initialMode
                 ? INTL_WEIGHT_PRESETS
                 : DOMESTIC_WEIGHT_PRESETS;
 
-    const handleModeChange = (mode: Destination) => {
+    const defaultWeightForMode = (mode: Destination) =>
+        mode === "cod" ? "250" : mode === "ems" ? "20" : "30";
+
+    const resetCalculatorForMode = (mode: Destination) => {
         setDestination(mode);
-        if (weightGrams <= 0) {
-            setWeight(mode === "cod" ? "250" : "30");
-        }
+        setWeight(defaultWeightForMode(mode));
+        setServiceId(
+            config.domesticServices.some((s) => s.id === "letter")
+                ? "letter"
+                : (config.domesticServices[0]?.id ?? "letter")
+        );
+        setRegistered(false);
+        setArReceipt(false);
+        setCodAmount("2500");
+        setEmsCountryCode(
+            config.emsCountries.some((c) => c.code === "GB")
+                ? "GB"
+                : (config.emsCountries[0]?.code ?? "GB")
+        );
+        setIntlTransport("air");
+        setIntlServiceId("air_letter");
+        setIntlRegistered(false);
+        setShowCountryWhyNote(false);
+    };
+
+    useEffect(() => {
+        resetCalculatorForMode(initialMode);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [initialMode]);
+
+    const handleModeChange = (mode: Destination) => {
+        resetCalculatorForMode(mode);
     };
 
     const handleIntlTransportChange = (transport: InternationalTransport) => {
         setIntlTransport(transport);
-        const currentMatches = activeIntlQuote.service.transport === transport;
-        if (!currentMatches) {
-            setIntlServiceId(transport === "air" ? "air_letter" : "sea_letter");
-        }
+        setWeight("20");
+        setIntlServiceId(transport === "air" ? "air_letter" : "sea_letter");
+        setIntlRegistered(false);
     };
 
     // Derive banner state for the active mode
