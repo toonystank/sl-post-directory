@@ -212,6 +212,11 @@ export default function AddOfficeModal({ children }: { children: React.ReactNode
                                         siteKey={turnstileSiteKey}
                                         onSuccess={(token) => setTurnstileToken(token)}
                                         onExpire={() => setTurnstileToken(null)}
+                                        onError={() => {
+                                            setTurnstileToken(null);
+                                            setError(true);
+                                            setMessage("Captcha failed to load. Please check your connection, system clock, or ad-blocker and try again.");
+                                        }}
                                     />
                                 </div>
                             )}

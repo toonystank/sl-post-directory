@@ -29,12 +29,13 @@ export async function GET(
     }
 
     try {
-        const office = await prisma.postOffice.findUnique({
-            where: { id },
-            include: {
-                fields: true,
-            }
-        });
+        const office =
+            (await prisma.postOffice.findUnique({
+                where: { id },
+                include: {
+                    fields: true,
+                }
+            })) ?? getLocalOfficeById(id);
 
         if (!office) {
             return NextResponse.json({ error: "Post office not found" }, { status: 404 });

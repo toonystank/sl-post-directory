@@ -162,8 +162,8 @@ export default async function OfficeDetails({ params }: { params: Promise<{ loca
             {
                 "@type": "ListItem",
                 "position": 2,
-                "name": "Post Offices",
-                "item": "https://lankapost.vercel.app/office"
+                "name": "Browse Post Offices",
+                "item": "https://lankapost.vercel.app/browse"
             },
             {
                 "@type": "ListItem",

@@ -10,7 +10,7 @@ export interface WeightTier {
  * Definition for a Sri Lanka Post postal service and its pricing brackets.
  */
 export interface PostalService {
-    id: string;                 // e.g., "letter", "open_article", "parcel", "courier", "speed_post", "state", "newspaper", "postcard"
+    id: string;                 // e.g., "letter", "open_article", "parcel", "courier", "state", "newspaper", "postcard"
     name: string;               // e.g., "Ordinary / Business Letter"
     shortName?: string;         // Compact label for mobile 2-col grid, e.g., "Letter"
     description?: string;
@@ -62,6 +62,11 @@ export interface EmsCountry {
     name: string; // e.g., "United States", "United Kingdom"
     zoneId: string;
     group?: CountryGroup;
+    emsMaxWeight?: number; // 20000 or 30000 grams
+    maxParcelWeight?: number; // 20000 or 30000 grams
+    emsTiers?: WeightTier[];
+    airParcelRate?: { first500g: number; additional500g: number; maxWeight?: number };
+    seaParcelRate?: { first1000g: number; additional1000g: number; maxWeight?: number };
     seaMailAvailable?: boolean;
     seaMailNote?: string;
     uPacketAvailable?: boolean;

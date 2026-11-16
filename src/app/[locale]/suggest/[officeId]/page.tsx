@@ -11,12 +11,14 @@ async function findOfficeForSuggest(officeId: string) {
         return getLocalOfficeById(officeId);
     }
     try {
-        return await prisma.postOffice.findUnique({
-            where: { id: officeId },
-            include: {
-                fields: true,
-            }
-        });
+        return (
+            (await prisma.postOffice.findUnique({
+                where: { id: officeId },
+                include: {
+                    fields: true,
+                }
+            })) ?? getLocalOfficeById(officeId)
+        );
     } catch {
         return getLocalOfficeById(officeId);
     }

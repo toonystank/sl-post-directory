@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect, useId, useMemo } from "react";
-import { Globe, MapPin, Banknote, Scale, AlertTriangle, Check, Plane, Ship, Info } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { Mail, Banknote, Scale, AlertTriangle, Check, Plane, Ship, Info } from "lucide-react";
 import Postmark from "@/components/brand/Postmark";
+import { MODE_COLORS, getServiceColor, serviceStyle } from "@/lib/service-colors";
 import {
     DEFAULT_RATE_CONFIG,
     calculateAllDomesticServices,
@@ -20,15 +22,27 @@ import {
 import { cn } from "@/lib/utils";
 
 const DOMESTIC_WEIGHT_PRESETS = [30, 100, 250, 500, 1000, 2000, 5000, 10000];
-const COD_WEIGHT_PRESETS = [250, 500, 1000, 2000, 5000, 10000, 20000];
+const COD_WEIGHT_PRESETS = [250, 500, 1000, 2000, 5000, 10000, 20000, 40000];
 const INTL_WEIGHT_PRESETS = [20, 50, 100, 250, 500, 1000, 2000, 5000];
 const COD_AMOUNT_PRESETS = [1000, 2500, 5000, 10000, 25000, 50000];
 
-const MODE_OPTIONS: { id: Destination; label: string; icon: typeof MapPin }[] = [
-    { id: "domestic", label: "Local", icon: MapPin },
+const MODE_OPTIONS: { id: Destination; label: string; icon: typeof Mail }[] = [
+    { id: "ems", label: "International", icon: Plane },
     { id: "cod", label: "COD", icon: Banknote },
-    { id: "ems", label: "International", icon: Globe },
+    { id: "domestic", label: "Local", icon: Mail },
 ];
+
+/** Index of the cheapest valid quote (only when 2+ are valid), else -1. */
+function cheapestIndex(prices: (number | null)[]): number {
+    let best = -1;
+    let valid = 0;
+    prices.forEach((p, i) => {
+        if (p === null || p <= 0) return;
+        valid++;
+        if (best === -1 || p < (prices[best] as number)) best = i;
+    });
+    return valid > 1 ? best : -1;
+}
 
 function sanitizeDigits(value: string): string {
     return value.replace(/[^\d]/g, "");
@@ -42,16 +56,101 @@ function formatCompactAmount(amount: number): string {
     return String(amount);
 }
 
-export default function PostageCalculator() {
+/** Colour-coded service tile: coloured left bar + dot, large coloured price, optional "Cheapest" badge. */
+function ServiceCard({
+    serviceId,
+    name,
+    selected,
+    dimmed,
+    cheapest,
+    cheapestLabel,
+    onSelect,
+    price,
+    note,
+    status,
+}: {
+    serviceId: string;
+    name: string;
+    selected: boolean;
+    dimmed: boolean;
+    cheapest: boolean;
+    cheapestLabel: string;
+    onSelect: () => void;
+    /** Total in LKR, or null when a status message should be shown instead */
+    price: number | null;
+    note?: string;
+    status?: { text: string; tone: "error" | "muted" };
+}) {
+    const color = getServiceColor(serviceId);
+    return (
+        <button
+            type="button"
+            onClick={onSelect}
+            aria-pressed={selected}
+            style={serviceStyle(color)}
+            className={cn(
+                "svc tap relative flex flex-col justify-between overflow-hidden rounded-md border-[1.5px] py-1.5 pl-3.5 pr-2.5 md:py-2 text-left transition-colors min-h-[58px]",
+                selected
+                    ? "border-[var(--c)] bg-[color-mix(in_srgb,var(--c)_10%,hsl(var(--card)))] shadow-[0_2px_0_0_var(--c)] ring-1 ring-[var(--c)]"
+                    : dimmed
+                        ? "border-border/70 bg-muted/40 opacity-70 hover:border-foreground/40"
+                        : "border-border bg-card hover:border-[var(--c)]"
+            )}
+        >
+            {/* Colour bar (EMS / airmail get a two-tone accent) */}
+            <span
+                aria-hidden="true"
+                className="absolute inset-y-0 left-0 w-1.5"
+                style={{ background: "linear-gradient(to bottom, var(--c) 0 65%, var(--ca) 65% 100%)" }}
+            />
+            <div className="flex items-center justify-between gap-1 w-full">
+                <span className="flex min-w-0 items-center gap-1.5">
+                    <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--c)]" />
+                    <span className="text-xs md:text-sm font-semibold text-foreground truncate">{name}</span>
+                </span>
+                <span className="flex shrink-0 items-center gap-1">
+                    {selected && <Check className="w-4 h-4 text-[var(--c)]" strokeWidth={3} aria-hidden="true" />}
+                </span>
+            </div>
+            <div className="flex items-center justify-between gap-1 w-full mt-0.5">
+                {price !== null ? (
+                    <span className="font-mono text-base md:text-lg font-bold text-[var(--c)] tabular-nums leading-tight">
+                        <span className="text-[11px] md:text-xs font-semibold">Rs.</span> {price.toLocaleString()}
+                    </span>
+                ) : (
+                    <span
+                        className={cn(
+                            "font-mono text-[11px] font-medium truncate",
+                            status?.tone === "error" ? "text-destructive" : "text-muted-foreground"
+                        )}
+                    >
+                        {status?.text ?? "—"}
+                    </span>
+                )}
+                <span className="flex shrink-0 items-center gap-1">
+                    {note && <span className="font-mono text-[10px] text-muted-foreground">{note}</span>}
+                    {cheapest && (
+                        <span className="rounded-full bg-green-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-green-800 dark:bg-green-900/50 dark:text-green-300">
+                            {cheapestLabel}
+                        </span>
+                    )}
+                </span>
+            </div>
+        </button>
+    );
+}
+
+export default function PostageCalculator({ initialMode = "ems" }: { initialMode?: Destination }) {
+    const t = useTranslations("Home");
     const [config, setConfig] = useState<RateConfig>(DEFAULT_RATE_CONFIG);
-    const [destination, setDestination] = useState<Destination>("domestic");
+    const [destination, setDestination] = useState<Destination>(initialMode);
     const [serviceId, setServiceId] = useState<string>("letter");
     const [emsCountryCode, setEmsCountryCode] = useState<string>("GB");
     const [intlTransport, setIntlTransport] = useState<InternationalTransport>("air");
     const [intlServiceId, setIntlServiceId] = useState<InternationalServiceId>("air_letter");
     const [intlRegistered, setIntlRegistered] = useState(false);
     const [showCountryWhyNote, setShowCountryWhyNote] = useState(false);
-    const [weight, setWeight] = useState<string>("30");
+    const [weight, setWeight] = useState<string>(initialMode === "cod" ? "250" : initialMode === "ems" ? "20" : "30");
     const [codAmount, setCodAmount] = useState<string>("2500");
     const [registered, setRegistered] = useState(false);
     const [arReceipt, setArReceipt] = useState(false);
@@ -182,6 +281,42 @@ export default function PostageCalculator() {
 
     const canIntlRegister = Boolean(activeIntlQuote.available && activeIntlQuote.service.supportsRegistration);
     const foreignRegFeeAmount = config.extraFees.foreignRegisteredPost ?? 870;
+
+    const domesticCheapest = useMemo(
+        () =>
+            cheapestIndex(
+                domesticQuotes.map(({ result }) =>
+                    result.error || result.exceedsMaxWeight ? null : result.totalCost
+                )
+            ),
+        [domesticQuotes]
+    );
+
+    const intlCheapest = useMemo(
+        () =>
+            cheapestIndex(
+                filteredIntlQuotes.map((q) =>
+                    !q.available || q.result.error || q.result.exceedsMaxWeight ? null : q.result.totalCost
+                )
+            ),
+        [filteredIntlQuotes]
+    );
+
+    // Colour of the currently highlighted result (drives the receipt banner)
+    const activeColor =
+        destination === "cod"
+            ? MODE_COLORS.cod
+            : destination === "ems"
+                ? getServiceColor(activeIntlQuote.service.id)
+                : getServiceColor(selectedService?.id);
+    const bannerStripe =
+        destination === "cod"
+            ? "bg-[var(--c)]"
+            : destination === "ems"
+                ? activeIntlQuote.service.id === "ems"
+                    ? "ems-stripe"
+                    : "par-avion-stripe"
+                : "airmail-stripe";
 
     const weightPresets =
         destination === "cod"
@@ -322,12 +457,12 @@ export default function PostageCalculator() {
             {/* 1. Segmented Mode Bar (native radios for arrow-key navigation + zero-click scanning) */}
             <fieldset className="contents">
                 <legend className="sr-only">Calculator mode</legend>
-                <div className="grid grid-cols-3 rounded-md border-2 border-foreground bg-card p-0.5">
+                <div className="grid grid-cols-3 gap-1 rounded-lg border-2 border-foreground bg-card p-1">
                     {MODE_OPTIONS.map(({ id, label, icon: Icon }) => {
                         const inputId = `${uid}-mode-${id}`;
                         const checked = destination === id;
                         return (
-                            <div key={id} className="flex">
+                            <div key={id} className="flex svc" style={serviceStyle(MODE_COLORS[id as keyof typeof MODE_COLORS])}>
                                 <input
                                     type="radio"
                                     id={inputId}
@@ -340,14 +475,14 @@ export default function PostageCalculator() {
                                 <label
                                     htmlFor={inputId}
                                     className={cn(
-                                        "tap flex w-full h-8 md:h-9 cursor-pointer items-center justify-center gap-1.5 rounded-[4px] px-2 text-xs md:text-sm font-semibold transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-ring peer-focus-visible:outline-offset-1",
+                                        "tap flex w-full min-h-[56px] md:min-h-[60px] cursor-pointer flex-col items-center justify-center gap-0.5 rounded-md px-1.5 py-1.5 text-xs md:text-sm font-bold transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-ring peer-focus-visible:outline-offset-1",
                                         checked
-                                            ? "bg-foreground text-background"
-                                            : "text-muted-foreground hover:text-foreground"
+                                            ? "bg-[var(--c)] text-white dark:text-background shadow-[0_2px_0_0_hsl(var(--foreground))]"
+                                            : "text-[var(--c)] hover:bg-muted"
                                     )}
                                 >
-                                    <Icon className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" aria-hidden="true" />
-                                    <span>{label}</span>
+                                    <Icon className="w-6 h-6 md:w-7 md:h-7 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+                                    <span className="leading-tight">{label}</span>
                                 </label>
                             </div>
                         );
@@ -359,13 +494,14 @@ export default function PostageCalculator() {
             <div
                 role="status"
                 aria-live="polite"
-                className="rounded-md border-2 border-foreground bg-card overflow-hidden shadow-[3px_3px_0_0_hsl(var(--foreground))]"
+                className="svc rounded-md border-2 border-foreground bg-card overflow-hidden shadow-[3px_3px_0_0_hsl(var(--foreground))]"
+                style={serviceStyle(activeColor)}
             >
-                <div className="airmail-stripe h-1 md:h-1.5" aria-hidden="true" />
+                <div className={cn("h-1.5 md:h-2", bannerStripe)} aria-hidden="true" />
                 <div className="px-3 py-2 md:px-5 md:py-4">
                     <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0">
-                            <p className="font-heading text-sm md:text-base font-extrabold [font-stretch:85%] truncate text-foreground">
+                            <p className="font-heading text-sm md:text-base font-extrabold [font-stretch:85%] line-clamp-2 leading-tight text-foreground">
                                 {banner.title}
                             </p>
                             {banner.error ? (
@@ -387,8 +523,8 @@ export default function PostageCalculator() {
                                 </span>
                                 <span
                                     className={cn(
-                                        "font-mono text-2xl md:text-4xl font-semibold tabular-nums leading-tight",
-                                        banner.error ? "text-muted-foreground" : "text-primary"
+                                        "font-mono text-3xl md:text-4xl font-bold tabular-nums leading-tight",
+                                        banner.error ? "text-muted-foreground" : "text-[var(--c)]"
                                     )}
                                 >
                                     {banner.total !== null ? `Rs. ${banner.total.toLocaleString()}` : "—"}
@@ -493,51 +629,26 @@ export default function PostageCalculator() {
                     <fieldset className="contents">
                         <legend className="label-mono">Select Service · Live Prices</legend>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 md:gap-2">
-                            {domesticQuotes.map(({ service, result }) => {
-                                const isSelected = selectedService?.id === service.id;
+                            {domesticQuotes.map(({ service, result }, i) => {
                                 const isOver = Boolean(result.exceedsMaxWeight);
                                 return (
-                                    <button
+                                    <ServiceCard
                                         key={service.id}
-                                        type="button"
-                                        onClick={() => setServiceId(service.id)}
-                                        aria-pressed={isSelected}
-                                        className={cn(
-                                            "tap flex flex-col justify-between rounded-md border-[1.5px] px-2.5 py-1.5 md:py-2 text-left transition-colors min-h-[44px]",
-                                            isSelected
-                                                ? "border-foreground bg-secondary/35 shadow-[0_2px_0_0_hsl(var(--foreground))]"
-                                                : isOver
-                                                    ? "border-border/70 bg-muted/40 opacity-75 hover:border-foreground/40"
-                                                    : "border-border bg-card hover:border-foreground/50"
-                                        )}
-                                    >
-                                        <div className="flex items-center justify-between gap-1 w-full">
-                                            <span className="text-xs md:text-sm font-semibold text-foreground truncate">
-                                                {service.shortName || service.name}
-                                            </span>
-                                            {isSelected && (
-                                                <Check className="w-3.5 h-3.5 shrink-0 text-foreground" aria-hidden="true" />
-                                            )}
-                                        </div>
-                                        <div className="flex items-baseline justify-between gap-1 w-full mt-0.5">
-                                            {isOver && result.maxWeight ? (
-                                                <span className="font-mono text-[11px] font-medium text-destructive">
-                                                    Max {formatWeightLabel(result.maxWeight)}
-                                                </span>
-                                            ) : result.error ? (
-                                                <span className="font-mono text-[11px] text-muted-foreground">
-                                                    —
-                                                </span>
-                                            ) : (
-                                                <span className="font-mono text-xs md:text-sm font-bold text-primary tabular-nums">
-                                                    Rs. {result.totalCost.toLocaleString()}
-                                                </span>
-                                            )}
-                                            {service.flatRate && !isOver && (
-                                                <span className="font-mono text-[10px] text-muted-foreground">Flat</span>
-                                            )}
-                                        </div>
-                                    </button>
+                                        serviceId={service.id}
+                                        name={service.shortName || service.name}
+                                        selected={selectedService?.id === service.id}
+                                        dimmed={isOver}
+                                        cheapest={i === domesticCheapest}
+                                        cheapestLabel={t("cheapest")}
+                                        onSelect={() => setServiceId(service.id)}
+                                        price={isOver || result.error ? null : result.totalCost}
+                                        status={
+                                            isOver && result.maxWeight
+                                                ? { text: `Max ${formatWeightLabel(result.maxWeight)}`, tone: "error" }
+                                                : { text: "—", tone: "muted" }
+                                        }
+                                        note={service.flatRate && !isOver ? "Flat" : undefined}
+                                    />
                                 );
                             })}
                         </div>
@@ -562,7 +673,7 @@ export default function PostageCalculator() {
                                 checked={registered && canRegister}
                                 disabled={!canRegister}
                                 onChange={(e) => setRegistered(e.target.checked)}
-                                className="h-4 w-4 shrink-0 rounded-sm border-foreground accent-primary cursor-pointer disabled:cursor-not-allowed"
+                                className="h-4 w-4 shrink-0 rounded-sm border-foreground accent-[#1E40AF] cursor-pointer disabled:cursor-not-allowed"
                             />
                             <label
                                 htmlFor={regCheckboxId}
@@ -763,11 +874,11 @@ export default function PostageCalculator() {
                                     className={cn(
                                         "tap flex items-center justify-center gap-1 rounded-[4px] px-2.5 text-xs md:text-sm font-semibold transition-colors",
                                         intlTransport === "air"
-                                            ? "bg-foreground text-background"
+                                            ? "bg-[#1D4E9E] text-white"
                                             : "text-muted-foreground hover:text-foreground"
                                     )}
                                 >
-                                    <Plane className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                                    <Plane className="w-4 h-4 shrink-0" aria-hidden="true" />
                                     <span>Air</span>
                                 </button>
                                 <button
@@ -777,11 +888,11 @@ export default function PostageCalculator() {
                                     className={cn(
                                         "tap flex items-center justify-center gap-1 rounded-[4px] px-2.5 text-xs md:text-sm font-semibold transition-colors",
                                         intlTransport === "sea"
-                                            ? "bg-foreground text-background"
+                                            ? "bg-[#0E4A6B] text-white"
                                             : "text-muted-foreground hover:text-foreground"
                                     )}
                                 >
-                                    <Ship className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                                    <Ship className="w-4 h-4 shrink-0" aria-hidden="true" />
                                     <span>Sea</span>
                                 </button>
                             </div>
@@ -824,53 +935,29 @@ export default function PostageCalculator() {
                             {intlTransport === "air" ? "Air Mail Services · Live Prices" : "Sea Mail Services · Live Prices"}
                         </legend>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 md:gap-2">
-                            {filteredIntlQuotes.map((quote) => {
-                                const isSelected = activeIntlQuote.service.id === quote.service.id;
+                            {filteredIntlQuotes.map((quote, i) => {
                                 const isOver = quote.available && Boolean(quote.result.exceedsMaxWeight);
+                                const hasPrice = quote.available && !isOver && !quote.result.error;
                                 return (
-                                    <button
+                                    <ServiceCard
                                         key={quote.service.id}
-                                        type="button"
-                                        onClick={() => setIntlServiceId(quote.service.id)}
-                                        aria-pressed={isSelected}
-                                        className={cn(
-                                            "tap flex flex-col justify-between rounded-md border-[1.5px] px-2.5 py-1.5 md:py-2 text-left transition-colors min-h-[42px]",
-                                            isSelected
-                                                ? "border-foreground bg-secondary/35 shadow-[0_2px_0_0_hsl(var(--foreground))]"
-                                                : !quote.available || isOver
-                                                    ? "border-border/70 bg-muted/40 opacity-75 hover:border-foreground/40"
-                                                    : "border-border bg-card hover:border-foreground/50"
-                                        )}
-                                    >
-                                        <div className="flex items-center justify-between gap-1 w-full">
-                                            <span className="text-xs md:text-sm font-semibold text-foreground truncate">
-                                                {quote.service.shortName}
-                                            </span>
-                                            {isSelected && (
-                                                <Check className="w-3.5 h-3.5 shrink-0 text-foreground" aria-hidden="true" />
-                                            )}
-                                        </div>
-                                        <div className="flex items-baseline justify-between gap-1 w-full mt-0.5">
-                                            {!quote.available ? (
-                                                <span className="font-mono text-[10px] md:text-[11px] font-medium text-destructive truncate">
-                                                    {quote.shortUnavailableTag ?? "Unavailable"}
-                                                </span>
-                                            ) : isOver && quote.result.maxWeight ? (
-                                                <span className="font-mono text-[11px] font-medium text-destructive">
-                                                    Max {formatWeightLabel(quote.result.maxWeight)}
-                                                </span>
-                                            ) : quote.result.error ? (
-                                                <span className="font-mono text-[11px] text-muted-foreground">—</span>
-                                            ) : (
-                                                <span className="font-mono text-xs md:text-sm font-bold text-primary tabular-nums">
-                                                    Rs. {quote.result.totalCost.toLocaleString()}
-                                                </span>
-                                            )}
-                                            {quote.available && quote.service.supportsRegistration && intlRegistered && !quote.result.error && (
-                                                <span className="font-mono text-[10px] text-muted-foreground">Reg</span>
-                                            )}
-                                        </div>
-                                    </button>
+                                        serviceId={quote.service.id}
+                                        name={quote.service.shortName}
+                                        selected={activeIntlQuote.service.id === quote.service.id}
+                                        dimmed={!quote.available || isOver}
+                                        cheapest={i === intlCheapest}
+                                        cheapestLabel={t("cheapest")}
+                                        onSelect={() => setIntlServiceId(quote.service.id)}
+                                        price={hasPrice ? quote.result.totalCost : null}
+                                        status={
+                                            !quote.available
+                                                ? { text: quote.shortUnavailableTag ?? "Unavailable", tone: "error" }
+                                                : isOver && quote.result.maxWeight
+                                                    ? { text: `Max ${formatWeightLabel(quote.result.maxWeight)}`, tone: "error" }
+                                                    : { text: "—", tone: "muted" }
+                                        }
+                                        note={hasPrice && quote.service.supportsRegistration && intlRegistered ? "Reg" : undefined}
+                                    />
                                 );
                             })}
                         </div>
@@ -893,7 +980,7 @@ export default function PostageCalculator() {
                                 checked={intlRegistered && canIntlRegister}
                                 disabled={!canIntlRegister}
                                 onChange={(e) => setIntlRegistered(e.target.checked)}
-                                className="h-4 w-4 shrink-0 rounded-sm border-foreground accent-primary cursor-pointer disabled:cursor-not-allowed"
+                                className="h-4 w-4 shrink-0 rounded-sm border-foreground accent-[#1E40AF] cursor-pointer disabled:cursor-not-allowed"
                             />
                             <label
                                 htmlFor={intlRegCheckboxId}
@@ -915,8 +1002,8 @@ export default function PostageCalculator() {
                             </span>
                             <span className="font-mono text-xs font-semibold text-foreground mt-0.5 truncate">
                                 {activeIntlQuote.service.id === "ems"
-                                    ? `${activeEmsZone?.name ?? "Zone"}`
-                                    : `Group ${activeEmsCountry?.group ?? "—"} · Max ${formatWeightLabel(activeIntlQuote.service.maxWeight)}`}
+                                    ? `${activeEmsZone?.name ?? "EMS"} · Max ${formatWeightLabel(activeIntlQuote.result.maxWeight ?? activeIntlQuote.service.maxWeight)}`
+                                    : `Group ${activeEmsCountry?.group ?? "—"} · Max ${formatWeightLabel(activeIntlQuote.result.maxWeight ?? activeIntlQuote.service.maxWeight)}`}
                             </span>
                         </div>
                     </div>

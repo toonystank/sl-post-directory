@@ -70,6 +70,7 @@
     "titleOffice": "Post office",
     "titleSuggest": "Suggest an edit",
     "titleRegister": "Create account",
+    "titlePrivacy": "Privacy policy",
     "disclaimerShort": "Independent community directory · not affiliated with Sri Lanka Post"
   },
   "More": {
@@ -83,7 +84,8 @@
     "loginCta": "Log in to contribute",
     "aboutTitle": "About this app",
     "disclaimer": "Lanka Post Directory is an independent, community-maintained project. It is not affiliated with or endorsed by Sri Lanka Post. Always confirm hours with the office before you travel.",
-    "openSource": "Open source on GitHub"
+    "openSource": "Open source on GitHub",
+    "privacy": "Privacy policy"
   },
   "Footer": {
     "disclaimer": "An independent, community-maintained directory of Sri Lankan post offices. Not affiliated with or endorsed by Sri Lanka Post.",
@@ -92,6 +94,7 @@
     "project": "Project",
     "source": "Source code",
     "contribute": "Contribute data",
+    "privacy": "Privacy policy",
     "rights": "Data provided as-is."
   },
   "Home": {
@@ -102,6 +105,13 @@
     "quickTools": "Quick tools",
     "toolPostcode": "Postcode lookup",
     "toolRates": "Postage rates",
+    "toolIntl": "International",
+    "toolIntlSub": "Air & sea mail",
+    "toolCod": "COD",
+    "toolCodSub": "Cash on delivery",
+    "toolLocal": "Local post",
+    "toolLocalSub": "Letters, parcels, courier",
+    "cheapest": "Cheapest",
     "toolGuides": "Guides",
     "latestGuides": "Latest guides",
     "viewAll": "View all",

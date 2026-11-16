@@ -3,10 +3,10 @@ const prisma = new PrismaClient();
 
 async function main() {
     const vars = [
-        { key: "register_post", value: "50", description: "Registration fee for domestic mail (LKR)" },
-        { key: "ordinary_post", value: "15", description: "Base price for ordinary letter (LKR)" },
-        { key: "speed_post", value: "1500", description: "Base price for Speed Post / EMS (LKR)" },
-        { key: "cod", value: "100", description: "Cash on Delivery fee (LKR)" }
+        { key: "register_post", value: "60", description: "Registration fee for domestic mail (LKR)" },
+        { key: "ordinary_post", value: "70", description: "Base price for ordinary letter up to 30g (LKR)" },
+        { key: "slp_courier", value: "200", description: "Base price for SLP Courier (formerly Speed Post) up to 250g (LKR)" },
+        { key: "cod", value: "50", description: "Cash on Delivery fixed service fee (LKR)" }
     ];
 
     for (const v of vars) {

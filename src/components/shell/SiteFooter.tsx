@@ -32,6 +32,7 @@ export default async function SiteFooter() {
                             </a>
                         </li>
                         <li><Link href="/login" className="hover:text-primary">{t("contribute")}</Link></li>
+                        <li><Link href="/privacy" className="hover:text-primary">{t("privacy")}</Link></li>
                     </ul>
                 </div>
             </div>
