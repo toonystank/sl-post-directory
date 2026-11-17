@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { Link, usePathname, useRouter } from "@/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useTranslations } from "next-intl";
@@ -8,6 +9,7 @@ import { ArrowLeft, LogOut, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import LanguageSwitcher from "./LanguageSwitcher";
+import CurrencySwitcher from "./CurrencySwitcher";
 import StampLogo from "./brand/StampLogo";
 
 /**
@@ -21,15 +23,26 @@ export default function Navbar() {
     const { data: session } = useSession();
     const t = useTranslations("Nav");
     const tApp = useTranslations("App");
+    const [scrolled, setScrolled] = React.useState(false);
+
+    React.useEffect(() => {
+        const onScroll = () => setScrolled(window.scrollY > 4);
+        onScroll();
+        window.addEventListener("scroll", onScroll, { passive: true });
+        return () => window.removeEventListener("scroll", onScroll);
+    }, []);
+
     const user = session?.user as { name?: string | null; role?: string } | undefined;
     const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN" || user?.role === "MODERATOR";
 
     const isHome = pathname === "/";
-    const isTabRoot = ["/", "/browse", "/calculator", "/blog"].includes(pathname);
+    const isRatesPage = pathname.startsWith("/calculator");
+    const isTabRoot = ["/", "/browse", "/calculator", "/track", "/blog"].includes(pathname);
 
     const mobileTitle =
         pathname.startsWith("/browse") ? tApp("tabBrowse")
         : pathname.startsWith("/calculator") ? tApp("titleRates")
+        : pathname.startsWith("/track") ? tApp("titleTrack")
         : pathname === "/blog" ? tApp("titleGuides")
         : pathname.startsWith("/blog/") ? tApp("titleGuide")
         : pathname.startsWith("/office/") ? tApp("titleOffice")
@@ -41,8 +54,10 @@ export default function Navbar() {
         : "";
 
     const navItems = [
-        { href: "/", label: t("directory"), active: isHome || pathname.startsWith("/office") || pathname.startsWith("/browse") },
+        { href: "/", label: t("home"), active: isHome },
         { href: "/calculator", label: t("calculator"), active: pathname.startsWith("/calculator") },
+        { href: "/browse", label: t("browse"), active: pathname.startsWith("/browse") || pathname.startsWith("/office") },
+        { href: "/track", label: t("track"), active: pathname.startsWith("/track") },
         { href: "/blog", label: t("blog"), active: pathname.startsWith("/blog") },
         ...(isAdmin ? [{ href: "/dashboard", label: t("dashboard"), active: pathname.startsWith("/dashboard") }] : []),
     ];
@@ -62,9 +77,14 @@ export default function Navbar() {
                 </div>
             </div>
 
-            <header className="sticky top-0 z-50 w-full border-b-2 border-foreground bg-background pt-safe">
+            <header
+                className={cn(
+                    "sticky top-0 z-50 w-full bg-background pt-safe transition-colors duration-150 border-b-2",
+                    scrolled ? "border-foreground" : "border-transparent"
+                )}
+            >
                 {/* ===== Mobile app bar ===== */}
-                <div className="md:hidden flex h-[var(--appbar-h)] items-center gap-2 px-3">
+                <div className="md:hidden flex h-[50px] items-center gap-2 px-3">
                     {isTabRoot && isHome ? (
                         <Link href="/" aria-label={tApp("home")} className="tap">
                             <StampLogo size={32} />
@@ -81,7 +101,8 @@ export default function Navbar() {
                             </span>
                         </>
                     )}
-                    <div className="ml-auto flex items-center">
+                    <div className="ml-auto flex items-center gap-1.5">
+                        {isRatesPage && <CurrencySwitcher />}
                         <LanguageSwitcher />
                     </div>
                 </div>
@@ -110,6 +131,7 @@ export default function Navbar() {
                     </nav>
 
                     <div className="flex items-center gap-2">
+                        {isRatesPage && <CurrencySwitcher />}
                         <LanguageSwitcher />
                         <ThemeToggle />
                         {session ? (

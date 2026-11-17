@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { Camera, X, CheckCircle, Loader2 } from "lucide-react";
 
@@ -14,6 +15,7 @@ const UPLOADCARE_CDN_BASE = process.env.NEXT_PUBLIC_UPLOADCARE_CDN || "https://3
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 export default function PhotoUpload({ officeId, onUploadComplete }: PhotoUploadProps) {
+    const t = useTranslations("Photos");
     const [isUploading, setIsUploading] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
@@ -76,7 +78,7 @@ export default function PhotoUpload({ officeId, onUploadComplete }: PhotoUploadP
             <div className="relative rounded-md overflow-hidden border border-status-open/40 bg-status-open/10 p-4">
                 <div className="flex items-center gap-3">
                     <CheckCircle className="w-5 h-5 text-status-open shrink-0" />
-                    <p className="text-sm text-status-open font-medium">Photo uploaded successfully!</p>
+                    <p className="text-sm text-status-open font-medium">{t("uploadSuccess")}</p>
                     <button
                         onClick={() => { setUploadedUrl(null); setError(null); }}
                         className="ml-auto text-muted-foreground hover:text-foreground transition-colors"
@@ -120,7 +122,7 @@ export default function PhotoUpload({ officeId, onUploadComplete }: PhotoUploadP
                 {isUploading ? (
                     <div className="flex flex-col items-center gap-3">
                         <Loader2 className="w-10 h-10 text-primary animate-spin" />
-                        <p className="text-sm text-muted-foreground">Uploading photo...</p>
+                        <p className="text-sm text-muted-foreground">{t("uploading")}</p>
                     </div>
                 ) : (
                     <div className="flex flex-col items-center gap-3">
@@ -128,8 +130,8 @@ export default function PhotoUpload({ officeId, onUploadComplete }: PhotoUploadP
                             <Camera className="w-6 h-6" />
                         </div>
                         <div>
-                            <p className="text-sm font-medium">Drop a photo or click to upload</p>
-                            <p className="text-xs text-muted-foreground mt-1">JPG, PNG up to 5MB</p>
+                            <p className="text-sm font-medium">{t("dropOrClick")}</p>
+                            <p className="text-xs text-muted-foreground mt-1">{t("fileLimits")}</p>
                         </div>
                     </div>
                 )}

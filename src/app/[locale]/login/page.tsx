@@ -3,6 +3,7 @@
 import { signIn } from "next-auth/react";
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Mail, Lock, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Link, useRouter } from "@/navigation";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import StampLogo from "@/components/brand/StampLogo";
 
 function LoginForm() {
+    const t = useTranslations("Auth");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [token, setToken] = useState("");
@@ -56,14 +58,14 @@ function LoginForm() {
         <div className="p-6 md:p-8">
             <div className="mb-6">
                 <StampLogo size={36} />
-                <h1 className="display text-3xl mt-4">Welcome Back</h1>
-                <p className="text-sm text-muted-foreground mt-1">Sign in to manage contributions</p>
+                <h1 className="display text-3xl mt-4">{t("loginTitle")}</h1>
+                <p className="text-sm text-muted-foreground mt-1">{t("loginSub")}</p>
             </div>
 
             {isVerified && !error && (
                 <div className="mb-5 p-3.5 rounded-md bg-status-open/10 border border-status-open/40 flex items-center gap-3 text-status-open">
                     <CheckCircle2 className="w-5 h-5 shrink-0" />
-                    <p className="text-sm font-medium">Your email has been verified! You can now sign in.</p>
+                    <p className="text-sm font-medium">{t("verifiedMsg")}</p>
                 </div>
             )}
 
@@ -79,7 +81,7 @@ function LoginForm() {
                     <>
                         <div>
                             <label className="label-mono block mb-1.5" htmlFor="email">
-                                Email Address
+                                {t("emailLabel")}
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted-foreground">
@@ -99,7 +101,7 @@ function LoginForm() {
 
                         <div>
                             <label className="label-mono block mb-1.5" htmlFor="password">
-                                Password
+                                {t("passwordLabel")}
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted-foreground">
@@ -123,20 +125,20 @@ function LoginForm() {
                             className="w-full h-11 mt-2 text-base"
                             size="lg"
                         >
-                            {loading ? "Signing in..." : "Sign In"}
+                            {loading ? t("signingIn") : t("signIn")}
                         </Button>
                     </>
                 ) : (
                     <div className="space-y-4">
                         <div className="border-y border-border py-3">
-                            <h2 className="font-heading text-lg font-extrabold [font-stretch:82%]">Two-Factor Authentication</h2>
+                            <h2 className="font-heading text-lg font-extrabold [font-stretch:82%]">{t("twoFactorTitle")}</h2>
                             <p className="text-sm text-muted-foreground mt-0.5">
-                                Enter the 6-digit code from your authenticator app
+                                {t("twoFactorSub")}
                             </p>
                         </div>
                         <div>
                             <label className="label-mono block mb-1.5" htmlFor="token">
-                                Authentication Code
+                                {t("authCodeLabel")}
                             </label>
                             <Input
                                 id="token"
@@ -160,7 +162,7 @@ function LoginForm() {
                                 className="w-full h-11 text-base"
                                 size="lg"
                             >
-                                {loading ? "Verifying..." : "Verify Code"}
+                                {loading ? t("verifying") : t("verifyCode")}
                             </Button>
 
                             <Button
@@ -174,7 +176,7 @@ function LoginForm() {
                                     setError("");
                                 }}
                             >
-                                &larr; Back to Sign In
+                                &larr; {t("backToSignIn")}
                             </Button>
                         </div>
                     </div>
@@ -183,9 +185,9 @@ function LoginForm() {
 
             {!show2FA && (
                 <div className="mt-6 pt-4 border-t border-border text-center text-sm text-muted-foreground">
-                    Don&apos;t have an account?{" "}
+                    {t("noAccount")}{" "}
                     <Link href="/register" className="text-primary hover:underline font-semibold">
-                        Register
+                        {t("registerLink")}
                     </Link>
                 </div>
             )}
@@ -194,12 +196,13 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
+    const t = useTranslations("Auth");
     return (
         <div className="min-h-[calc(100dvh-var(--appbar-h))] md:min-h-[calc(100vh-8rem)] flex items-stretch md:items-center justify-center md:p-6">
             <div className="w-full md:max-w-md flex flex-col rounded-none md:rounded-md md:border-2 border-foreground bg-card overflow-hidden md:shadow-[5px_5px_0_0_hsl(var(--foreground))]">
                 <div className="airmail-stripe h-2 shrink-0" aria-hidden="true" />
                 <div className="flex-1 flex flex-col justify-center">
-                    <Suspense fallback={<div className="p-8 text-center font-mono text-sm text-muted-foreground">Loading form...</div>}>
+                    <Suspense fallback={<div className="p-8 text-center font-mono text-sm text-muted-foreground">{t("loadingForm")}</div>}>
                         <LoginForm />
                     </Suspense>
                 </div>

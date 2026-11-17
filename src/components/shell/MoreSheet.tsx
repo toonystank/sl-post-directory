@@ -5,8 +5,10 @@ import { useLocale, useTranslations } from "next-intl";
 import { useTheme } from "next-themes";
 import { useSession, signOut } from "next-auth/react";
 import { Link, usePathname, useRouter } from "@/navigation";
-import { Sun, Moon, MonitorSmartphone, LogIn, LogOut, User, LayoutDashboard, Github, Check } from "lucide-react";
+import { Sun, Moon, MonitorSmartphone, LogIn, LogOut, User, LayoutDashboard, Github, Check, BookOpen } from "lucide-react";
 import { Sheet, SheetContent } from "./Sheet";
+import { useCurrency } from "@/context/CurrencyContext";
+import { CURRENCY_META, type Currency } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 
 const LOCALES = [
@@ -41,6 +43,7 @@ export default function MoreSheet({ open, onOpenChange }: MoreSheetProps) {
     const router = useRouter();
     const pathname = usePathname();
     const { theme, setTheme } = useTheme();
+    const { currency, setCurrency } = useCurrency();
     const { data: session } = useSession();
     const user = session?.user as { name?: string | null; role?: string } | undefined;
     const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN" || user?.role === "MODERATOR";
@@ -77,6 +80,36 @@ export default function MoreSheet({ open, onOpenChange }: MoreSheetProps) {
                     </div>
                 </section>
 
+                {/* Currency — only relevant on the Rates tab */}
+                {pathname?.startsWith("/calculator") && (
+                    <section className="mb-5">
+                        <h3 className="label-mono mb-2">{t("currency")}</h3>
+                        <div className="grid grid-cols-2 gap-2">
+                            {(["LKR", "USD"] as Currency[]).map((code) => {
+                                const meta = CURRENCY_META[code];
+                                const active = currency === code;
+                                return (
+                                    <button
+                                        key={code}
+                                        type="button"
+                                        onClick={() => setCurrency(code)}
+                                        className={cn(
+                                            "tap flex h-12 items-center justify-center gap-2 rounded-md border-2 text-sm font-bold",
+                                            active
+                                                ? "border-foreground bg-foreground text-background"
+                                                : "border-border hover:border-foreground/40"
+                                        )}
+                                        aria-pressed={active}
+                                    >
+                                        <span className="font-mono text-base">{meta.symbol}</span>
+                                        <span>{code}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </section>
+                )}
+
                 {/* Theme */}
                 <section className="mb-5">
                     <h3 className="label-mono mb-2">{t("appearance")}</h3>
@@ -105,10 +138,13 @@ export default function MoreSheet({ open, onOpenChange }: MoreSheetProps) {
                     </div>
                 </section>
 
-                {/* Account */}
+                {/* Account & Quick Links */}
                 <section className="mb-5">
                     <h3 className="label-mono mb-1">{t("account")}</h3>
                     <div className="-mx-3">
+                        <Link href="/blog" onClick={close} className="tap flex items-center gap-3 rounded-md px-3 py-3 font-medium hover:bg-muted">
+                            <BookOpen className="h-5 w-5 text-muted-foreground" /> {tNav("blog")}
+                        </Link>
                         {session ? (
                             <>
                                 <Link href="/dashboard/profile" onClick={close} className="tap flex items-center gap-3 rounded-md px-3 py-3 hover:bg-muted">

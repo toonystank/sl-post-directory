@@ -1,10 +1,32 @@
 "use client";
 
 import { useState, useEffect, useId, useMemo } from "react";
-import { useTranslations } from "next-intl";
-import { Mail, Banknote, Scale, AlertTriangle, Check, Plane, Ship, Info } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
+import {
+    Mail,
+    Banknote,
+    Scale,
+    AlertTriangle,
+    Check,
+    Plane,
+    Ship,
+    Info,
+    Minus,
+    Plus,
+    ChevronDown,
+} from "lucide-react";
 import Postmark from "@/components/brand/Postmark";
+import CountryFlag from "@/components/brand/CountryFlag";
+import { useCurrency } from "@/context/CurrencyContext";
+import { CURRENCY_META, Currency, formatCurrencyAmount, splitCurrencyPrice } from "@/lib/currency";
 import { MODE_COLORS, getServiceColor, serviceStyle } from "@/lib/service-colors";
+import {
+    getLocalizedCountryName,
+    getLocalizedZoneName,
+    getServiceTagline,
+    stepCodAmount,
+    stepWeight,
+} from "@/lib/calculator-ui";
 import {
     DEFAULT_RATE_CONFIG,
     calculateAllDomesticServices,
@@ -25,12 +47,6 @@ const DOMESTIC_WEIGHT_PRESETS = [30, 100, 250, 500, 1000, 2000, 5000, 10000];
 const COD_WEIGHT_PRESETS = [250, 500, 1000, 2000, 5000, 10000, 20000, 40000];
 const INTL_WEIGHT_PRESETS = [20, 50, 100, 250, 500, 1000, 2000, 5000];
 const COD_AMOUNT_PRESETS = [1000, 2500, 5000, 10000, 25000, 50000];
-
-const MODE_OPTIONS: { id: Destination; label: string; icon: typeof Mail }[] = [
-    { id: "ems", label: "International", icon: Plane },
-    { id: "cod", label: "COD", icon: Banknote },
-    { id: "domestic", label: "Local", icon: Mail },
-];
 
 /** Index of the cheapest valid quote (only when 2+ are valid), else -1. */
 function cheapestIndex(prices: (number | null)[]): number {
@@ -56,7 +72,24 @@ function formatCompactAmount(amount: number): string {
     return String(amount);
 }
 
-/** Colour-coded service tile: coloured left bar + dot, large coloured price, optional "Cheapest" badge. */
+/** Numbered step badge ("1", "2", "3") for clear visual flow */
+function StepBadge({ step }: { step: number }) {
+    return (
+        <span
+            aria-hidden="true"
+            className="inline-flex h-4 w-4 md:h-5 md:w-5 shrink-0 items-center justify-center rounded-[4px] bg-foreground font-mono text-[10px] md:text-[11px] font-bold text-background"
+        >
+            {step}
+        </span>
+    );
+}
+
+/**
+ * Colour-coded service tile:
+ * - Full-width service title on top row so names like "Printed Matter" or Sinhala/Tamil titles never get cut off.
+ * - "CHEAPEST" pill placed in the bottom-right corner next to the price.
+ * - Selected state shows a solid service-coloured top header bar ("SELECTED · [ShortTag] ✓").
+ */
 function ServiceCard({
     serviceId,
     name,
@@ -64,6 +97,10 @@ function ServiceCard({
     dimmed,
     cheapest,
     cheapestLabel,
+    selectedCardHeader,
+    locale,
+    currency,
+    lkrPerUsd,
     onSelect,
     price,
     note,
@@ -75,6 +112,10 @@ function ServiceCard({
     dimmed: boolean;
     cheapest: boolean;
     cheapestLabel: string;
+    selectedCardHeader: string;
+    locale: string;
+    currency: Currency;
+    lkrPerUsd: number;
     onSelect: () => void;
     /** Total in LKR, or null when a status message should be shown instead */
     price: number | null;
@@ -82,6 +123,10 @@ function ServiceCard({
     status?: { text: string; tone: "error" | "muted" };
 }) {
     const color = getServiceColor(serviceId);
+    const tagline = getServiceTagline(serviceId, locale);
+    const isIndic = locale === "si" || locale === "ta";
+    const priceParts = price !== null ? splitCurrencyPrice(price, currency, lkrPerUsd) : null;
+
     return (
         <button
             type="button"
@@ -89,65 +134,123 @@ function ServiceCard({
             aria-pressed={selected}
             style={serviceStyle(color)}
             className={cn(
-                "svc tap relative flex flex-col justify-between overflow-hidden rounded-md border-[1.5px] py-1.5 pl-3.5 pr-2.5 md:py-2 text-left transition-colors min-h-[58px]",
+                "svc tap relative flex flex-col justify-between overflow-hidden rounded-md text-left transition-all min-h-[56px] md:min-h-[76px] lg:min-h-[96px]",
                 selected
-                    ? "border-[var(--c)] bg-[color-mix(in_srgb,var(--c)_10%,hsl(var(--card)))] shadow-[0_2px_0_0_var(--c)] ring-1 ring-[var(--c)]"
+                    ? "border-2 border-[var(--c)] bg-[color-mix(in_srgb,var(--c)_13%,hsl(var(--card)))] shadow-[0_2px_0_0_var(--c)] ring-1 ring-[var(--c)]/40"
                     : dimmed
-                        ? "border-border/70 bg-muted/40 opacity-70 hover:border-foreground/40"
-                        : "border-border bg-card hover:border-[var(--c)]"
+                        ? "border-[1.5px] border-border/70 bg-muted/40 opacity-70 hover:border-foreground/40"
+                        : "border-[1.5px] border-border bg-card hover:border-[var(--c)]"
             )}
         >
-            {/* Colour bar (EMS / airmail get a two-tone accent) */}
-            <span
-                aria-hidden="true"
-                className="absolute inset-y-0 left-0 w-1.5"
-                style={{ background: "linear-gradient(to bottom, var(--c) 0 65%, var(--ca) 65% 100%)" }}
-            />
-            <div className="flex items-center justify-between gap-1 w-full">
-                <span className="flex min-w-0 items-center gap-1.5">
-                    <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--c)]" />
-                    <span className="text-xs md:text-sm font-semibold text-foreground truncate">{name}</span>
-                </span>
-                <span className="flex shrink-0 items-center gap-1">
-                    {selected && <Check className="w-4 h-4 text-[var(--c)]" strokeWidth={3} aria-hidden="true" />}
-                </span>
-            </div>
-            <div className="flex items-center justify-between gap-1 w-full mt-0.5">
-                {price !== null ? (
-                    <span className="font-mono text-base md:text-lg font-bold text-[var(--c)] tabular-nums leading-tight">
-                        <span className="text-[11px] md:text-xs font-semibold">Rs.</span> {price.toLocaleString()}
-                    </span>
-                ) : (
+            {/* Selected state: solid service-colored top banner */}
+            {selected ? (
+                <div className="flex w-full items-center justify-between gap-1 bg-[var(--svc)] px-1.5 py-0.5 lg:px-2.5 lg:py-1 text-white">
                     <span
                         className={cn(
-                            "font-mono text-[11px] font-medium truncate",
-                            status?.tone === "error" ? "text-destructive" : "text-muted-foreground"
+                            "min-w-0 font-mono font-bold uppercase tracking-tight truncate",
+                            isIndic ? "text-[8.5px] md:text-[10px]" : "text-[8.5px] sm:text-[9.5px] md:text-[10.5px]"
                         )}
                     >
-                        {status?.text ?? "—"}
+                        {selectedCardHeader}
                     </span>
+                    <Check className="w-2.5 h-2.5 lg:w-3.5 lg:h-3.5 shrink-0" strokeWidth={3} aria-hidden="true" />
+                </div>
+            ) : (
+                /* Unselected state: left colour bar (two-tone when service has an accent) */
+                <span
+                    aria-hidden="true"
+                    className="absolute inset-y-0 left-0 w-1.5"
+                    style={{ background: "linear-gradient(to bottom, var(--c) 0 68%, var(--ca) 68% 100%)" }}
+                />
+            )}
+
+            <div
+                className={cn(
+                    "flex flex-1 flex-col justify-between w-full",
+                    selected ? "px-2 py-0.5 lg:px-3 lg:py-2" : "py-1 pl-2.5 pr-1.5 lg:py-2 lg:pl-3.5 lg:pr-2.5"
                 )}
-                <span className="flex shrink-0 items-center gap-1">
-                    {note && <span className="font-mono text-[10px] text-muted-foreground">{note}</span>}
-                    {cheapest && (
-                        <span className="rounded-full bg-green-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-green-800 dark:bg-green-900/50 dark:text-green-300">
-                            {cheapestLabel}
+            >
+                <div className="w-full min-w-0">
+                    <div className="flex items-center gap-1 lg:gap-1.5 w-full min-w-0">
+                        <span
+                            aria-hidden="true"
+                            className="h-1.5 w-1.5 lg:h-2 lg:w-2 rounded-full bg-[var(--c)] shrink-0"
+                        />
+                        <span
+                            className={cn(
+                                "font-bold text-foreground leading-tight break-words",
+                                isIndic ? "text-[10.5px] sm:text-xs md:text-sm lg:text-[15px]" : "text-xs md:text-sm lg:text-[15px]"
+                            )}
+                        >
+                            {name}
+                        </span>
+                    </div>
+                    <p
+                        className={cn(
+                            "text-muted-foreground truncate leading-tight pl-2.5 lg:pl-3.5 lg:mt-0.5",
+                            isIndic ? "text-[8.5px] md:text-[10.5px] lg:text-xs" : "text-[9.5px] md:text-[11px] lg:text-xs"
+                        )}
+                    >
+                        {tagline.cardHint}
+                    </p>
+                </div>
+
+                <div className="flex items-baseline justify-between gap-1 w-full mt-0.5 lg:mt-1.5 pl-2.5 lg:pl-3.5">
+                    {priceParts !== null ? (
+                        <span className="font-mono text-sm sm:text-base md:text-lg lg:text-xl font-bold text-[var(--c)] tabular-nums leading-tight">
+                            {currency === "USD" ? (
+                                <>
+                                    <span className="text-[11px] md:text-xs font-semibold mr-px">{priceParts.symbol}</span>
+                                    {priceParts.value}
+                                </>
+                            ) : (
+                                <>
+                                    <span className="text-[10px] md:text-xs font-semibold">{priceParts.symbol}</span>{" "}
+                                    {priceParts.value}
+                                </>
+                            )}
+                        </span>
+                    ) : (
+                        <span
+                            className={cn(
+                                "font-mono text-[10.5px] lg:text-xs font-medium truncate",
+                                status?.tone === "error" ? "text-destructive" : "text-muted-foreground"
+                            )}
+                        >
+                            {status?.text ?? "—"}
                         </span>
                     )}
-                </span>
+                    <span className="flex shrink-0 items-center gap-1">
+                        {note && <span className="font-mono text-[9.5px] lg:text-[10.5px] font-semibold text-muted-foreground">{note}</span>}
+                        {cheapest && (
+                            <span
+                                className={cn(
+                                    "rounded-full bg-green-100 px-1.5 py-px lg:px-2 lg:py-0.5 font-bold uppercase tracking-wide text-green-800 dark:bg-green-900/50 dark:text-green-300",
+                                    isIndic ? "text-[8.5px] lg:text-[9.5px]" : "text-[9px] lg:text-[10px]"
+                                )}
+                            >
+                                {cheapestLabel}
+                            </span>
+                        )}
+                    </span>
+                </div>
             </div>
         </button>
     );
 }
 
 export default function PostageCalculator({ initialMode = "ems" }: { initialMode?: Destination }) {
-    const t = useTranslations("Home");
+    const locale = useLocale();
+    const isIndic = locale === "si" || locale === "ta";
+    const tHome = useTranslations("Home");
+    const tc = useTranslations("Calculator");
+    const { currency, lkrPerUsd } = useCurrency();
     const [config, setConfig] = useState<RateConfig>(DEFAULT_RATE_CONFIG);
     const [destination, setDestination] = useState<Destination>(initialMode);
     const [serviceId, setServiceId] = useState<string>("letter");
     const [emsCountryCode, setEmsCountryCode] = useState<string>("GB");
     const [intlTransport, setIntlTransport] = useState<InternationalTransport>("air");
-    const [intlServiceId, setIntlServiceId] = useState<InternationalServiceId>("air_letter");
+    const [intlServiceId, setIntlServiceId] = useState<InternationalServiceId>("ems");
     const [intlRegistered, setIntlRegistered] = useState(false);
     const [showCountryWhyNote, setShowCountryWhyNote] = useState(false);
     const [weight, setWeight] = useState<string>(initialMode === "cod" ? "250" : initialMode === "ems" ? "20" : "30");
@@ -162,6 +265,12 @@ export default function PostageCalculator({ initialMode = "ems" }: { initialMode
     const regCheckboxId = `${uid}-registered`;
     const arCheckboxId = `${uid}-ar-receipt`;
     const intlRegCheckboxId = `${uid}-intl-registered`;
+
+    const modeOptions: { id: Destination; label: string; icon: typeof Mail }[] = [
+        { id: "ems", label: tc("modeIntl"), icon: Plane },
+        { id: "cod", label: tc("modeCod"), icon: Banknote },
+        { id: "domestic", label: tc("modeLocal"), icon: Mail },
+    ];
 
     useEffect(() => {
         let active = true;
@@ -302,20 +411,32 @@ export default function PostageCalculator({ initialMode = "ems" }: { initialMode
         [filteredIntlQuotes]
     );
 
-    // Colour of the currently highlighted result (drives the receipt banner)
+    // Colour of the currently highlighted result (drives the receipt banner background tint + border)
+    const activeServiceKey =
+        destination === "cod"
+            ? "cod"
+            : destination === "ems"
+                ? activeIntlQuote.service.id
+                : (selectedService?.id ?? "letter");
+
     const activeColor =
         destination === "cod"
             ? MODE_COLORS.cod
             : destination === "ems"
                 ? getServiceColor(activeIntlQuote.service.id)
                 : getServiceColor(selectedService?.id);
+
+    const activeTagline = getServiceTagline(activeServiceKey, locale);
+
     const bannerStripe =
         destination === "cod"
-            ? "bg-[var(--c)]"
+            ? "bg-[var(--svc)]"
             : destination === "ems"
                 ? activeIntlQuote.service.id === "ems"
                     ? "ems-stripe"
-                    : "par-avion-stripe"
+                    : activeIntlQuote.service.id === "air_letter" || activeIntlQuote.service.id === "air_printed"
+                        ? "par-avion-stripe"
+                        : "bg-[var(--svc)]"
                 : "airmail-stripe";
 
     const weightPresets =
@@ -345,7 +466,7 @@ export default function PostageCalculator({ initialMode = "ems" }: { initialMode
                 : (config.emsCountries[0]?.code ?? "GB")
         );
         setIntlTransport("air");
-        setIntlServiceId("air_letter");
+        setIntlServiceId("ems");
         setIntlRegistered(false);
         setShowCountryWhyNote(false);
     };
@@ -362,114 +483,196 @@ export default function PostageCalculator({ initialMode = "ems" }: { initialMode
     const handleIntlTransportChange = (transport: InternationalTransport) => {
         setIntlTransport(transport);
         setWeight("20");
-        setIntlServiceId(transport === "air" ? "air_letter" : "sea_letter");
+        setIntlServiceId(transport === "air" ? "ems" : "sea_letter");
         setIntlRegistered(false);
     };
+
+    const handleStepWeight = (direction: "up" | "down") => {
+        const next = stepWeight(weightGrams, direction, 10, 40000);
+        setWeight(String(next));
+    };
+
+    const handleStepCodAmount = (direction: "up" | "down") => {
+        const next = stepCodAmount(collectAmountNum, direction, 500, 100000);
+        setCodAmount(String(next));
+    };
+
+    const localizedZone = getLocalizedZoneName(
+        activeEmsZone?.id,
+        activeEmsZone?.name ?? "EMS Zone",
+        locale
+    );
+
+    const localizedCountryName = getLocalizedCountryName(
+        activeEmsCountry?.code,
+        activeEmsCountry?.name ?? "United Kingdom",
+        locale
+    );
 
     // Derive banner state for the active mode
     const banner = (() => {
         if (destination === "domestic") {
-            const title = selectedService?.name ?? "Domestic Mail";
+            const title = activeTagline.name || selectedService?.name || "Domestic Mail";
+            const badgeLabel = (activeTagline.shortName || selectedService?.shortName || "Letter").toUpperCase();
+            const maxWeightLabel = activeDomesticResult.maxWeight
+                ? tc("maxWeight", { weight: formatWeightLabel(activeDomesticResult.maxWeight) })
+                : undefined;
+
             if (activeDomesticResult.error) {
                 return {
+                    flagCode: "LK",
+                    locationPill: tc("locationLocal"),
+                    selectedBadge: tc("selectedPrefix", { service: badgeLabel }),
                     title,
-                    subtitle: activeDomesticResult.error,
+                    subtitle: `${activeTagline.cardHint} · ${activeDomesticResult.error}`,
                     total: null as number | null,
                     error: activeDomesticResult.error,
                     footerNote: undefined as string | undefined,
+                    rightFooter: maxWeightLabel,
                     items: [] as { label: string; value: string }[],
                 };
             }
             const items: { label: string; value: string }[] = [
-                { label: "Base", value: `Rs. ${activeDomesticResult.baseCost.toLocaleString()}` },
+                { label: tc("itemBase"), value: formatCurrencyAmount(activeDomesticResult.baseCost, currency, lkrPerUsd) },
             ];
             if (activeDomesticResult.registrationFee > 0) {
-                items.push({ label: "Reg", value: `+Rs. ${activeDomesticResult.registrationFee}` });
+                items.push({ label: tc("itemReg"), value: formatCurrencyAmount(activeDomesticResult.registrationFee, currency, lkrPerUsd, { plus: true }) });
             }
             if (activeDomesticResult.arReceiptFee > 0) {
-                items.push({ label: "AR", value: `+Rs. ${activeDomesticResult.arReceiptFee}` });
+                items.push({ label: tc("itemAr"), value: formatCurrencyAmount(activeDomesticResult.arReceiptFee, currency, lkrPerUsd, { plus: true }) });
             }
             return {
+                flagCode: "LK",
+                locationPill: tc("locationLocal"),
+                selectedBadge: tc("selectedPrefix", { service: badgeLabel }),
                 title,
-                subtitle: activeDomesticResult.tierLabel,
+                subtitle: `${activeTagline.cardHint} · ${activeDomesticResult.tierLabel}`,
                 total: activeDomesticResult.totalCost,
                 error: undefined,
                 footerNote: undefined,
+                rightFooter: maxWeightLabel,
                 items,
             };
         }
 
         if (destination === "cod") {
-            const title = "Cash on Delivery (COD)";
+            const title = tc("codTitle");
+            const maxWeightLabel = tc("maxWeight", { weight: "40kg" });
             if (codResult.error) {
                 return {
+                    flagCode: "LK",
+                    locationPill: tc("locationCod"),
+                    selectedBadge: tc("selectedCod"),
                     title,
-                    subtitle: codResult.error,
+                    subtitle: `${activeTagline.cardHint} · ${codResult.error}`,
                     total: null as number | null,
                     error: codResult.error,
                     footerNote: undefined,
+                    rightFooter: maxWeightLabel,
                     items: [] as { label: string; value: string }[],
                 };
             }
             return {
+                flagCode: "LK",
+                locationPill: tc("locationCod"),
+                selectedBadge: tc("selectedCod"),
                 title,
-                subtitle: `${codResult.tierLabel} · Collect Rs. ${collectAmountNum.toLocaleString()}`,
+                subtitle: `${codResult.tierLabel} · ${tc("collectAmount", {
+                    amount:
+                        currency === "USD"
+                            ? `${collectAmountNum.toLocaleString()} (${formatCurrencyAmount(collectAmountNum, "USD", lkrPerUsd)})`
+                            : collectAmountNum.toLocaleString(),
+                })}`,
                 total: codResult.totalCost,
                 error: undefined,
                 footerNote: undefined,
+                rightFooter: tc("netRemittance", {
+                    amount: formatCurrencyAmount(codResult.netRemittance, currency, lkrPerUsd),
+                }),
                 items: [
-                    { label: "Courier", value: `Rs. ${codResult.courierFee.toLocaleString()}` },
-                    { label: "MO Fee", value: `Rs. ${codResult.moneyOrderFee.toLocaleString()}` },
-                    { label: "COD", value: `Rs. ${codResult.codServiceFee.toLocaleString()}` },
+                    { label: tc("itemCourier"), value: formatCurrencyAmount(codResult.courierFee, currency, lkrPerUsd) },
+                    { label: tc("itemMoFee"), value: formatCurrencyAmount(codResult.moneyOrderFee, currency, lkrPerUsd) },
+                    { label: tc("itemCod"), value: formatCurrencyAmount(codResult.codServiceFee, currency, lkrPerUsd) },
                 ],
             };
         }
 
         const isRegActive = activeIntlQuote.service.supportsRegistration && intlRegistered && activeIntlQuote.available;
-        const serviceLabel = isRegActive ? `Registered ${activeIntlQuote.service.shortName}` : activeIntlQuote.service.name;
-        const title = activeEmsCountry ? `${serviceLabel} · ${activeEmsCountry.name}` : serviceLabel;
+        const localizedShortName = activeTagline.shortName || activeIntlQuote.service.shortName;
+        const localizedFullName = activeTagline.name || activeIntlQuote.service.name;
+        const serviceLabel = isRegActive
+            ? tc("registeredPrefix", { service: localizedShortName })
+            : localizedFullName;
+        const badgeLabel = (isRegActive
+            ? tc("regBadgePrefix", { service: localizedShortName })
+            : localizedShortName
+        ).toUpperCase();
+
+        const shortZone =
+            activeIntlQuote.service.id === "ems"
+                ? localizedZone.short
+                : tc("groupLabel", { group: activeEmsCountry?.group ?? "—" });
+
+        const locationPill = activeEmsCountry
+            ? `${localizedCountryName} · ${shortZone}`
+            : shortZone;
+
+        const maxW = activeIntlQuote.result.maxWeight ?? activeIntlQuote.service.maxWeight;
+        const rightFooter = maxW ? tc("maxWeight", { weight: formatWeightLabel(maxW) }) : undefined;
 
         if (!activeIntlQuote.available) {
             return {
-                title,
-                subtitle: activeIntlQuote.shortUnavailableTag ?? "Unavailable",
+                flagCode: activeEmsCountry?.code ?? "GB",
+                locationPill,
+                selectedBadge: tc("selectedPrefix", { service: badgeLabel }),
+                title: serviceLabel,
+                subtitle: `${activeTagline.cardHint} · ${activeIntlQuote.shortUnavailableTag ?? "Unavailable"}`,
                 total: null as number | null,
-                error: `${activeIntlQuote.shortUnavailableTag ?? "Unavailable"} for ${activeEmsCountry?.name ?? "country"}`,
+                error: tc("unavailableFor", {
+                    tag: activeIntlQuote.shortUnavailableTag ?? "Unavailable",
+                    country: localizedCountryName,
+                }),
                 footerNote: activeIntlQuote.unavailableReason,
+                rightFooter,
                 items: [] as { label: string; value: string }[],
             };
         }
 
         if (activeIntlQuote.result.error) {
             return {
-                title,
-                subtitle: activeIntlQuote.result.error,
+                flagCode: activeEmsCountry?.code ?? "GB",
+                locationPill,
+                selectedBadge: tc("selectedPrefix", { service: badgeLabel }),
+                title: serviceLabel,
+                subtitle: `${activeTagline.cardHint} · ${activeIntlQuote.result.error}`,
                 total: null as number | null,
                 error: activeIntlQuote.result.error,
                 footerNote: undefined,
+                rightFooter,
                 items: [] as { label: string; value: string }[],
             };
         }
 
-        const groupLabel = activeEmsCountry?.group ? `Group ${activeEmsCountry.group}` : (activeEmsZone?.name ?? "Intl");
-        const subMeta =
-            activeIntlQuote.service.id === "ems"
-                ? `${activeEmsZone?.name ?? "EMS Zone"} · ${activeIntlQuote.result.tierLabel}`
-                : `${groupLabel} · ${activeIntlQuote.result.tierLabel}`;
-
         const items: { label: string; value: string }[] = [
-            { label: "Base", value: `Rs. ${activeIntlQuote.result.baseCost.toLocaleString()}` },
+            { label: tc("itemBase"), value: formatCurrencyAmount(activeIntlQuote.result.baseCost, currency, lkrPerUsd) },
         ];
         if (activeIntlQuote.result.registrationFee > 0) {
-            items.push({ label: "Foreign Reg", value: `+Rs. ${activeIntlQuote.result.registrationFee.toLocaleString()}` });
+            items.push({
+                label: tc("itemForeignReg"),
+                value: formatCurrencyAmount(activeIntlQuote.result.registrationFee, currency, lkrPerUsd, { plus: true }),
+            });
         }
 
         return {
-            title,
-            subtitle: subMeta,
+            flagCode: activeEmsCountry?.code ?? "GB",
+            locationPill,
+            selectedBadge: tc("selectedPrefix", { service: badgeLabel }),
+            title: serviceLabel,
+            subtitle: `${activeTagline.cardHint} · ${activeIntlQuote.result.tierLabel}`,
             total: activeIntlQuote.result.totalCost,
             error: undefined,
             footerNote: undefined,
+            rightFooter,
             items,
         };
     })();
@@ -477,14 +680,16 @@ export default function PostageCalculator({ initialMode = "ems" }: { initialMode
     return (
         <form
             onSubmit={(e) => e.preventDefault()}
-            aria-label="Sri Lanka Post Postage Calculator"
-            className="max-w-2xl mx-auto w-full flex flex-col gap-1.5 md:gap-4"
+            aria-label={tc("formAriaLabel")}
+            className="w-full flex flex-col gap-1 md:gap-3 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start"
         >
-            {/* 1. Segmented Mode Bar (native radios for arrow-key navigation + zero-click scanning) */}
+            {/* Left Workbench Column on Desktop (Mode Bar + Receipt Banner + Step 1 & Step 2 Controls) */}
+            <div className="contents lg:flex lg:flex-col lg:col-span-5 lg:gap-4">
+            {/* 1. Segmented Mode Bar */}
             <fieldset className="contents">
-                <legend className="sr-only">Calculator mode</legend>
-                <div className="grid grid-cols-3 gap-1 rounded-lg border-2 border-foreground bg-card p-1">
-                    {MODE_OPTIONS.map(({ id, label, icon: Icon }) => {
+                <legend className="sr-only">{tc("modeLabel")}</legend>
+                <div className="grid grid-cols-3 gap-1 rounded-lg border-2 border-foreground bg-card p-0.5 md:p-1">
+                    {modeOptions.map(({ id, label, icon: Icon }) => {
                         const inputId = `${uid}-mode-${id}`;
                         const checked = destination === id;
                         return (
@@ -501,14 +706,15 @@ export default function PostageCalculator({ initialMode = "ems" }: { initialMode
                                 <label
                                     htmlFor={inputId}
                                     className={cn(
-                                        "tap flex w-full min-h-[56px] md:min-h-[60px] cursor-pointer flex-col items-center justify-center gap-0.5 rounded-md px-1.5 py-1.5 text-xs md:text-sm font-bold transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-ring peer-focus-visible:outline-offset-1",
+                                        "tap flex w-full min-h-[38px] md:min-h-[54px] cursor-pointer flex-col items-center justify-center gap-0.5 rounded-md px-1 py-0.5 font-bold transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-ring peer-focus-visible:outline-offset-1 text-center",
+                                        isIndic ? "text-[10.5px] md:text-sm" : "text-xs md:text-sm",
                                         checked
                                             ? "bg-[var(--c)] text-white dark:text-background shadow-[0_2px_0_0_hsl(var(--foreground))]"
                                             : "text-[var(--c)] hover:bg-muted"
                                     )}
                                 >
-                                    <Icon className="w-6 h-6 md:w-7 md:h-7 shrink-0" strokeWidth={2.2} aria-hidden="true" />
-                                    <span className="leading-tight">{label}</span>
+                                    <Icon className="w-4 h-4 md:w-6 md:h-6 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+                                    <span className="leading-tight truncate max-w-full">{label}</span>
                                 </label>
                             </div>
                         );
@@ -516,48 +722,113 @@ export default function PostageCalculator({ initialMode = "ems" }: { initialMode
                 </div>
             </fieldset>
 
-            {/* 2. Pinned Top Live Receipt Banner */}
+            {/* 2. Pinned Top Live Receipt Banner — Tinted with Selected Service Colour & Full Un-Cut Country Flag Pill */}
             <div
                 role="status"
                 aria-live="polite"
-                className="svc rounded-md border-2 border-foreground bg-card overflow-hidden shadow-[3px_3px_0_0_hsl(var(--foreground))]"
+                data-testid="live-receipt-banner"
+                data-active-service={activeServiceKey}
+                className="svc rounded-lg border-2 border-[var(--c)] bg-[color-mix(in_srgb,var(--c)_13%,hsl(var(--card)))] overflow-hidden shadow-[3px_3px_0_0_var(--c)] transition-colors duration-150"
                 style={serviceStyle(activeColor)}
             >
                 <div className={cn("h-1.5 md:h-2", bannerStripe)} aria-hidden="true" />
-                <div className="px-3 py-2 md:px-5 md:py-4">
+                <div className="px-2.5 py-1.5 md:px-4 md:py-3">
+                    {/* Top Pill Bar: Full Country + Zone Pill on left + Compact Selected Badge on right */}
+                    <div className="flex items-center justify-between gap-1.5 mb-1">
+                        <span
+                            data-testid="banner-country-pill"
+                            className={cn(
+                                "inline-flex min-w-0 items-center gap-1.5 rounded-full border border-foreground/30 bg-card px-2 py-0.5 font-bold text-foreground shadow-2xs",
+                                isIndic ? "text-[10px] md:text-xs" : "text-[11px] md:text-xs"
+                            )}
+                        >
+                            <CountryFlag
+                                code={banner.flagCode}
+                                title={banner.locationPill}
+                                className="w-4 h-3 md:w-5 md:h-3.5 shrink-0"
+                            />
+                            <span className="truncate">{banner.locationPill}</span>
+                        </span>
+
+                        <span
+                            data-testid="banner-selected-service"
+                            className={cn(
+                                "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 font-mono font-bold uppercase tracking-wide shadow-2xs",
+                                isIndic ? "text-[9px] md:text-[10.5px]" : "text-[9.5px] md:text-[11px]",
+                                activeServiceKey === "ems"
+                                    ? "bg-[#FF8533] text-[#1A1714]"
+                                    : "bg-[var(--svc)] text-white"
+                            )}
+                        >
+                            {banner.selectedBadge}
+                        </span>
+                    </div>
+
                     <div className="flex items-center justify-between gap-2">
-                        <div className="min-w-0">
-                            <p className="font-heading text-sm md:text-base font-extrabold [font-stretch:85%] line-clamp-2 leading-tight text-foreground">
+                        <div className="min-w-0 flex-1">
+                            <p
+                                className={cn(
+                                    "font-heading font-extrabold [font-stretch:88%] leading-tight text-foreground break-words",
+                                    isIndic
+                                        ? "text-[13px] sm:text-sm md:text-base"
+                                        : "text-[14px] sm:text-base md:text-lg"
+                                )}
+                            >
                                 {banner.title}
                             </p>
                             {banner.error ? (
-                                <p className="flex items-center gap-1 font-mono text-[11px] md:text-xs font-medium text-destructive mt-0.5">
+                                <p className="flex items-center gap-1 font-mono text-[10.5px] md:text-xs font-medium text-destructive mt-0.5">
                                     <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                                     <span className="truncate">{banner.error}</span>
                                 </p>
                             ) : (
-                                <p className="font-mono text-[11px] md:text-xs text-muted-foreground truncate mt-0.5">
+                                <p
+                                    className={cn(
+                                        "font-mono text-foreground/80 truncate mt-0.5",
+                                        isIndic ? "text-[9.5px] md:text-xs" : "text-[10px] md:text-xs"
+                                    )}
+                                >
                                     {banner.subtitle}
                                 </p>
                             )}
                         </div>
 
-                        <div className="flex items-center gap-3 shrink-0">
+                        <div className="flex items-center gap-2.5 shrink-0">
                             <div className="text-right">
-                                <span className="block font-mono text-[10px] uppercase tracking-wider text-muted-foreground leading-none">
-                                    Total
+                                <span className="inline-flex items-center justify-end gap-1 font-mono text-[9.5px] font-semibold uppercase tracking-wider text-foreground/75 leading-none">
+                                    <span>{tc("total")}</span>
+                                    <span
+                                        data-testid="banner-currency-indicator"
+                                        className="rounded border border-foreground/30 bg-background/80 px-1 py-px text-[9px] font-bold text-foreground"
+                                    >
+                                        {CURRENCY_META[currency].symbol} {currency}
+                                    </span>
                                 </span>
                                 <span
+                                    data-testid="banner-total-price"
                                     className={cn(
-                                        "font-mono text-3xl md:text-4xl font-bold tabular-nums leading-tight",
+                                        "block font-mono text-xl sm:text-2xl md:text-4xl font-bold tabular-nums leading-tight",
                                         banner.error ? "text-muted-foreground" : "text-[var(--c)]"
                                     )}
                                 >
-                                    {banner.total !== null ? `Rs. ${banner.total.toLocaleString()}` : "—"}
+                                    {banner.total !== null
+                                        ? (() => {
+                                            const parts = splitCurrencyPrice(banner.total, currency, lkrPerUsd);
+                                            return currency === "USD"
+                                                ? `${parts.symbol}${parts.value}`
+                                                : `${parts.symbol} ${parts.value}`;
+                                        })()
+                                        : "—"}
                                 </span>
+                                {currency === "USD" && banner.total !== null && (
+                                    <span className="block font-mono text-[10px] font-medium text-foreground/75 tabular-nums leading-none mt-0.5">
+                                        {tc("lkrEquivalent", { amount: banner.total.toLocaleString() })}
+                                    </span>
+                                )}
                             </div>
                             <Postmark
-                                code="LKR"
+                                code={currency}
+                                date={currency === "USD" ? `1$≈${Math.round(lkrPerUsd)}` : "17 NOV 26"}
                                 size="sm"
                                 tone="red"
                                 rotate={-10}
@@ -566,114 +837,395 @@ export default function PostageCalculator({ initialMode = "ems" }: { initialMode
                         </div>
                     </div>
 
-                    <div className="border-t border-dashed border-foreground/25 pt-1.5 mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 font-mono text-[11px] md:text-xs">
+                    <div className="border-t border-dashed border-foreground/30 pt-1 mt-1 flex flex-wrap items-center justify-between gap-x-2.5 gap-y-0.5 font-mono text-[10.5px] md:text-xs">
                         {banner.items.length > 0 ? (
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-muted-foreground">
+                            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-foreground/80">
                                 {banner.items.map((item) => (
                                     <span key={item.label}>
                                         {item.label}{" "}
-                                        <strong className="text-foreground font-semibold">{item.value}</strong>
+                                        <strong className="text-foreground font-bold">{item.value}</strong>
                                     </span>
                                 ))}
                             </div>
                         ) : (
-                            <span className="text-muted-foreground leading-snug">
+                            <span className="text-foreground/80 leading-snug">
                                 {banner.footerNote ??
-                                    (weightGrams <= 0 ? "Enter a valid weight above 0g" : "Adjust weight or choose another service")}
+                                    (weightGrams <= 0 ? tc("enterValidWeight") : tc("adjustWeight"))}
                             </span>
                         )}
-                        {destination === "cod" && !codResult.error && (
-                            <span className="text-muted-foreground">
-                                Net:{" "}
-                                <strong className="text-foreground font-semibold">
-                                    Rs. {codResult.netRemittance.toLocaleString()}
-                                </strong>
-                            </span>
-                        )}
+                        <span className="font-semibold text-foreground flex items-center gap-2">
+                            {currency === "USD" && (
+                                <span className="text-[10px] text-muted-foreground font-medium">
+                                    {tc("exchangeRateNote", { rate: lkrPerUsd.toFixed(0) })}
+                                </span>
+                            )}
+                            {banner.rightFooter && <span>{banner.rightFooter}</span>}
+                        </span>
                     </div>
                 </div>
             </div>
 
-            {/* 3. Weight Input + Single-Row Horizontal Presets */}
-            <div>
-                <div className="flex items-center justify-between mb-1">
-                    <label htmlFor={weightInputId} className="label-mono">
-                        Weight (grams)
-                    </label>
-                    <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
-                        {weightGrams > 0 ? `= ${formatWeightLabel(weightGrams)}` : "Enter grams"}
-                    </span>
+            {/* 3. Unified Compact Input Card: Step 1 Weight ([ - | ⚖️ 20 g | + ]) + Step 2 Country / COD Amount */}
+            <div className="rounded-lg border-[1.5px] border-foreground bg-card p-1.5 md:p-3.5 shadow-[2px_2px_0_0_hsl(var(--foreground))] space-y-1.5">
+                {/* Step 1: Centered Editable Weight Stepper ([ − | ⚖️ 20 g | + ]) */}
+                <div>
+                    <div className="flex items-center justify-between mb-1">
+                        <label
+                            htmlFor={weightInputId}
+                            className={cn(
+                                "flex items-center gap-1.5 font-heading font-extrabold uppercase tracking-wide text-foreground cursor-pointer",
+                                isIndic ? "text-[10.5px] md:text-xs" : "text-xs md:text-sm"
+                            )}
+                        >
+                            <StepBadge step={1} />
+                            <span>{tc("step1Title")}</span>
+                        </label>
+                        <span className="font-mono text-[11px] md:text-xs font-bold text-foreground tabular-nums">
+                            {weightGrams > 0 ? `= ${formatWeightLabel(weightGrams)}` : tc("enterGrams")}
+                        </span>
+                    </div>
+
+                    <div className="grid grid-cols-[38px_1fr_38px] items-center rounded-md border-[1.5px] border-foreground bg-background overflow-hidden focus-within:ring-[3px] focus-within:ring-primary/25">
+                        <button
+                            type="button"
+                            onClick={() => handleStepWeight("down")}
+                            aria-label={tc("decreaseWeight")}
+                            className="tap flex h-8 md:h-10 w-full items-center justify-center border-r border-foreground/30 bg-card text-foreground hover:bg-muted"
+                        >
+                            <Minus className="w-4 h-4" strokeWidth={2.5} aria-hidden="true" />
+                        </button>
+
+                        <label
+                            htmlFor={weightInputId}
+                            className="flex items-center justify-center gap-1.5 h-8 md:h-10 cursor-text px-2"
+                        >
+                            <Scale
+                                className="w-3.5 h-3.5 md:w-4 md:h-4 text-muted-foreground shrink-0 pointer-events-none"
+                                aria-hidden="true"
+                            />
+                            <input
+                                id={weightInputId}
+                                name="weight"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                enterKeyHint="done"
+                                autoComplete="off"
+                                value={weight}
+                                onChange={(e) => setWeight(sanitizeDigits(e.target.value))}
+                                placeholder="20"
+                                style={{ width: `${Math.max(2, (weight || "20").length + 0.5)}ch` }}
+                                className="h-full bg-transparent text-center font-mono text-base md:text-lg font-bold text-foreground focus:outline-none tabular-nums"
+                            />
+                            <span className="pointer-events-none font-mono text-xs md:text-sm font-bold text-muted-foreground">
+                                g
+                            </span>
+                        </label>
+
+                        <button
+                            type="button"
+                            onClick={() => handleStepWeight("up")}
+                            aria-label={tc("increaseWeight")}
+                            className="tap flex h-8 md:h-10 w-full items-center justify-center border-l border-foreground/30 bg-card text-foreground hover:bg-muted"
+                        >
+                            <Plus className="w-4 h-4" strokeWidth={2.5} aria-hidden="true" />
+                        </button>
+                    </div>
+
+                    <div className="mt-1 grid grid-cols-8 gap-1">
+                        {weightPresets.map((preset) => {
+                            const active = weightGrams === preset;
+                            return (
+                                <button
+                                    key={preset}
+                                    type="button"
+                                    onClick={() => setWeight(String(preset))}
+                                    aria-pressed={active}
+                                    className={cn(
+                                        "tap flex items-center justify-center rounded-full border py-0.5 font-mono text-[10px] md:text-xs font-bold transition-colors min-h-[22px] md:min-h-[26px]",
+                                        active
+                                            ? "border-foreground bg-foreground text-background"
+                                            : "border-foreground/35 bg-background text-foreground hover:border-foreground"
+                                    )}
+                                >
+                                    {formatWeightLabel(preset)}
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
-                <div className="relative">
-                    <Scale
-                        className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
-                        aria-hidden="true"
-                    />
-                    <input
-                        id={weightInputId}
-                        name="weight"
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        enterKeyHint="done"
-                        autoComplete="off"
-                        value={weight}
-                        onChange={(e) => setWeight(sanitizeDigits(e.target.value))}
-                        placeholder="e.g. 250"
-                        className="h-10 md:h-11 w-full rounded-md border-[1.5px] border-input bg-card pl-9 pr-12 font-mono text-base font-medium text-foreground focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-[3px] focus-visible:ring-primary/25"
-                    />
-                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs font-semibold text-muted-foreground">
-                        g
-                    </span>
-                </div>
-                <div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
-                    {weightPresets.map((preset) => {
-                        const active = weightGrams === preset;
-                        return (
-                            <button
-                                key={preset}
-                                type="button"
-                                onClick={() => setWeight(String(preset))}
-                                aria-pressed={active}
+
+                {/* Step 2 (International): Destination Country & Air/Sea Mode inside the unified card */}
+                {destination === "ems" && (
+                    <div className="border-t border-border/80 pt-1.5 space-y-1">
+                        <div className="flex items-center justify-between gap-1.5">
+                            <label
+                                htmlFor={emsCountryId}
                                 className={cn(
-                                    "tap shrink-0 rounded-full border px-2.5 py-1 font-mono text-[11px] md:text-xs font-semibold transition-colors",
-                                    active
-                                        ? "border-foreground bg-foreground text-background"
-                                        : "border-border bg-card text-foreground hover:border-foreground/60"
+                                    "flex items-center gap-1.5 font-heading font-extrabold uppercase tracking-wide text-foreground cursor-pointer min-w-0",
+                                    isIndic ? "text-[10.5px] md:text-xs" : "text-xs md:text-sm"
                                 )}
                             >
-                                {formatWeightLabel(preset)}
+                                <StepBadge step={2} />
+                                <span className="truncate">{tc("step2IntlTitle")}</span>
+                            </label>
+                            <button
+                                type="button"
+                                onClick={() => setShowCountryWhyNote((prev) => !prev)}
+                                aria-expanded={showCountryWhyNote}
+                                className="inline-flex items-center gap-1 font-mono text-[10px] md:text-[11px] font-semibold text-primary hover:underline shrink-0"
+                            >
+                                <Info className="w-3 h-3 shrink-0" aria-hidden="true" />
+                                <span>{showCountryWhyNote ? tc("hideNote") : tc("missingWhy")}</span>
                             </button>
-                        );
-                    })}
-                </div>
+                        </div>
+
+                        <div className="grid grid-cols-[1fr_auto] gap-1 md:gap-2 items-center">
+                            {/* Country Flag + Full-Width Select + Compact Chevron (no wide 'Change' text badge cutting off country name) */}
+                            <div className="relative flex items-center h-8 md:h-10 min-w-0 rounded-md border-[1.5px] border-foreground bg-background px-1.5 md:px-2 gap-1.5 focus-within:ring-[3px] focus-within:ring-primary/25">
+                                <span className="pointer-events-none shrink-0 flex items-center">
+                                    <CountryFlag
+                                        code={activeEmsCountry?.code ?? emsCountryCode}
+                                        title={localizedCountryName}
+                                        className="w-5 h-3.5 md:w-6 md:h-4"
+                                    />
+                                </span>
+                                <select
+                                    id={emsCountryId}
+                                    name="emsCountry"
+                                    value={emsCountryCode}
+                                    onChange={(e) => setEmsCountryCode(e.target.value)}
+                                    className={cn(
+                                        "h-full flex-1 min-w-0 appearance-none bg-transparent font-bold text-foreground focus:outline-none cursor-pointer truncate",
+                                        locale === "ta"
+                                            ? "text-[11px] sm:text-sm md:text-base"
+                                            : isIndic
+                                                ? "text-xs sm:text-sm md:text-base"
+                                                : "text-sm md:text-base"
+                                    )}
+                                >
+                                    {sortedEmsCountries.map((c) => {
+                                        const cName = getLocalizedCountryName(c.code, c.name, locale);
+                                        const suffix =
+                                            c.suspensionStatus === "suspended"
+                                                ? tc("suspendedSuffix")
+                                                : c.suspensionStatus === "restricted"
+                                                    ? tc("noteSuffix")
+                                                    : "";
+                                        return (
+                                            <option key={c.code} value={c.code}>
+                                                {cName}
+                                                {suffix}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                                <ChevronDown
+                                    className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0 text-foreground pointer-events-none"
+                                    strokeWidth={2.5}
+                                    aria-hidden="true"
+                                />
+                            </div>
+
+                            <div
+                                role="group"
+                                aria-label={tc("transportLabel")}
+                                className="grid grid-cols-2 h-8 md:h-10 rounded-md border-[1.5px] border-foreground bg-background p-0.5 shrink-0"
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => handleIntlTransportChange("air")}
+                                    aria-pressed={intlTransport === "air"}
+                                    className={cn(
+                                        "tap flex items-center justify-center gap-1 rounded-[4px] px-1.5 md:px-2 font-bold transition-colors",
+                                        isIndic ? "text-[10.5px] md:text-xs" : "text-xs md:text-sm",
+                                        intlTransport === "air"
+                                            ? "bg-[#1D4E9E] text-white"
+                                            : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    <Plane className="w-3 h-3 md:w-3.5 md:h-3.5 shrink-0" aria-hidden="true" />
+                                    <span>{tc("air")}</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleIntlTransportChange("sea")}
+                                    aria-pressed={intlTransport === "sea"}
+                                    className={cn(
+                                        "tap flex items-center justify-center gap-1 rounded-[4px] px-1.5 md:px-2 font-bold transition-colors",
+                                        isIndic ? "text-[10.5px] md:text-xs" : "text-xs md:text-sm",
+                                        intlTransport === "sea"
+                                            ? "bg-[#0E4A6B] text-white"
+                                            : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    <Ship className="w-3 h-3 md:w-3.5 md:h-3.5 shrink-0" aria-hidden="true" />
+                                    <span>{tc("sea")}</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {showCountryWhyNote && (
+                            <div className="rounded-md border border-foreground/30 bg-muted/40 px-2.5 py-1.5 text-[11px] leading-snug text-foreground space-y-0.5">
+                                <p className="font-semibold">{tc("whyTitle")}</p>
+                                <p className="text-muted-foreground">{tc("whyBody")}</p>
+                            </div>
+                        )}
+
+                        {(activeEmsCountry?.restrictionNote ||
+                            (intlTransport === "sea" && activeEmsCountry?.seaMailAvailable === false)) && (
+                            <p
+                                className={cn(
+                                    "flex items-start gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] md:text-xs leading-snug",
+                                    activeEmsCountry?.suspensionStatus === "suspended"
+                                        ? "border-destructive/60 bg-destructive/10 text-destructive"
+                                        : "border-secondary bg-secondary/20 text-foreground"
+                                )}
+                            >
+                                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
+                                <span>
+                                    {intlTransport === "sea" && activeEmsCountry?.seaMailAvailable === false && activeEmsCountry.seaMailNote
+                                        ? activeEmsCountry.seaMailNote
+                                        : activeEmsCountry?.restrictionNote}
+                                </span>
+                            </p>
+                        )}
+                    </div>
+                )}
+
+                {/* Step 2 (COD): Collection Amount inside the unified card */}
+                {destination === "cod" && (
+                    <div className="border-t border-border/80 pt-1.5">
+                        <div className="flex items-center justify-between mb-1">
+                            <label
+                                htmlFor={codAmountId}
+                                className={cn(
+                                    "flex items-center gap-1.5 font-heading font-extrabold uppercase tracking-wide text-foreground cursor-pointer",
+                                    isIndic ? "text-[11px] md:text-xs" : "text-xs md:text-sm"
+                                )}
+                            >
+                                <StepBadge step={2} />
+                                <span>{tc("step2CodTitle")}</span>
+                            </label>
+                            <span className="font-mono text-[10.5px] font-semibold text-muted-foreground">
+                                {tc("maxCodAmount")}
+                            </span>
+                        </div>
+
+                        <div className="grid grid-cols-[40px_1fr_40px] items-center rounded-md border-[1.5px] border-foreground bg-background overflow-hidden focus-within:ring-[3px] focus-within:ring-primary/25">
+                            <button
+                                type="button"
+                                onClick={() => handleStepCodAmount("down")}
+                                aria-label={tc("decreaseCod")}
+                                className="tap flex h-9 md:h-10 w-full items-center justify-center border-r border-foreground/30 bg-card text-foreground hover:bg-muted"
+                            >
+                                <Minus className="w-4 h-4" strokeWidth={2.5} aria-hidden="true" />
+                            </button>
+
+                            <label
+                                htmlFor={codAmountId}
+                                className="flex items-center justify-center gap-1 h-9 md:h-10 cursor-text px-2"
+                            >
+                                <span
+                                    className="pointer-events-none font-mono text-xs md:text-sm font-bold text-muted-foreground"
+                                    aria-hidden="true"
+                                >
+                                    Rs.
+                                </span>
+                                <input
+                                    id={codAmountId}
+                                    name="codAmount"
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    enterKeyHint="done"
+                                    autoComplete="off"
+                                    value={codAmount}
+                                    onChange={(e) => setCodAmount(sanitizeDigits(e.target.value))}
+                                    placeholder="2500"
+                                    style={{ width: `${Math.max(4, (codAmount || "2500").length + 0.5)}ch` }}
+                                    className="h-full bg-transparent text-center font-mono text-base md:text-lg font-bold text-foreground focus:outline-none tabular-nums"
+                                />
+                            </label>
+
+                            <button
+                                type="button"
+                                onClick={() => handleStepCodAmount("up")}
+                                aria-label={tc("increaseCod")}
+                                className="tap flex h-9 md:h-10 w-full items-center justify-center border-l border-foreground/30 bg-card text-foreground hover:bg-muted"
+                            >
+                                <Plus className="w-4 h-4" strokeWidth={2.5} aria-hidden="true" />
+                            </button>
+                        </div>
+
+                        <div className="mt-1 flex items-center gap-1 overflow-x-auto scrollbar-hide pb-0.5">
+                            {COD_AMOUNT_PRESETS.map((amt) => {
+                                const active = collectAmountNum === amt;
+                                return (
+                                    <button
+                                        key={amt}
+                                        type="button"
+                                        onClick={() => setCodAmount(String(amt))}
+                                        aria-pressed={active}
+                                        className={cn(
+                                            "tap shrink-0 rounded-full border px-2 py-0.5 font-mono text-[10.5px] md:text-xs font-bold transition-colors min-h-[24px]",
+                                            active
+                                                ? "border-foreground bg-foreground text-background"
+                                                : "border-foreground/35 bg-background text-foreground hover:border-foreground"
+                                        )}
+                                    >
+                                        Rs. {formatCompactAmount(amt)}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+            </div>
             </div>
 
-            {/* 4A. Domestic Mode: 2-Column Live Service Grid + Add-ons */}
+            {/* Right Workbench Column on Desktop (Step 3 Service Comparison Grid / Local Services / COD Breakdown) */}
+            <div className="contents lg:flex lg:flex-col lg:col-span-7 lg:gap-4">
+            {/* 4A. Domestic Mode: Step 2 Service Grid + Add-ons */}
             {destination === "domestic" && (
-                <>
+                <div className="rounded-lg border-[1.5px] border-foreground bg-card p-2 md:p-3.5 shadow-[2px_2px_0_0_hsl(var(--foreground))] flex flex-col gap-2">
                     <fieldset className="contents">
-                        <legend className="label-mono">Select Service · Live Prices</legend>
+                        <legend className="flex items-center justify-between w-full mb-0.5">
+                            <span
+                                className={cn(
+                                    "flex items-center gap-1.5 font-heading font-extrabold uppercase tracking-wide text-foreground",
+                                    isIndic ? "text-[11px] md:text-xs" : "text-xs md:text-sm"
+                                )}
+                            >
+                                <StepBadge step={2} />
+                                <span>{tc("step2LocalTitle")}</span>
+                            </span>
+                        </legend>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 md:gap-2">
                             {domesticQuotes.map(({ service, result }, i) => {
                                 const isOver = Boolean(result.exceedsMaxWeight);
+                                const svcTagline = getServiceTagline(service.id, locale);
                                 return (
                                     <ServiceCard
                                         key={service.id}
                                         serviceId={service.id}
-                                        name={service.shortName || service.name}
+                                        name={svcTagline.shortName || service.shortName || service.name}
                                         selected={selectedService?.id === service.id}
                                         dimmed={isOver}
                                         cheapest={i === domesticCheapest}
-                                        cheapestLabel={t("cheapest")}
+                                        cheapestLabel={tHome("cheapest")}
+                                        selectedCardHeader={tc("selectedCardHeader", { tag: svcTagline.shortTag })}
+                                        locale={locale}
+                                        currency={currency}
+                                        lkrPerUsd={lkrPerUsd}
                                         onSelect={() => setServiceId(service.id)}
                                         price={isOver || result.error ? null : result.totalCost}
                                         status={
                                             isOver && result.maxWeight
-                                                ? { text: `Max ${formatWeightLabel(result.maxWeight)}`, tone: "error" }
+                                                ? { text: tc("maxWeight", { weight: formatWeightLabel(result.maxWeight) }), tone: "error" }
                                                 : { text: "—", tone: "muted" }
                                         }
-                                        note={service.flatRate && !isOver ? "Flat" : undefined}
+                                        note={service.flatRate && !isOver ? tc("flatRate") : undefined}
                                     />
                                 );
                             })}
@@ -681,15 +1233,15 @@ export default function PostageCalculator({ initialMode = "ems" }: { initialMode
                     </fieldset>
 
                     {/* Compact Add-ons Bar */}
-                    <div className="grid grid-cols-2 gap-1.5 md:gap-2">
+                    <div className="grid grid-cols-2 gap-1.5 md:gap-2 pt-1 border-t border-border">
                         <div
                             className={cn(
-                                "flex items-center gap-2 rounded-md border-[1.5px] px-2.5 py-2 transition-colors min-h-[42px]",
+                                "flex items-center gap-2 rounded-md border-[1.5px] px-2 py-1.5 transition-colors min-h-[40px]",
                                 !canRegister
                                     ? "border-border/60 bg-muted/40 opacity-60"
                                     : registered
-                                        ? "border-foreground bg-card"
-                                        : "border-border bg-card"
+                                        ? "border-foreground bg-background"
+                                        : "border-border bg-background"
                             )}
                         >
                             <input
@@ -704,25 +1256,28 @@ export default function PostageCalculator({ initialMode = "ems" }: { initialMode
                             <label
                                 htmlFor={regCheckboxId}
                                 className={cn(
-                                    "flex-1 text-xs md:text-sm font-medium leading-tight select-none",
+                                    "flex-1 font-semibold leading-tight select-none",
+                                    isIndic ? "text-[11px] md:text-xs" : "text-xs md:text-sm",
                                     canRegister ? "cursor-pointer text-foreground" : "cursor-not-allowed text-muted-foreground"
                                 )}
                             >
-                                <span className="block">Registered</span>
-                                <span className="block font-mono text-[10px] md:text-[11px] text-muted-foreground">
-                                    {canRegister ? `+Rs. ${config.extraFees.registeredPost}` : "N/A for service"}
+                                <span className="block">{tc("registeredPost")}</span>
+                                <span className="block font-mono text-[10px] text-muted-foreground">
+                                    {canRegister
+                                        ? formatCurrencyAmount(config.extraFees.registeredPost, currency, lkrPerUsd, { plus: true })
+                                        : tc("naForService")}
                                 </span>
                             </label>
                         </div>
 
                         <div
                             className={cn(
-                                "flex items-center gap-2 rounded-md border-[1.5px] px-2.5 py-2 transition-colors min-h-[42px]",
+                                "flex items-center gap-2 rounded-md border-[1.5px] px-2 py-1.5 transition-colors min-h-[40px]",
                                 !canAr
                                     ? "border-border/60 bg-muted/40 opacity-60"
                                     : arReceipt
-                                        ? "border-foreground bg-card"
-                                        : "border-border bg-card"
+                                        ? "border-foreground bg-background"
+                                        : "border-border bg-background"
                             )}
                         >
                             <input
@@ -737,252 +1292,119 @@ export default function PostageCalculator({ initialMode = "ems" }: { initialMode
                             <label
                                 htmlFor={arCheckboxId}
                                 className={cn(
-                                    "flex-1 text-xs md:text-sm font-medium leading-tight select-none",
+                                    "flex-1 font-semibold leading-tight select-none",
+                                    isIndic ? "text-[11px] md:text-xs" : "text-xs md:text-sm",
                                     canAr ? "cursor-pointer text-foreground" : "cursor-not-allowed text-muted-foreground"
                                 )}
                             >
-                                <span className="block">AR Receipt</span>
-                                <span className="block font-mono text-[10px] md:text-[11px] text-muted-foreground">
-                                    {canAr ? `+Rs. ${config.extraFees.arReceipt}` : "N/A for service"}
+                                <span className="block">{tc("arReceipt")}</span>
+                                <span className="block font-mono text-[10px] text-muted-foreground">
+                                    {canAr
+                                        ? formatCurrencyAmount(config.extraFees.arReceipt, currency, lkrPerUsd, { plus: true })
+                                        : tc("naForService")}
                                 </span>
                             </label>
                         </div>
                     </div>
-                </>
+                </div>
             )}
 
-            {/* 4B. COD Mode: Collection Amount + 3-Part Formula Breakdown */}
+            {/* 4B. COD Mode: Step 3 Formula Breakdown */}
             {destination === "cod" && (
-                <div className="flex flex-col gap-2 md:gap-3">
-                    <div>
-                        <div className="flex items-center justify-between mb-1">
-                            <label htmlFor={codAmountId} className="label-mono">
-                                Amount to Collect (LKR)
-                            </label>
-                            <span className="font-mono text-[11px] text-muted-foreground">
-                                Max Rs. 100,000
-                            </span>
-                        </div>
-                        <div className="relative">
-                            <span
-                                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-xs font-semibold text-muted-foreground"
-                                aria-hidden="true"
-                            >
-                                Rs.
-                            </span>
-                            <input
-                                id={codAmountId}
-                                name="codAmount"
-                                type="text"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                enterKeyHint="done"
-                                autoComplete="off"
-                                value={codAmount}
-                                onChange={(e) => setCodAmount(sanitizeDigits(e.target.value))}
-                                placeholder="e.g. 2500"
-                                className="h-10 md:h-11 w-full rounded-md border-[1.5px] border-input bg-card pl-10 pr-3 font-mono text-base font-medium text-foreground focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-[3px] focus-visible:ring-primary/25"
-                            />
-                        </div>
-                        <div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
-                            {COD_AMOUNT_PRESETS.map((amt) => {
-                                const active = collectAmountNum === amt;
-                                return (
-                                    <button
-                                        key={amt}
-                                        type="button"
-                                        onClick={() => setCodAmount(String(amt))}
-                                        aria-pressed={active}
-                                        className={cn(
-                                            "tap shrink-0 rounded-full border px-2.5 py-1 font-mono text-[11px] md:text-xs font-semibold transition-colors",
-                                            active
-                                                ? "border-foreground bg-foreground text-background"
-                                                : "border-border bg-card text-foreground hover:border-foreground/60"
-                                        )}
-                                    >
-                                        Rs. {formatCompactAmount(amt)}
-                                    </button>
-                                );
-                            })}
-                        </div>
+                <div className="rounded-lg border-[1.5px] border-foreground bg-card p-2 md:p-3.5 shadow-[2px_2px_0_0_hsl(var(--foreground))] flex flex-col gap-1.5">
+                    <div
+                        className={cn(
+                            "flex items-center gap-1.5 font-heading font-extrabold uppercase tracking-wide text-foreground",
+                            isIndic ? "text-[11px] md:text-xs" : "text-xs md:text-sm"
+                        )}
+                    >
+                        <StepBadge step={3} />
+                        <span>{tc("step3CodTitle")}</span>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-1.5 md:gap-2.5">
-                        <div className="rounded-md border-[1.5px] border-border bg-card px-2.5 py-2">
-                            <span className="block font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                                SLP Courier
+                    <div className="grid grid-cols-3 gap-1.5 md:gap-2">
+                        <div className="rounded-md border-[1.5px] border-border bg-background px-2 py-1.5">
+                            <span className="block font-mono text-[9.5px] uppercase tracking-wider text-muted-foreground truncate">
+                                {tc("slpCourier")}
                             </span>
-                            <span className="block font-mono text-sm md:text-base font-bold text-foreground mt-0.5 tabular-nums">
-                                Rs. {codResult.courierFee.toLocaleString()}
-                            </span>
-                        </div>
-                        <div className="rounded-md border-[1.5px] border-border bg-card px-2.5 py-2">
-                            <span className="block font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                                PMT MO Fee
-                            </span>
-                            <span className="block font-mono text-sm md:text-base font-bold text-foreground mt-0.5 tabular-nums">
-                                Rs. {codResult.moneyOrderFee.toLocaleString()}
+                            <span className="block font-mono text-xs sm:text-sm md:text-base font-bold text-foreground mt-0.5 tabular-nums">
+                                {formatCurrencyAmount(codResult.courierFee, currency, lkrPerUsd)}
                             </span>
                         </div>
-                        <div className="rounded-md border-[1.5px] border-border bg-card px-2.5 py-2">
-                            <span className="block font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                                COD Service
+                        <div className="rounded-md border-[1.5px] border-border bg-background px-2 py-1.5">
+                            <span className="block font-mono text-[9.5px] uppercase tracking-wider text-muted-foreground truncate">
+                                {tc("pmtMoFee")}
                             </span>
-                            <span className="block font-mono text-sm md:text-base font-bold text-foreground mt-0.5 tabular-nums">
-                                Rs. {codResult.codServiceFee.toLocaleString()}
+                            <span className="block font-mono text-xs sm:text-sm md:text-base font-bold text-foreground mt-0.5 tabular-nums">
+                                {formatCurrencyAmount(codResult.moneyOrderFee, currency, lkrPerUsd)}
+                            </span>
+                        </div>
+                        <div className="rounded-md border-[1.5px] border-border bg-background px-2 py-1.5">
+                            <span className="block font-mono text-[9.5px] uppercase tracking-wider text-muted-foreground truncate">
+                                {tc("codService")}
+                            </span>
+                            <span className="block font-mono text-xs sm:text-sm md:text-base font-bold text-foreground mt-0.5 tabular-nums">
+                                {formatCurrencyAmount(codResult.codServiceFee, currency, lkrPerUsd)}
                             </span>
                         </div>
                     </div>
 
                     {codResult.subPostOfficeWarning && !codResult.error && (
-                        <p className="flex items-start gap-1.5 rounded-md border border-secondary bg-secondary/20 px-2.5 py-1.5 text-[11px] md:text-xs text-foreground">
+                        <p className="flex items-start gap-1.5 rounded-md border border-secondary bg-secondary/20 px-2.5 py-1.5 text-[10.5px] md:text-xs text-foreground leading-snug">
                             <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary" aria-hidden="true" />
-                            <span>
-                                Sub-Post Offices cap Money Orders at Rs. 25,000. Use a Main Post Office for amounts up to Rs. 100,000.
-                            </span>
+                            <span>{tc("subPoWarning")}</span>
                         </p>
                     )}
                 </div>
             )}
 
-            {/* 4C. International Mail Mode (Air Mail, U-Packet, TDS, Air Parcel, EMS, Sea Mail) */}
+            {/* 4C. International Mail Mode: Step 3 Service Selection Grid (High Above the Fold) */}
             {destination === "ems" && (
-                <div className="flex flex-col gap-1.5 md:gap-3">
-                    <div>
-                        <div className="flex items-center justify-between mb-1 gap-2">
-                            <label htmlFor={emsCountryId} className="label-mono">
-                                Destination Country
-                            </label>
-                            <button
-                                type="button"
-                                onClick={() => setShowCountryWhyNote((prev) => !prev)}
-                                aria-expanded={showCountryWhyNote}
-                                className="inline-flex items-center gap-1 font-mono text-[10px] md:text-[11px] font-semibold text-primary hover:underline"
-                            >
-                                <Info className="w-3 h-3 shrink-0" aria-hidden="true" />
-                                <span>{showCountryWhyNote ? "Hide coverage note" : "Country / service missing? Why"}</span>
-                            </button>
-                        </div>
-
-                        <div className="grid grid-cols-[1fr_auto] gap-1.5 md:gap-2 items-center">
-                            <select
-                                id={emsCountryId}
-                                name="emsCountry"
-                                value={emsCountryCode}
-                                onChange={(e) => setEmsCountryCode(e.target.value)}
-                                className="h-10 md:h-11 w-full rounded-md border-[1.5px] border-input bg-card px-2.5 md:px-3 text-base font-medium text-foreground focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-[3px] focus-visible:ring-primary/25"
-                            >
-                                {sortedEmsCountries.map((c) => {
-                                    const suffix =
-                                        c.suspensionStatus === "suspended"
-                                            ? " (Suspended)"
-                                            : c.suspensionStatus === "restricted"
-                                                ? " (Note)"
-                                                : "";
-                                    return (
-                                        <option key={c.code} value={c.code}>
-                                            {c.name}
-                                            {suffix}
-                                        </option>
-                                    );
-                                })}
-                            </select>
-
-                            <div
-                                role="group"
-                                aria-label="International transport mode"
-                                className="grid grid-cols-2 h-10 md:h-11 rounded-md border-[1.5px] border-foreground bg-card p-0.5 shrink-0"
-                            >
-                                <button
-                                    type="button"
-                                    onClick={() => handleIntlTransportChange("air")}
-                                    aria-pressed={intlTransport === "air"}
-                                    className={cn(
-                                        "tap flex items-center justify-center gap-1 rounded-[4px] px-2.5 text-xs md:text-sm font-semibold transition-colors",
-                                        intlTransport === "air"
-                                            ? "bg-[#1D4E9E] text-white"
-                                            : "text-muted-foreground hover:text-foreground"
-                                    )}
-                                >
-                                    <Plane className="w-4 h-4 shrink-0" aria-hidden="true" />
-                                    <span>Air</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => handleIntlTransportChange("sea")}
-                                    aria-pressed={intlTransport === "sea"}
-                                    className={cn(
-                                        "tap flex items-center justify-center gap-1 rounded-[4px] px-2.5 text-xs md:text-sm font-semibold transition-colors",
-                                        intlTransport === "sea"
-                                            ? "bg-[#0E4A6B] text-white"
-                                            : "text-muted-foreground hover:text-foreground"
-                                    )}
-                                >
-                                    <Ship className="w-4 h-4 shrink-0" aria-hidden="true" />
-                                    <span>Sea</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    {showCountryWhyNote && (
-                        <div className="rounded-md border border-foreground/30 bg-muted/40 px-2.5 py-1.5 text-[11px] leading-snug text-foreground space-y-0.5">
-                            <p className="font-semibold">Why a country or service may be unavailable:</p>
-                            <p className="text-muted-foreground">
-                                1) Direct air/sea dispatch required (e.g., Sea Mail suspended for Canada &amp; Maldives; unavailable for landlocked states).{" "}
-                                2) U-Packet &amp; TDS require bilateral UPU agreements.{" "}
-                                3) 19 EU states restrict commercial parcels €45–€150.{" "}
-                                4) Airspace/conflict suspensions apply to Israel, Lebanon, Russia &amp; Ukraine.
-                            </p>
-                        </div>
-                    )}
-
-                    {(activeEmsCountry?.restrictionNote ||
-                        (intlTransport === "sea" && activeEmsCountry?.seaMailAvailable === false)) && (
-                        <p
-                            className={cn(
-                                "flex items-start gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] md:text-xs leading-snug",
-                                activeEmsCountry?.suspensionStatus === "suspended"
-                                    ? "border-destructive/60 bg-destructive/10 text-destructive"
-                                    : "border-secondary bg-secondary/20 text-foreground"
-                            )}
-                        >
-                            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
-                            <span>
-                                {intlTransport === "sea" && activeEmsCountry?.seaMailAvailable === false && activeEmsCountry.seaMailNote
-                                    ? activeEmsCountry.seaMailNote
-                                    : activeEmsCountry?.restrictionNote}
-                            </span>
-                        </p>
-                    )}
-
+                <div className="rounded-lg border-[1.5px] border-foreground bg-card p-1.5 md:p-3.5 shadow-[2px_2px_0_0_hsl(var(--foreground))] flex flex-col gap-1.5">
                     <fieldset className="contents">
-                        <legend className="label-mono">
-                            {intlTransport === "air" ? "Air Mail Services · Live Prices" : "Sea Mail Services · Live Prices"}
+                        <legend className="flex items-center justify-between w-full mb-0.5">
+                            <span
+                                className={cn(
+                                    "flex items-center gap-1.5 font-heading font-extrabold uppercase tracking-wide text-foreground",
+                                    isIndic ? "text-[10.5px] md:text-xs" : "text-xs md:text-sm"
+                                )}
+                            >
+                                <StepBadge step={3} />
+                                <span>
+                                    {intlTransport === "air"
+                                        ? tc("step3AirTitle")
+                                        : tc("step3SeaTitle")}
+                                </span>
+                            </span>
                         </legend>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 md:gap-2">
                             {filteredIntlQuotes.map((quote, i) => {
                                 const isOver = quote.available && Boolean(quote.result.exceedsMaxWeight);
                                 const hasPrice = quote.available && !isOver && !quote.result.error;
+                                const svcTagline = getServiceTagline(quote.service.id, locale);
                                 return (
                                     <ServiceCard
                                         key={quote.service.id}
                                         serviceId={quote.service.id}
-                                        name={quote.service.shortName}
+                                        name={svcTagline.shortName || quote.service.shortName}
                                         selected={activeIntlQuote.service.id === quote.service.id}
                                         dimmed={!quote.available || isOver}
                                         cheapest={i === intlCheapest}
-                                        cheapestLabel={t("cheapest")}
+                                        cheapestLabel={tHome("cheapest")}
+                                        selectedCardHeader={tc("selectedCardHeader", { tag: svcTagline.shortName || svcTagline.shortTag })}
+                                        locale={locale}
+                                        currency={currency}
+                                        lkrPerUsd={lkrPerUsd}
                                         onSelect={() => setIntlServiceId(quote.service.id)}
                                         price={hasPrice ? quote.result.totalCost : null}
                                         status={
                                             !quote.available
                                                 ? { text: quote.shortUnavailableTag ?? "Unavailable", tone: "error" }
                                                 : isOver && quote.result.maxWeight
-                                                    ? { text: `Max ${formatWeightLabel(quote.result.maxWeight)}`, tone: "error" }
+                                                    ? { text: tc("maxWeight", { weight: formatWeightLabel(quote.result.maxWeight) }), tone: "error" }
                                                     : { text: "—", tone: "muted" }
                                         }
-                                        note={hasPrice && quote.service.supportsRegistration && intlRegistered ? "Reg" : undefined}
+                                        note={hasPrice && quote.service.supportsRegistration && intlRegistered ? tc("itemReg") : undefined}
                                     />
                                 );
                             })}
@@ -990,13 +1412,15 @@ export default function PostageCalculator({ initialMode = "ems" }: { initialMode
                     </fieldset>
 
                     {/* Foreign Registered Mail (+Rs. 870) + Group / Limit Info */}
-                    <div className="grid grid-cols-2 gap-1.5 md:gap-2">
+                    <div className="grid grid-cols-2 gap-1.5 md:gap-2 pt-1 border-t border-border">
                         <div
                             className={cn(
-                                "flex items-center gap-2 rounded-md border-[1.5px] px-2.5 py-1.5 transition-colors min-h-[40px]",
+                                "flex items-center gap-2 rounded-md border-[1.5px] px-2 py-1 transition-colors min-h-[38px]",
                                 !canIntlRegister
                                     ? "border-border/60 bg-muted/40 opacity-60"
-                                    : "border-border bg-card"
+                                    : intlRegistered
+                                        ? "border-foreground bg-background"
+                                        : "border-border bg-background"
                             )}
                         >
                             <input
@@ -1011,34 +1435,38 @@ export default function PostageCalculator({ initialMode = "ems" }: { initialMode
                             <label
                                 htmlFor={intlRegCheckboxId}
                                 className={cn(
-                                    "flex-1 text-xs md:text-sm font-medium leading-tight select-none",
+                                    "flex-1 font-semibold leading-tight select-none",
+                                    isIndic ? "text-[11px] md:text-xs" : "text-xs md:text-sm",
                                     canIntlRegister ? "cursor-pointer text-foreground" : "cursor-not-allowed text-muted-foreground"
                                 )}
                             >
-                                <span className="block">Registered</span>
-                                <span className="block font-mono text-[10px] md:text-[11px] text-muted-foreground">
-                                    {canIntlRegister ? `+Rs. ${foreignRegFeeAmount.toLocaleString()}` : "Tracked / N/A"}
+                                <span className="block">{tc("registeredShort")}</span>
+                                <span className="block font-mono text-[9.5px] md:text-[10.5px] text-muted-foreground">
+                                    {canIntlRegister
+                                        ? formatCurrencyAmount(foreignRegFeeAmount, currency, lkrPerUsd, { plus: true })
+                                        : tc("trackedNa")}
                                 </span>
                             </label>
                         </div>
 
-                        <div className="rounded-md border-[1.5px] border-border bg-card px-2.5 py-1.5 flex flex-col justify-center min-h-[40px]">
-                            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground leading-none">
-                                {activeIntlQuote.service.id === "ems" ? "EMS Tariff Zone" : "Country Group"}
+                        <div className="rounded-md border-[1.5px] border-border bg-background px-2 py-1 lg:px-3 lg:py-2 flex flex-col justify-center min-h-[38px] lg:min-h-[48px]">
+                            <span className="font-mono text-[9px] md:text-[10px] uppercase tracking-wider text-muted-foreground leading-none truncate">
+                                {activeIntlQuote.service.id === "ems" ? tc("emsTariffZone") : tc("countryGroup")}
                             </span>
-                            <span className="font-mono text-xs font-semibold text-foreground mt-0.5 truncate">
+                            <span className="font-mono text-[11px] md:text-xs lg:text-sm font-bold text-foreground mt-0.5 truncate">
                                 {activeIntlQuote.service.id === "ems"
-                                    ? `${activeEmsZone?.name ?? "EMS"} · Max ${formatWeightLabel(activeIntlQuote.result.maxWeight ?? activeIntlQuote.service.maxWeight)}`
-                                    : `Group ${activeEmsCountry?.group ?? "—"} · Max ${formatWeightLabel(activeIntlQuote.result.maxWeight ?? activeIntlQuote.service.maxWeight)}`}
+                                    ? `${localizedZone.short} · ${tc("maxWeight", { weight: formatWeightLabel(activeIntlQuote.result.maxWeight ?? activeIntlQuote.service.maxWeight) })}`
+                                    : `${tc("groupLabel", { group: activeEmsCountry?.group ?? "—" })} · ${tc("maxWeight", { weight: formatWeightLabel(activeIntlQuote.result.maxWeight ?? activeIntlQuote.service.maxWeight) })}`}
                             </span>
                         </div>
                     </div>
                 </div>
             )}
+            </div>
 
             {/* 5. Compact 1-line Mobile Reference Footer */}
             <p className="md:hidden text-center font-mono text-[10px] text-muted-foreground pt-0.5">
-                SL Post Tariff · Effective Feb 9, 2026
+                {tc("mobileFooter")}
             </p>
         </form>
     );

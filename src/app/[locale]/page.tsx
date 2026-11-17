@@ -1,10 +1,9 @@
 import { Suspense } from "react";
-import { Loader2 } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/navigation";
 import { Button } from "@/components/ui/button";
 import Postmark from "@/components/brand/Postmark";
-import SearchDirectory from "@/components/SearchDirectory";
+import HomeHero from "@/components/directory/HomeHero";
 
 export default async function Home() {
   const t = await getTranslations("Home");
@@ -16,7 +15,7 @@ export default async function Home() {
     "url": "https://lankapost.vercel.app/",
     "potentialAction": {
       "@type": "SearchAction",
-      "target": "https://lankapost.vercel.app/?q={search_term_string}",
+      "target": "https://lankapost.vercel.app/browse?q={search_term_string}",
       "query-input": "required name=search_term_string"
     }
   };
@@ -27,17 +26,11 @@ export default async function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <Suspense fallback={
-        <div className="flex justify-center py-20">
-          <Loader2 className="w-10 h-10 animate-spin text-primary" />
-        </div>
-      }>
-        <div suppressHydrationWarning className="flex-1 w-full bg-background relative z-20">
-          <SearchDirectory />
-        </div>
-      </Suspense>
+      <div suppressHydrationWarning className="w-full bg-background relative z-20">
+        <HomeHero />
+      </div>
 
-      <section className="border-t-2 border-foreground bg-card/50 py-10 md:py-14">
+      <section className=" bg-card/50 py-10 md:py-14 flex-1">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <div className="lg:col-span-2">

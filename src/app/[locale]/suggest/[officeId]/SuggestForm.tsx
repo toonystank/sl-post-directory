@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { Info, Send, Lock, Edit3, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +9,6 @@ import { Separator } from "@/components/ui/separator";
 import { useRouter, Link } from "@/navigation";
 import { useSession } from "next-auth/react";
 import { Turnstile } from "@marsidev/react-turnstile";
-import { useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Field {
@@ -26,6 +26,8 @@ interface Office {
 }
 
 export default function SuggestForm({ office }: { office: Office }) {
+    const t = useTranslations("Suggest");
+    const tAuth = useTranslations("Auth");
     const { status } = useSession();
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
@@ -62,10 +64,8 @@ export default function SuggestForm({ office }: { office: Office }) {
         const formData = new FormData(e.currentTarget);
         const data = Object.fromEntries(formData.entries());
 
-        // Add token and form type manually
         const payload: Record<string, FormDataEntryValue | string | null | undefined> = { ...data, officeId: office.id, turnstileToken, type: formType };
 
-        // Remove empty strings so they become `undefined` and pass Zod's `.optional()` validation
         Object.keys(payload).forEach(key => {
             if (payload[key] === "") {
                 delete payload[key];
@@ -104,7 +104,7 @@ export default function SuggestForm({ office }: { office: Office }) {
                 <div className="w-16 h-16 bg-status-open/10 text-status-open border border-status-open/40 rounded-full flex items-center justify-center mx-auto mb-4">
                     <Send className="w-8 h-8" />
                 </div>
-                <h3 className="font-heading text-xl font-extrabold [font-stretch:82%] text-foreground">Success!</h3>
+                <h3 className="font-heading text-xl font-extrabold [font-stretch:82%] text-foreground">{t("successTitle")}</h3>
                 <p className="text-muted-foreground">{message}</p>
             </div>
         );
@@ -113,7 +113,7 @@ export default function SuggestForm({ office }: { office: Office }) {
     if (status === "loading") {
         return (
             <div className="p-8 text-center font-mono text-sm text-muted-foreground">
-                Loading form...
+                {tAuth("loadingForm")}
             </div>
         );
     }
@@ -127,7 +127,7 @@ export default function SuggestForm({ office }: { office: Office }) {
                     className="flex-1 rounded-[4px]"
                     onClick={() => setFormType("EDIT")}
                 >
-                    <Edit3 className="w-4 h-4 mr-2" /> Suggest Edits
+                    <Edit3 className="w-4 h-4 mr-2" /> {t("tabEdit")}
                 </Button>
                 <Button
                     type="button"
@@ -135,16 +135,14 @@ export default function SuggestForm({ office }: { office: Office }) {
                     className={`flex-1 rounded-[4px] ${formType !== "REMOVAL" ? "hover:bg-destructive/10 hover:text-destructive" : ""}`}
                     onClick={() => setFormType("REMOVAL")}
                 >
-                    <Trash2 className="w-4 h-4 mr-2" /> Request Removal
+                    <Trash2 className="w-4 h-4 mr-2" /> {t("tabRemoval")}
                 </Button>
             </div>
 
             <div className="mb-4 p-4 bg-background border border-border rounded-md flex gap-3 text-sm text-muted-foreground">
                 <Info className="w-5 h-5 shrink-0 text-primary mt-0.5" />
                 <p>
-                    {formType === "EDIT"
-                        ? "Please enter your updated information below. All changes are subject to moderation by the admin team before they are published to the public directory."
-                        : "Use this form to request the removal of this post office if it is closed or does not exist. Our team will verify before removing it."}
+                    {formType === "EDIT" ? t("infoEdit") : t("infoRemoval")}
                 </p>
             </div>
 
@@ -160,27 +158,27 @@ export default function SuggestForm({ office }: { office: Office }) {
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div>
                                 <h3 className="font-heading font-extrabold text-lg text-primary flex items-center gap-2">
-                                    <Lock className="w-5 h-5" /> Sign up to Contribute
+                                    <Lock className="w-5 h-5" /> {t("signUpTitle")}
                                 </h3>
-                                <p className="text-sm text-muted-foreground">Create an account to track your edits.</p>
+                                <p className="text-sm text-muted-foreground">{t("signUpSub")}</p>
                             </div>
                             <Button variant="outline" size="sm" asChild>
-                                <Link href="/login">Already have an account? Log In</Link>
+                                <Link href="/login">{t("alreadyAccount")}</Link>
                             </Button>
                         </div>
                         <Separator />
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-muted-foreground mb-1.5" htmlFor="submitterName">Your Name</label>
+                                <label className="block text-sm font-medium text-muted-foreground mb-1.5" htmlFor="submitterName">{t("yourName")}</label>
                                 <Input type="text" id="submitterName" name="submitterName" required placeholder="Kasun Perera" />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-muted-foreground mb-1.5" htmlFor="submitterEmail">Your Email</label>
+                                <label className="block text-sm font-medium text-muted-foreground mb-1.5" htmlFor="submitterEmail">{t("yourEmail")}</label>
                                 <Input type="email" id="submitterEmail" name="submitterEmail" required placeholder="you@example.com" />
                             </div>
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-muted-foreground mb-1.5" htmlFor="submitterPassword">Create a Password</label>
+                                <label className="block text-sm font-medium text-muted-foreground mb-1.5" htmlFor="submitterPassword">{t("createPassword")}</label>
                                 <Input type="password" id="submitterPassword" name="submitterPassword" required placeholder="••••••••" minLength={8} />
                             </div>
                         </div>
@@ -190,24 +188,24 @@ export default function SuggestForm({ office }: { office: Office }) {
                 {formType === "EDIT" ? (
                     <>
                         <div className="space-y-4">
-                            <h3 className="font-heading font-extrabold text-lg">Basic Information</h3>
+                            <h3 className="font-heading font-extrabold text-lg">{t("basicInfo")}</h3>
                             <Separator />
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-muted-foreground mb-1.5">Office Name</label>
+                                    <label className="block text-sm font-medium text-muted-foreground mb-1.5">{t("officeName")}</label>
                                     <Input type="text" name="name" defaultValue={office.name} />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-muted-foreground mb-1.5">Postal Code</label>
+                                    <label className="block text-sm font-medium text-muted-foreground mb-1.5">{t("postalCode")}</label>
                                     <Input type="text" name="postalCode" defaultValue={office.postalCode} />
                                 </div>
                             </div>
                         </div>
 
                         <div className="space-y-4">
-                            <h3 className="font-heading font-extrabold text-lg">Additional Fields</h3>
+                            <h3 className="font-heading font-extrabold text-lg">{t("additionalFields")}</h3>
                             <Separator />
 
                             {(() => {
@@ -218,12 +216,11 @@ export default function SuggestForm({ office }: { office: Office }) {
                                 return (
                                     <>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {/* Standard Fields always rendered */}
                                             <div>
-                                                <label className="block text-sm font-medium text-muted-foreground mb-1.5">Division</label>
+                                                <label className="block text-sm font-medium text-muted-foreground mb-1.5">{t("division")}</label>
                                                 <Select name="field_Division" defaultValue={fieldMap.get("Division")}>
                                                     <SelectTrigger className="w-full h-10 bg-card text-sm">
-                                                        <SelectValue placeholder="Select Division" />
+                                                        <SelectValue placeholder={t("selectDivision")} />
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         {divisions.map(div => (
@@ -234,10 +231,10 @@ export default function SuggestForm({ office }: { office: Office }) {
                                             </div>
 
                                             <div>
-                                                <label className="block text-sm font-medium text-muted-foreground mb-1.5">Type</label>
+                                                <label className="block text-sm font-medium text-muted-foreground mb-1.5">{t("type")}</label>
                                                 <Select name="field_Type" defaultValue={fieldMap.get("Type") || "Post office"}>
                                                     <SelectTrigger className="w-full h-10 bg-card text-sm">
-                                                        <SelectValue placeholder="Select Type" />
+                                                        <SelectValue placeholder={t("selectType")} />
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         <SelectItem value="Post office">Post office</SelectItem>
@@ -250,30 +247,29 @@ export default function SuggestForm({ office }: { office: Office }) {
                                             </div>
 
                                             <div>
-                                                <label className="block text-sm font-medium text-muted-foreground mb-1.5">Delivery Facility</label>
+                                                <label className="block text-sm font-medium text-muted-foreground mb-1.5">{t("deliveryFacility")}</label>
                                                 <Select name="field_Delivery" defaultValue={fieldMap.get("Delivery") || "No"}>
                                                     <SelectTrigger className="w-full h-10 bg-card text-sm">
-                                                        <SelectValue placeholder="Select Delivery" />
+                                                        <SelectValue placeholder={t("selectDelivery")} />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        <SelectItem value="Yes">Yes</SelectItem>
-                                                        <SelectItem value="No">No</SelectItem>
+                                                        <SelectItem value="Yes">{t("yes")}</SelectItem>
+                                                        <SelectItem value="No">{t("no")}</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>
 
                                             <div>
-                                                <label className="block text-sm font-medium text-muted-foreground mb-1.5">Short Code</label>
+                                                <label className="block text-sm font-medium text-muted-foreground mb-1.5">{t("shortCode")}</label>
                                                 <Input type="text" name="field_Short Code" defaultValue={fieldMap.get("Short Code") || ""} placeholder="e.g. WP/CO" />
                                             </div>
 
                                             <div className="md:col-span-2">
-                                                <label className="block text-sm font-medium text-muted-foreground mb-1.5">Location</label>
+                                                <label className="block text-sm font-medium text-muted-foreground mb-1.5">{t("location")}</label>
                                                 <Input type="text" name="field_Location" defaultValue={fieldMap.get("Location") || ""} placeholder="Address or Location specifics" />
                                             </div>
                                         </div>
 
-                                        {/* Render any additional weird fields the DB might have */}
                                         {extraFields.length > 0 && (
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                                                 {extraFields.map(field => (
@@ -288,23 +284,22 @@ export default function SuggestForm({ office }: { office: Office }) {
                                 );
                             })()}
 
-
                             <div>
-                                <label className="block text-sm font-medium text-muted-foreground mb-1.5">Add New Field</label>
+                                <label className="block text-sm font-medium text-muted-foreground mb-1.5">{t("addNewField")}</label>
                                 <div className="flex gap-3">
-                                    <Input type="text" name="newFieldName" placeholder="Field name (e.g. Phone)" className="flex-1" />
-                                    <Input type="text" name="newFieldValue" placeholder="Value" className="flex-1" />
+                                    <Input type="text" name="newFieldName" placeholder={t("fieldNamePlaceholder")} className="flex-1" />
+                                    <Input type="text" name="newFieldValue" placeholder={t("fieldValuePlaceholder")} className="flex-1" />
                                 </div>
                             </div>
                         </div>
                     </>
                 ) : (
                     <div className="space-y-4">
-                        <h3 className="font-heading font-extrabold text-lg text-destructive">Removal Details</h3>
+                        <h3 className="font-heading font-extrabold text-lg text-destructive">{t("removalDetails")}</h3>
                         <Separator />
                         <div>
-                            <label className="block text-sm font-medium text-muted-foreground mb-1.5">Why should this be removed?</label>
-                            <Input type="text" name="reason" required placeholder="e.g. This post office closed in 2022" />
+                            <label className="block text-sm font-medium text-muted-foreground mb-1.5">{t("removalReasonLabel")}</label>
+                            <Input type="text" name="reason" required placeholder={t("removalReasonPlaceholder")} />
                         </div>
                     </div>
                 )}
@@ -325,7 +320,7 @@ export default function SuggestForm({ office }: { office: Office }) {
                 )}
 
                 <Button type="submit" disabled={loading} size="lg" className="w-full h-11 text-base">
-                    <Send className="w-5 h-5 mr-2" /> {loading ? "Submitting..." : "Submit for Review"}
+                    <Send className="w-5 h-5 mr-2" /> {loading ? t("submitting") : t("submitForReview")}
                 </Button>
             </form>
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Mail, Lock, AlertCircle, UserPlus, User } from "lucide-react";
 import { Link } from "@/navigation";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import StampLogo from "@/components/brand/StampLogo";
 import { Turnstile } from "@marsidev/react-turnstile";
 
 export default function RegisterPage() {
+    const t = useTranslations("Auth");
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -62,8 +64,8 @@ export default function RegisterPage() {
                 <div className="flex-1 flex flex-col justify-center p-6 md:p-8">
                     <div className="mb-6">
                         <StampLogo size={36} />
-                        <h1 className="display text-3xl mt-4">Create an Account</h1>
-                        <p className="text-sm text-muted-foreground mt-1">Become a contributor to Lanka Post Directory</p>
+                        <h1 className="display text-3xl mt-4">{t("registerTitle")}</h1>
+                        <p className="text-sm text-muted-foreground mt-1">{t("registerSub")}</p>
                     </div>
 
                     {error && (
@@ -83,7 +85,7 @@ export default function RegisterPage() {
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
                             <label className="label-mono block mb-1.5" htmlFor="name">
-                                Full Name
+                                {t("fullNameLabel")}
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted-foreground">
@@ -104,7 +106,7 @@ export default function RegisterPage() {
 
                         <div>
                             <label className="label-mono block mb-1.5" htmlFor="email">
-                                Email Address
+                                {t("emailLabel")}
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted-foreground">
@@ -125,7 +127,7 @@ export default function RegisterPage() {
 
                         <div>
                             <label className="label-mono block mb-1.5" htmlFor="password">
-                                Password
+                                {t("passwordLabel")}
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted-foreground">
@@ -162,14 +164,14 @@ export default function RegisterPage() {
                             className="w-full h-11 mt-2 text-base"
                             size="lg"
                         >
-                            {loading ? "Creating account..." : "Register"}
+                            {loading ? t("creatingAccount") : t("registerLink")}
                         </Button>
                     </form>
 
                     <div className="mt-6 pt-4 border-t border-border text-center text-sm text-muted-foreground">
-                        Already have an account?{" "}
+                        {t("haveAccount")}{" "}
                         <Link href="/login" className="text-primary hover:underline font-semibold">
-                            Sign In
+                            {t("signIn")}
                         </Link>
                     </div>
                 </div>

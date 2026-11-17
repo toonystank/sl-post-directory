@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { ImageIcon, Expand, X } from "lucide-react";
 
@@ -15,6 +16,7 @@ interface PhotoGalleryProps {
 }
 
 export default function PhotoGallery({ photos, officeName }: PhotoGalleryProps) {
+    const t = useTranslations("Photos");
     const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
 
     if (!photos || photos.length === 0) {
@@ -23,8 +25,8 @@ export default function PhotoGallery({ photos, officeName }: PhotoGalleryProps) 
                 <div className="w-12 h-12 rounded-md bg-muted flex items-center justify-center mx-auto mb-3">
                     <ImageIcon className="w-6 h-6 text-muted-foreground" />
                 </div>
-                <p className="text-sm text-muted-foreground">No community photos yet.</p>
-                <p className="text-xs text-muted-foreground/70 mt-1">Be the first to upload a photo!</p>
+                <p className="text-sm text-muted-foreground">{t("noPhotos")}</p>
+                <p className="text-xs text-muted-foreground/70 mt-1">{t("beFirst")}</p>
             </div>
         );
     }
