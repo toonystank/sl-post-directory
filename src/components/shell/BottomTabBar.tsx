@@ -4,6 +4,7 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/navigation";
 import { Home, FolderOpen, Calculator, Package, Menu } from "lucide-react";
+import { m } from "motion/react";
 import { cn } from "@/lib/utils";
 import MoreSheet from "./MoreSheet";
 
@@ -44,13 +45,22 @@ export default function BottomTabBar() {
                                     active ? "text-primary" : "text-muted-foreground"
                                 )}
                             >
-                                <span
-                                    className={cn(
-                                        "flex h-7 w-12 items-center justify-center rounded-full transition-colors",
-                                        active && "bg-secondary text-secondary-foreground"
+                                <span className="relative flex h-7 w-12 items-center justify-center rounded-full">
+                                    {active && !moreOpen && (
+                                        <m.span
+                                            layoutId="mobile-tab-pill"
+                                            transition={{ type: "spring", stiffness: 480, damping: 34 }}
+                                            className="absolute inset-0 rounded-full bg-secondary"
+                                            aria-hidden="true"
+                                        />
                                     )}
-                                >
-                                    <Icon className="h-[1.15rem] w-[1.15rem]" strokeWidth={active ? 2.4 : 2} />
+                                    <Icon
+                                        className={cn(
+                                            "relative z-10 h-[1.15rem] w-[1.15rem] transition-colors",
+                                            active && !moreOpen && "text-secondary-foreground"
+                                        )}
+                                        strokeWidth={active ? 2.4 : 2}
+                                    />
                                 </span>
                                 <span className="leading-none">{label}</span>
                             </Link>
@@ -66,8 +76,16 @@ export default function BottomTabBar() {
                                 moreOpen ? "text-primary" : "text-muted-foreground"
                             )}
                         >
-                            <span className={cn("flex h-7 w-12 items-center justify-center rounded-full", moreOpen && "bg-secondary text-secondary-foreground")}>
-                                <Menu className="h-[1.15rem] w-[1.15rem]" />
+                            <span className="relative flex h-7 w-12 items-center justify-center rounded-full">
+                                {moreOpen && (
+                                    <m.span
+                                        layoutId="mobile-tab-pill"
+                                        transition={{ type: "spring", stiffness: 480, damping: 34 }}
+                                        className="absolute inset-0 rounded-full bg-secondary"
+                                        aria-hidden="true"
+                                    />
+                                )}
+                                <Menu className={cn("relative z-10 h-[1.15rem] w-[1.15rem]", moreOpen && "text-secondary-foreground")} />
                             </span>
                             <span className="leading-none">{t("tabMore")}</span>
                         </button>

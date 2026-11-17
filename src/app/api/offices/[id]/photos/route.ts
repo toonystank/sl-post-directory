@@ -1,50 +1,63 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { hasDatabaseUrl, prisma } from "@/lib/prisma";
+import { checkRateLimit, rateLimiters, rateLimitHeaders } from "@/lib/rate-limiter";
+import { photoUploadSchema } from "@/lib/validations";
 
 export async function POST(
     req: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { id } = await params;
-        const body = await req.json();
-        const { url, caption } = body;
-
-        if (!url) {
+        const rateLimit = await checkRateLimit(req, rateLimiters.photos);
+        if (rateLimit.isRateLimited) {
             return NextResponse.json(
-                { error: "URL is required" },
+                { error: "Too many photo uploads. Please try again later." },
+                { status: 429, headers: rateLimitHeaders(rateLimit) }
+            );
+        }
+
+        if (!hasDatabaseUrl) {
+            return NextResponse.json({ error: "Database unavailable in preview mode" }, { status: 503 });
+        }
+
+        const { id } = await params;
+        const officeId = id?.trim();
+        if (!officeId || officeId.length > 64) {
+            return NextResponse.json({ error: "Invalid post office ID" }, { status: 400 });
+        }
+
+        const body = await req.json();
+        const parsed = photoUploadSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: parsed.error.issues[0]?.message || "Invalid photo payload" },
                 { status: 400 }
             );
         }
 
-        // Verify office exists
+        const { url, caption } = parsed.data;
+
         const office = await prisma.postOffice.findUnique({
-            where: { id },
+            where: { id: officeId },
+            select: { id: true },
         });
 
         if (!office) {
-            return NextResponse.json(
-                { error: "Post office not found" },
-                { status: 404 }
-            );
+            return NextResponse.json({ error: "Post office not found" }, { status: 404 });
         }
 
-        // Save photo record
         const photo = await prisma.communityPhoto.create({
             data: {
                 url,
-                caption,
-                postOfficeId: id,
-                status: "APPROVED", // Auto-approve for now
+                caption: caption || null,
+                postOfficeId: officeId,
+                status: "APPROVED",
             },
         });
 
-        return NextResponse.json({ success: true, photo });
+        return NextResponse.json({ success: true, photo }, { status: 201 });
     } catch (error) {
         console.error("Error creating photo:", error);
-        return NextResponse.json(
-            { error: "Internal Server Error" },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

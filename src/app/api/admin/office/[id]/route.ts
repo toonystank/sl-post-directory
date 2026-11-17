@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
+import { updateOfficeSchema } from "@/lib/validations";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -18,8 +19,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             include: {
                 fields: true,
                 controllingOffice: { select: { id: true, name: true, postalCode: true } },
-                controlledOffices: { select: { id: true, name: true, postalCode: true } }
-            }
+                controlledOffices: { select: { id: true, name: true, postalCode: true } },
+            },
         });
 
         if (!office) {
@@ -27,7 +28,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         }
 
         return NextResponse.json({ office });
-    } catch (error: any) {
+    } catch (error) {
         console.error("Admin Get Office Error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
@@ -44,7 +45,15 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         }
 
         const body = await req.json();
-        const { name, postalCode, newFieldName, newFieldValue, controllingOfficeId, controlledOfficesIds, ...fields } = body;
+        const parsed = updateOfficeSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: parsed.error.issues[0]?.message || "Invalid office update payload" },
+                { status: 400 }
+            );
+        }
+
+        const { name, postalCode, newFieldName, newFieldValue, controllingOfficeId, controlledOfficesIds, ...fields } = parsed.data;
 
         // Start a transaction to safely update fields
         const result = await prisma.$transaction(async (tx) => {
@@ -52,23 +61,23 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
             if (controlledOfficesIds !== undefined) {
                 await tx.postOffice.updateMany({
                     where: { controllingOfficeId: id },
-                    data: { controllingOfficeId: null }
+                    data: { controllingOfficeId: null },
                 });
             }
 
             // Update the core office data and relations
             const updatedOffice = await tx.postOffice.update({
                 where: { id },
-                data: { 
-                    name, 
+                data: {
+                    name,
                     postalCode,
                     ...(controllingOfficeId !== undefined && { controllingOfficeId: controllingOfficeId || null }),
-                    ...(controlledOfficesIds !== undefined && Array.isArray(controlledOfficesIds) && {
+                    ...(controlledOfficesIds !== undefined && {
                         controlledOffices: {
-                            connect: controlledOfficesIds.map((childId: string) => ({ id: childId }))
-                        }
-                    })
-                }
+                            connect: controlledOfficesIds.map((childId) => ({ id: childId })),
+                        },
+                    }),
+                },
             });
 
             // Delete all existing fields

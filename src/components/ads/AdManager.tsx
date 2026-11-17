@@ -5,6 +5,7 @@ import Script from "next/script";
 import { usePathname } from "@/navigation";
 
 const NON_CONTENT_PREFIXES = ["/login", "/register", "/dashboard", "/suggest"];
+let cachedAdsEnabled: boolean | null = null;
 
 interface AdContextType {
     adsEnabled: boolean;
@@ -42,15 +43,20 @@ export default function AdManager({ children }: { children: React.ReactNode }) {
         setIsNative(native);
 
         const init = async () => {
-            // Fetch ad settings
-            try {
-                const res = await fetch("/api/admin/settings");
-                if (res.ok) {
-                    const data = await res.json();
-                    if (isMounted) setAdsEnabled(data.adsEnabled);
+            if (cachedAdsEnabled !== null) {
+                if (isMounted) setAdsEnabled(cachedAdsEnabled);
+            } else {
+                // Fetch ad settings once per session
+                try {
+                    const res = await fetch("/api/admin/settings");
+                    if (res.ok) {
+                        const data = await res.json();
+                        cachedAdsEnabled = Boolean(data.adsEnabled);
+                        if (isMounted) setAdsEnabled(cachedAdsEnabled);
+                    }
+                } catch {
+                    // Default to true on error
                 }
-            } catch {
-                // Default to true on error
             }
 
             // Initialize AdMob for native — dynamically imported
@@ -85,7 +91,6 @@ export default function AdManager({ children }: { children: React.ReactNode }) {
             {/* Conditionally load AdSense script only when ads are enabled on content pages */}
             {effectiveAdsEnabled && !isNative && (
                 <Script
-                    async
                     src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2503310431210239"
                     crossOrigin="anonymous"
                     strategy="lazyOnload"

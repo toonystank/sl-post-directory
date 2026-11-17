@@ -11,16 +11,21 @@ interface ExchangeRateCache {
 let cachedRate: ExchangeRateCache | null = null;
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
+const EXCHANGE_CACHE_CONTROL = "public, max-age=300, s-maxage=3600, stale-while-revalidate=21600";
+
 export async function GET() {
     const now = Date.now();
     if (cachedRate && cachedRate.expiresAt > now) {
-        return NextResponse.json({
-            base: "USD",
-            target: "LKR",
-            rate: cachedRate.rate,
-            source: cachedRate.source,
-            updatedAt: cachedRate.updatedAt,
-        });
+        return NextResponse.json(
+            {
+                base: "USD",
+                target: "LKR",
+                rate: cachedRate.rate,
+                source: cachedRate.source,
+                updatedAt: cachedRate.updatedAt,
+            },
+            { headers: { "Cache-Control": EXCHANGE_CACHE_CONTROL } }
+        );
     }
 
     try {
@@ -42,24 +47,30 @@ export async function GET() {
                     updatedAt: data.time_last_update_utc || new Date().toISOString(),
                     expiresAt: now + CACHE_TTL_MS,
                 };
-                return NextResponse.json({
-                    base: "USD",
-                    target: "LKR",
-                    rate: cachedRate.rate,
-                    source: cachedRate.source,
-                    updatedAt: cachedRate.updatedAt,
-                });
+                return NextResponse.json(
+                    {
+                        base: "USD",
+                        target: "LKR",
+                        rate: cachedRate.rate,
+                        source: cachedRate.source,
+                        updatedAt: cachedRate.updatedAt,
+                    },
+                    { headers: { "Cache-Control": EXCHANGE_CACHE_CONTROL } }
+                );
             }
         }
     } catch {
         // Fallback smoothly if network is unavailable
     }
 
-    return NextResponse.json({
-        base: "USD",
-        target: "LKR",
-        rate: DEFAULT_USD_TO_LKR_RATE,
-        source: "fallback",
-        updatedAt: new Date().toISOString(),
-    });
+    return NextResponse.json(
+        {
+            base: "USD",
+            target: "LKR",
+            rate: DEFAULT_USD_TO_LKR_RATE,
+            source: "fallback",
+            updatedAt: new Date().toISOString(),
+        },
+        { headers: { "Cache-Control": "public, max-age=60, s-maxage=300" } }
+    );
 }

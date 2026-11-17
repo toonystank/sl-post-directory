@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useId, useMemo } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { m, AnimatePresence } from "motion/react";
 import {
     Mail,
     Banknote,
@@ -47,6 +48,10 @@ const DOMESTIC_WEIGHT_PRESETS = [30, 100, 250, 500, 1000, 2000, 5000, 10000];
 const COD_WEIGHT_PRESETS = [250, 500, 1000, 2000, 5000, 10000, 20000, 40000];
 const INTL_WEIGHT_PRESETS = [20, 50, 100, 250, 500, 1000, 2000, 5000];
 const COD_AMOUNT_PRESETS = [1000, 2500, 5000, 10000, 25000, 50000];
+
+let cachedRateConfig: RateConfig | null = null;
+let cachedRateConfigTimestamp = 0;
+const RATE_CACHE_TTL_MS = 10 * 60_000;
 
 /** Index of the cheapest valid quote (only when 2+ are valid), else -1. */
 function cheapestIndex(prices: (number | null)[]): number {
@@ -128,13 +133,16 @@ function ServiceCard({
     const priceParts = price !== null ? splitCurrencyPrice(price, currency, lkrPerUsd) : null;
 
     return (
-        <button
+        <m.button
             type="button"
             onClick={onSelect}
             aria-pressed={selected}
+            whileHover={{ y: -1.5 }}
+            whileTap={{ scale: 0.985 }}
+            transition={{ type: "spring", stiffness: 480, damping: 30 }}
             style={serviceStyle(color)}
             className={cn(
-                "svc tap relative flex flex-col justify-between overflow-hidden rounded-md text-left transition-all min-h-[56px] md:min-h-[76px] lg:min-h-[96px]",
+                "svc tap relative flex flex-col justify-between overflow-hidden rounded-md text-left transition-colors min-h-[56px] md:min-h-[76px] lg:min-h-[96px]",
                 selected
                     ? "border-2 border-[var(--c)] bg-[color-mix(in_srgb,var(--c)_13%,hsl(var(--card)))] shadow-[0_2px_0_0_var(--c)] ring-1 ring-[var(--c)]/40"
                     : dimmed
@@ -235,7 +243,7 @@ function ServiceCard({
                     </span>
                 </div>
             </div>
-        </button>
+        </m.button>
     );
 }
 
@@ -274,9 +282,14 @@ export default function PostageCalculator({ initialMode = "ems" }: { initialMode
 
     useEffect(() => {
         let active = true;
+        if (cachedRateConfig && Date.now() - cachedRateConfigTimestamp < RATE_CACHE_TTL_MS) {
+            setConfig(cachedRateConfig);
+            return;
+        }
+        const controller = new AbortController();
         const fetchConfig = async () => {
             try {
-                const res = await fetch("/api/admin/variables");
+                const res = await fetch("/api/admin/variables", { signal: controller.signal });
                 if (!res.ok || !active) return;
                 const vars = await res.json();
                 if (!Array.isArray(vars) || !active) return;
@@ -294,6 +307,8 @@ export default function PostageCalculator({ initialMode = "ems" }: { initialMode
                 }
 
                 const merged = mergeWithDefaultConfig(loaded);
+                cachedRateConfig = merged;
+                cachedRateConfigTimestamp = Date.now();
                 if (active) {
                     setConfig(merged);
                     setServiceId((prev) =>
@@ -308,12 +323,14 @@ export default function PostageCalculator({ initialMode = "ems" }: { initialMode
                     );
                 }
             } catch (e) {
+                if ((e as Error)?.name === "AbortError") return;
                 console.error("Failed to load rates config", e);
             }
         };
         fetchConfig();
         return () => {
             active = false;
+            controller.abort();
         };
     }, []);
 
@@ -706,15 +723,24 @@ export default function PostageCalculator({ initialMode = "ems" }: { initialMode
                                 <label
                                     htmlFor={inputId}
                                     className={cn(
-                                        "tap flex w-full min-h-[38px] md:min-h-[54px] cursor-pointer flex-col items-center justify-center gap-0.5 rounded-md px-1 py-0.5 font-bold transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-ring peer-focus-visible:outline-offset-1 text-center",
+                                        "tap relative flex w-full min-h-[38px] md:min-h-[54px] cursor-pointer flex-col items-center justify-center gap-0.5 rounded-md px-1 py-0.5 font-bold transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-ring peer-focus-visible:outline-offset-1 text-center",
                                         isIndic ? "text-[10.5px] md:text-sm" : "text-xs md:text-sm",
                                         checked
-                                            ? "bg-[var(--c)] text-white dark:text-background shadow-[0_2px_0_0_hsl(var(--foreground))]"
+                                            ? "text-white dark:text-background"
                                             : "text-[var(--c)] hover:bg-muted"
                                     )}
                                 >
-                                    <Icon className="w-4 h-4 md:w-6 md:h-6 shrink-0" strokeWidth={2.2} aria-hidden="true" />
-                                    <span className="leading-tight truncate max-w-full">{label}</span>
+                                    {checked && (
+                                        <m.span
+                                            layoutId={`calc-mode-pill-${uid}`}
+                                            transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                                            style={{ backgroundColor: "var(--c)" }}
+                                            className="absolute inset-0 rounded-md shadow-[0_2px_0_0_hsl(var(--foreground))]"
+                                            aria-hidden="true"
+                                        />
+                                    )}
+                                    <Icon className="relative z-10 w-4 h-4 md:w-6 md:h-6 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+                                    <span className="relative z-10 leading-tight truncate max-w-full">{label}</span>
                                 </label>
                             </div>
                         );
@@ -804,7 +830,11 @@ export default function PostageCalculator({ initialMode = "ems" }: { initialMode
                                         {CURRENCY_META[currency].symbol} {currency}
                                     </span>
                                 </span>
-                                <span
+                                <m.span
+                                    key={`${activeServiceKey}-${currency}-${banner.total ?? "err"}`}
+                                    initial={{ opacity: 0.65, y: 3 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.18, ease: "easeOut" }}
                                     data-testid="banner-total-price"
                                     className={cn(
                                         "block font-mono text-xl sm:text-2xl md:text-4xl font-bold tabular-nums leading-tight",
@@ -819,7 +849,7 @@ export default function PostageCalculator({ initialMode = "ems" }: { initialMode
                                                 : `${parts.symbol} ${parts.value}`;
                                         })()
                                         : "—"}
-                                </span>
+                                </m.span>
                                 {currency === "USD" && banner.total !== null && (
                                     <span className="block font-mono text-[10px] font-medium text-foreground/75 tabular-nums leading-none mt-0.5">
                                         {tc("lkrEquivalent", { amount: banner.total.toLocaleString() })}
@@ -1065,12 +1095,22 @@ export default function PostageCalculator({ initialMode = "ems" }: { initialMode
                             </div>
                         </div>
 
-                        {showCountryWhyNote && (
-                            <div className="rounded-md border border-foreground/30 bg-muted/40 px-2.5 py-1.5 text-[11px] leading-snug text-foreground space-y-0.5">
-                                <p className="font-semibold">{tc("whyTitle")}</p>
-                                <p className="text-muted-foreground">{tc("whyBody")}</p>
-                            </div>
-                        )}
+                        <AnimatePresence initial={false}>
+                            {showCountryWhyNote && (
+                                <m.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: "auto" }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    transition={{ duration: 0.2, ease: "easeOut" }}
+                                    className="overflow-hidden"
+                                >
+                                    <div className="rounded-md border border-foreground/30 bg-muted/40 px-2.5 py-1.5 text-[11px] leading-snug text-foreground space-y-0.5">
+                                        <p className="font-semibold">{tc("whyTitle")}</p>
+                                        <p className="text-muted-foreground">{tc("whyBody")}</p>
+                                    </div>
+                                </m.div>
+                            )}
+                        </AnimatePresence>
 
                         {(activeEmsCountry?.restrictionNote ||
                             (intlTransport === "sea" && activeEmsCountry?.seaMailAvailable === false)) && (

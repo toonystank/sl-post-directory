@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Link } from "@/navigation";
 import { ChevronRight, ChevronDown, Copy, Check, Phone } from "lucide-react";
+import { m, AnimatePresence } from "motion/react";
 import { useLocale, useTranslations } from "next-intl";
 import { PostOffice } from "./types";
 import { getPostOfficeStatus } from "@/lib/holidays";
@@ -56,7 +57,7 @@ export default function PostOfficeCard({ office }: PostOfficeCardProps) {
     };
 
     return (
-        <li className="cv-auto rounded-xl border-2 border-foreground bg-card px-3.5 py-3 shadow-[0_2px_0_0_hsl(var(--foreground))] transition-colors hover:border-primary/80">
+        <li className="cv-auto rounded-xl border-2 border-foreground bg-card px-3.5 py-3 shadow-[0_2px_0_0_hsl(var(--foreground))] transition-transform duration-150 hover:-translate-y-0.5 hover:border-primary/80">
             <div className="flex items-center justify-between gap-2.5 sm:gap-4">
                 {/* Left: Office Name + Type · Division · Open/Closed */}
                 <Link
@@ -133,24 +134,32 @@ export default function PostOfficeCard({ office }: PostOfficeCardProps) {
                         aria-expanded={isExpanded}
                         className="tap -ml-1 inline-flex items-center gap-1 rounded px-1 py-0.5 text-xs font-semibold text-muted-foreground hover:text-primary"
                     >
-                        <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", isExpanded && "rotate-180")} />
+                        <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-150", isExpanded && "rotate-180")} />
                         {ts("subOffices", { count: subs.length })}
                     </button>
-                    {isExpanded && (
-                        <ul className="ml-1 mt-1.5 space-y-1 border-l-2 border-secondary pl-3">
-                            {subs.map((sub) => (
-                                <li key={sub.id}>
-                                    <Link
-                                        href={`/office/${sub.slug}`}
-                                        className="tap flex items-center justify-between gap-3 py-1.5 text-sm hover:text-primary"
-                                    >
-                                        <span className="truncate font-medium">{sub.name}</span>
-                                        <span className="font-mono text-xs font-bold text-muted-foreground">{sub.postalCode || "—"}</span>
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
+                    <AnimatePresence initial={false}>
+                        {isExpanded && (
+                            <m.ul
+                                initial={{ opacity: 0, y: -4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -4 }}
+                                transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+                                className="ml-1 mt-1.5 space-y-1 border-l-2 border-secondary pl-3"
+                            >
+                                {subs.map((sub) => (
+                                    <li key={sub.id}>
+                                        <Link
+                                            href={`/office/${sub.slug}`}
+                                            className="tap flex items-center justify-between gap-3 py-1.5 text-sm hover:text-primary"
+                                        >
+                                            <span className="truncate font-medium">{sub.name}</span>
+                                            <span className="font-mono text-xs font-bold text-muted-foreground">{sub.postalCode || "—"}</span>
+                                        </Link>
+                                    </li>
+                                ))}
+                            </m.ul>
+                        )}
+                    </AnimatePresence>
                 </div>
             )}
         </li>

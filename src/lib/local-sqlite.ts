@@ -48,6 +48,17 @@ export interface LocalOfficeRecord {
     controlledOffices: LocalOfficeLink[];
 }
 
+interface IndexedLocalOffice {
+    record: LocalOfficeRecord;
+    nameLower: string;
+    baseSlug: string;
+    codeLower: string;
+    firstChar: string;
+    divisionLower: string;
+    fieldsLower: string[];
+    servicesLower: Set<string>;
+}
+
 interface SqliteRow {
     id: string | number;
     name: string;
@@ -73,6 +84,9 @@ interface SqliteModule {
 }
 
 let cachedOffices: LocalOfficeRecord[] | null = null;
+let cachedIndex: IndexedLocalOffice[] | null = null;
+let slugMap: Map<string, LocalOfficeRecord> | null = null;
+let idMap: Map<string, LocalOfficeRecord> | null = null;
 
 function createBaseSlug(name: string): string {
     return name
@@ -106,9 +120,39 @@ function getSqliteModule(): SqliteModule | null {
     return null;
 }
 
+function buildSearchIndex(offices: LocalOfficeRecord[]): void {
+    const slugs = new Map<string, LocalOfficeRecord>();
+    const ids = new Map<string, LocalOfficeRecord>();
+
+    cachedIndex = offices.map((record) => {
+        ids.set(String(record.id), record);
+        slugs.set(record.slug, record);
+        const base = createBaseSlug(record.name);
+        if (base && !slugs.has(base)) {
+            slugs.set(base, record);
+        }
+
+        const divisionField = record.fields.find((f) => f.name === "Division");
+        return {
+            record,
+            nameLower: record.name.toLowerCase(),
+            baseSlug: base,
+            codeLower: record.postalCode.toLowerCase(),
+            firstChar: record.name.charAt(0).toUpperCase(),
+            divisionLower: divisionField ? divisionField.value.toLowerCase() : "",
+            fieldsLower: record.fields.map((f) => f.value.toLowerCase()),
+            servicesLower: new Set(record.services.map((s) => s.toLowerCase())),
+        };
+    });
+
+    slugMap = slugs;
+    idMap = ids;
+}
+
 /**
  * Loads and caches all Sri Lankan post offices from `prisma/dev.db`
- * using Node's built-in `node:sqlite` module in read-only mode.
+ * using Node's built-in `node:sqlite` module in read-only mode,
+ * with precomputed lowercase indices for O(1) id/slug lookup and sub-ms filtering.
  */
 export function loadLocalOffices(): LocalOfficeRecord[] {
     if (cachedOffices !== null) {
@@ -118,12 +162,14 @@ export function loadLocalOffices(): LocalOfficeRecord[] {
     const dbPath = path.join(process.cwd(), "prisma", "dev.db");
     if (!fs.existsSync(dbPath)) {
         cachedOffices = [];
+        buildSearchIndex([]);
         return cachedOffices;
     }
 
     const sqliteMod = getSqliteModule();
     if (!sqliteMod) {
         cachedOffices = [];
+        buildSearchIndex([]);
         return cachedOffices;
     }
 
@@ -185,9 +231,11 @@ export function loadLocalOffices(): LocalOfficeRecord[] {
         });
 
         cachedOffices = offices;
+        buildSearchIndex(offices);
         return cachedOffices;
     } catch {
         cachedOffices = [];
+        buildSearchIndex([]);
         return cachedOffices;
     } finally {
         try {
@@ -210,31 +258,22 @@ export function queryLocalOffices(params: {
     total: number;
     nextCursor: number | null;
 } {
-    const allOffices = loadLocalOffices();
-    let filtered = allOffices;
+    loadLocalOffices();
+    let filtered = cachedIndex ?? [];
 
     const letter = params.letter?.trim() || "";
     if (letter && letter.toLowerCase() !== "all") {
-        const letterUpper = letter.toUpperCase();
-        filtered = filtered.filter((o) =>
-            o.name.toUpperCase().startsWith(letterUpper)
-        );
+        const letterUpper = letter.charAt(0).toUpperCase();
+        filtered = filtered.filter((item) => item.firstChar === letterUpper);
     }
 
     const service = params.service?.trim() || "";
     if (service) {
         const serviceLower = service.toLowerCase();
-        const hasServicesProvided = filtered.some((o) =>
-            o.fields.some((f) => f.name === "Services Provided")
-        );
         filtered = filtered.filter(
-            (o) =>
-                o.services.some((s) => s.toLowerCase() === serviceLower) ||
-                o.fields.some(
-                    (f) =>
-                        (hasServicesProvided ? f.name === "Services Provided" : true) &&
-                        f.value.toLowerCase().includes(serviceLower)
-                )
+            (item) =>
+                item.servicesLower.has(serviceLower) ||
+                item.fieldsLower.some((val) => val.includes(serviceLower))
         );
     }
 
@@ -244,50 +283,35 @@ export function queryLocalOffices(params: {
         const mode = params.mode || "name";
 
         if (mode === "division") {
-            filtered = filtered.filter((o) =>
-                o.fields.some(
-                    (f) =>
-                        f.name === "Division" &&
-                        f.value.toLowerCase().includes(qLower)
-                )
-            );
+            filtered = filtered.filter((item) => item.divisionLower.includes(qLower));
         } else {
-            filtered = filtered.filter(
-                (o) =>
-                    o.name.toLowerCase().includes(qLower) ||
-                    o.postalCode.toLowerCase().includes(qLower) ||
-                    o.fields.some((f) => f.value.toLowerCase().includes(qLower))
-            );
+            const exact: IndexedLocalOffice[] = [];
+            const prefix: IndexedLocalOffice[] = [];
+            const contains: IndexedLocalOffice[] = [];
 
-            filtered = [...filtered].sort((a, b) => {
-                const aName = a.name.toLowerCase();
-                const bName = b.name.toLowerCase();
-                const aCode = a.postalCode.toLowerCase();
-                const bCode = b.postalCode.toLowerCase();
+            for (const item of filtered) {
+                if (item.nameLower === qLower || item.codeLower === qLower) {
+                    exact.push(item);
+                } else if (item.nameLower.startsWith(qLower) || item.codeLower.startsWith(qLower)) {
+                    prefix.push(item);
+                } else if (
+                    item.nameLower.includes(qLower) ||
+                    item.codeLower.includes(qLower) ||
+                    item.fieldsLower.some((val) => val.includes(qLower))
+                ) {
+                    contains.push(item);
+                }
+            }
 
-                const aRank =
-                    aName === qLower || aCode === qLower
-                        ? 0
-                        : aName.startsWith(qLower) || aCode.startsWith(qLower)
-                            ? 1
-                            : 2;
-                const bRank =
-                    bName === qLower || bCode === qLower
-                        ? 0
-                        : bName.startsWith(qLower) || bCode.startsWith(qLower)
-                            ? 1
-                            : 2;
-
-                if (aRank !== bRank) return aRank - bRank;
-                return a.name.localeCompare(b.name);
-            });
+            // Inputs are already sorted by name ASC, so bucket concatenation preserves O(N) ranked order!
+            filtered = [...exact, ...prefix, ...contains];
         }
     }
 
     const cursor = Math.max(0, params.cursor ?? 0);
     const limit = Math.min(Math.max(params.limit ?? 12, 1), 100);
     const total = filtered.length;
-    const offices = filtered.slice(cursor, cursor + limit);
+    const offices = filtered.slice(cursor, cursor + limit).map((item) => item.record);
     const nextCursor = cursor + limit < total ? cursor + limit : null;
 
     return { offices, total, nextCursor };
@@ -297,18 +321,17 @@ export function autocompleteLocalOffices(q: string, mode = "name"): string[] {
     const trimmed = q.trim();
     if (!trimmed) return [];
 
-    const allOffices = loadLocalOffices();
+    loadLocalOffices();
+    const index = cachedIndex ?? [];
     const qLower = trimmed.toLowerCase();
 
     if (mode === "division") {
         const divisions = new Set<string>();
-        for (const office of allOffices) {
-            for (const field of office.fields) {
-                if (
-                    field.name === "Division" &&
-                    field.value.toLowerCase().startsWith(qLower)
-                ) {
-                    divisions.add(field.value);
+        for (const item of index) {
+            if (item.divisionLower.startsWith(qLower)) {
+                const div = item.record.fields.find((f) => f.name === "Division")?.value;
+                if (div) {
+                    divisions.add(div);
                     if (divisions.size >= 5) return Array.from(divisions);
                 }
             }
@@ -317,42 +340,33 @@ export function autocompleteLocalOffices(q: string, mode = "name"): string[] {
     }
 
     const isNumeric = /^\d+$/.test(trimmed);
-    const matches = allOffices
-        .filter(
-            (o) =>
-                o.name.toLowerCase().includes(qLower) ||
-                o.postalCode.includes(trimmed)
-        )
-        .sort((a, b) => {
-            const aName = a.name.toLowerCase();
-            const bName = b.name.toLowerCase();
-            const aRank =
-                aName === qLower || a.postalCode === trimmed
-                    ? 0
-                    : aName.startsWith(qLower) || a.postalCode.startsWith(trimmed)
-                        ? 1
-                        : 2;
-            const bRank =
-                bName === qLower || b.postalCode === trimmed
-                    ? 0
-                    : bName.startsWith(qLower) || b.postalCode.startsWith(trimmed)
-                        ? 1
-                        : 2;
-            if (aRank !== bRank) return aRank - bRank;
-            return a.name.localeCompare(b.name);
-        });
+    const exact: LocalOfficeRecord[] = [];
+    const prefix: LocalOfficeRecord[] = [];
+    const contains: LocalOfficeRecord[] = [];
+
+    for (const item of index) {
+        if (item.nameLower === qLower || item.record.postalCode === trimmed) {
+            exact.push(item.record);
+        } else if (item.nameLower.startsWith(qLower) || item.record.postalCode.startsWith(trimmed)) {
+            prefix.push(item.record);
+        } else if (item.nameLower.includes(qLower) || item.record.postalCode.includes(trimmed)) {
+            contains.push(item.record);
+        }
+    }
 
     const suggestions: string[] = [];
     const seen = new Set<string>();
-    for (const office of matches) {
-        const label =
-            isNumeric && office.postalCode
-                ? `${office.name} (${office.postalCode})`
-                : office.name;
-        if (!seen.has(label)) {
-            seen.add(label);
-            suggestions.push(label);
-            if (suggestions.length >= 5) break;
+    for (const bucket of [exact, prefix, contains]) {
+        for (const office of bucket) {
+            const label =
+                isNumeric && office.postalCode
+                    ? `${office.name} (${office.postalCode})`
+                    : office.name;
+            if (!seen.has(label)) {
+                seen.add(label);
+                suggestions.push(label);
+                if (suggestions.length >= 5) return suggestions;
+            }
         }
     }
 
@@ -360,15 +374,11 @@ export function autocompleteLocalOffices(q: string, mode = "name"): string[] {
 }
 
 export function getLocalOfficeBySlug(slug: string): LocalOfficeRecord | null {
-    const allOffices = loadLocalOffices();
-    return (
-        allOffices.find((o) => o.slug === slug) ??
-        allOffices.find((o) => createBaseSlug(o.name) === slug) ??
-        null
-    );
+    loadLocalOffices();
+    return slugMap?.get(slug) ?? null;
 }
 
 export function getLocalOfficeById(id: string): LocalOfficeRecord | null {
-    const allOffices = loadLocalOffices();
-    return allOffices.find((o) => String(o.id) === String(id)) ?? null;
+    loadLocalOffices();
+    return idMap?.get(String(id)) ?? null;
 }
