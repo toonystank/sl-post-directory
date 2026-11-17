@@ -19,6 +19,7 @@ export function useDirectoryState() {
     const [initialLoading, setInitialLoading] = useState(true);
 
     const isRestoringRef = useRef(false);
+    const activeAbortRef = useRef<AbortController | null>(null);
     const lastFetchedRef = useRef<{
         q: string;
         mode: SearchMode;
@@ -38,6 +39,12 @@ export function useDirectoryState() {
     }, [router]);
 
     const fetchOffices = useCallback(async (searchQuery: string, letter: string | null, mode: SearchMode, service: string | null, cursor: number, append: boolean) => {
+        if (!append) {
+            activeAbortRef.current?.abort();
+        }
+        const controller = new AbortController();
+        activeAbortRef.current = controller;
+
         if (cursor === 0) {
             lastFetchedRef.current = { q: searchQuery, mode, letter, service };
             setInitialLoading(true);
@@ -54,10 +61,13 @@ export function useDirectoryState() {
             params.set("cursor", cursor.toString());
             params.set("limit", "24");
 
-            const res = await fetch(`/api/offices?${params.toString()}`);
+            const res = await fetch(`/api/offices?${params.toString()}`, {
+                signal: controller.signal,
+            });
             if (!res.ok) throw new Error(`API Error: ${res.status}`);
             
             const data: SearchResponse = await res.json();
+            if (controller.signal.aborted) return;
 
             setOffices((prev) => {
                 const incomingOffices = data?.offices || [];
@@ -69,13 +79,16 @@ export function useDirectoryState() {
 
             setTotal(data?.total || 0);
             setNextCursor(data?.nextCursor ?? null);
-        } catch {
+        } catch (err) {
+            if ((err as { name?: string })?.name === "AbortError") return;
             setOffices([]);
             setTotal(0);
             setNextCursor(null);
         } finally {
-            setLoading(false);
-            setInitialLoading(false);
+            if (!controller.signal.aborted) {
+                setLoading(false);
+                setInitialLoading(false);
+            }
         }
     }, []);
 

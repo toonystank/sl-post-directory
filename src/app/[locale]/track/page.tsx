@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { Link } from "@/navigation";
 import { Package, Calculator, FolderOpen, Construction, CheckCircle2, Barcode } from "lucide-react";
 import Postmark from "@/components/brand/Postmark";
+import TrackMotionCard from "@/components/directory/TrackMotionCard";
 
 export const metadata: Metadata = {
     title: "Track Parcel & Mail · Coming Soon",
@@ -21,7 +22,7 @@ export default async function TrackPage() {
 
     return (
         <div className="container mx-auto max-w-3xl px-4 py-6 md:py-12">
-            <div className="overflow-hidden rounded-2xl border-2 border-foreground bg-card shadow-[4px_4px_0_0_hsl(var(--foreground))]">
+            <TrackMotionCard className="overflow-hidden rounded-2xl border-2 border-foreground bg-card shadow-[4px_4px_0_0_hsl(var(--foreground))]">
                 {/* Yellow-and-black construction hazard top stripe */}
                 <div
                     className="h-3 w-full border-b-2 border-foreground"
@@ -126,7 +127,7 @@ export default async function TrackPage() {
                         </div>
                     </div>
                 </div>
-            </div>
+            </TrackMotionCard>
         </div>
     );
 }

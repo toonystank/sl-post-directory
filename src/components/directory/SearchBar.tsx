@@ -1,6 +1,7 @@
 import React, { useRef, useState, useCallback, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Search, MapPin, Building2, Loader2, X, CornerDownLeft } from "lucide-react";
+import { m, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
 import { SearchMode } from "./types";
 
@@ -33,12 +34,14 @@ export default function SearchBar({
 
     const suggestionCache = useRef<Record<string, string[]>>({});
     const suggestDebounce = useRef<NodeJS.Timeout | null>(null);
+    const suggestAbort = useRef<AbortController | null>(null);
     const localContainerRef = useRef<HTMLDivElement>(null);
     const actualContainerRef = containerRef || localContainerRef;
     const listId = `suggestions-${id}`;
 
     const fetchSuggestions = useCallback(async (val: string, mode: SearchMode) => {
         if (!val.trim()) {
+            suggestAbort.current?.abort();
             setSuggestions([]);
             setShowSuggestions(false);
             return;
@@ -49,19 +52,28 @@ export default function SearchBar({
             setShowSuggestions(true);
             return;
         }
+        suggestAbort.current?.abort();
+        const controller = new AbortController();
+        suggestAbort.current = controller;
         setSuggestionsLoading(true);
         try {
-            const res = await fetch(`/api/autocomplete?q=${encodeURIComponent(val)}&mode=${mode}`);
-            if (res.ok) {
+            const res = await fetch(`/api/autocomplete?q=${encodeURIComponent(val)}&mode=${mode}`, {
+                signal: controller.signal,
+            });
+            if (res.ok && !controller.signal.aborted) {
                 const data = await res.json();
                 suggestionCache.current[cacheKey] = data.suggestions || [];
                 setSuggestions(data.suggestions || []);
                 setShowSuggestions(data.suggestions?.length > 0);
             }
         } catch (err) {
-            console.error("Autocomplete error:", err);
+            if ((err as { name?: string })?.name !== "AbortError") {
+                console.error("Autocomplete error:", err);
+            }
         } finally {
-            setSuggestionsLoading(false);
+            if (!controller.signal.aborted) {
+                setSuggestionsLoading(false);
+            }
         }
     }, []);
 
@@ -70,7 +82,7 @@ export default function SearchBar({
         onQueryChange(val, id);
         setHighlight(-1);
         if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
-        suggestDebounce.current = setTimeout(() => fetchSuggestions(val, searchMode), 150);
+        suggestDebounce.current = setTimeout(() => fetchSuggestions(val, searchMode), 140);
     };
 
     const handleSubmit = () => {
@@ -185,33 +197,39 @@ export default function SearchBar({
                 </button>
             </form>
 
-            {open && (
-                <ul
-                    id={listId}
-                    role="listbox"
-                    className="absolute left-0 right-0 top-full z-[60] mt-1.5 overflow-hidden rounded-md border-2 border-foreground bg-card py-1 shadow-[4px_4px_0_0_hsl(var(--foreground))]"
-                >
-                    {suggestions.map((s, i) => (
-                        <li key={s + i} id={`${listId}-${i}`} role="option" aria-selected={highlight === i}>
-                            <button
-                                type="button"
-                                onMouseDown={(e) => e.preventDefault()}
-                                onClick={() => handleSuggestClick(s)}
-                                className={cn(
-                                    "flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left text-[0.95rem] last:border-0",
-                                    highlight === i ? "bg-secondary/30" : "hover:bg-muted"
-                                )}
-                            >
-                                {searchMode === "name"
-                                    ? <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                    : <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />}
-                                <span className="flex-1 truncate">{s}</span>
-                                <CornerDownLeft className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" aria-hidden="true" />
-                            </button>
-                        </li>
-                    ))}
-                </ul>
-            )}
+            <AnimatePresence>
+                {open && (
+                    <m.ul
+                        id={listId}
+                        role="listbox"
+                        initial={{ opacity: 0, y: -4, scale: 0.99 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -4, scale: 0.99 }}
+                        transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
+                        className="absolute left-0 right-0 top-full z-[60] mt-1.5 overflow-hidden rounded-md border-2 border-foreground bg-card py-1 shadow-[4px_4px_0_0_hsl(var(--foreground))]"
+                    >
+                        {suggestions.map((s, i) => (
+                            <li key={s + i} id={`${listId}-${i}`} role="option" aria-selected={highlight === i}>
+                                <button
+                                    type="button"
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={() => handleSuggestClick(s)}
+                                    className={cn(
+                                        "flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left text-[0.95rem] last:border-0",
+                                        highlight === i ? "bg-secondary/30" : "hover:bg-muted"
+                                    )}
+                                >
+                                    {searchMode === "name"
+                                        ? <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                        : <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                                    <span className="flex-1 truncate">{s}</span>
+                                    <CornerDownLeft className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" aria-hidden="true" />
+                                </button>
+                            </li>
+                        ))}
+                    </m.ul>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

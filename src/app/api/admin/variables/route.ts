@@ -3,18 +3,20 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 
+const VARIABLES_CACHE_CONTROL = "public, max-age=60, s-maxage=1800, stale-while-revalidate=86400";
+
 export async function GET() {
     if (!hasDatabaseUrl) {
-        return NextResponse.json([]);
+        return NextResponse.json([], { headers: { "Cache-Control": VARIABLES_CACHE_CONTROL } });
     }
 
     try {
         const variables = await prisma.siteVariable.findMany({
-            orderBy: { key: 'asc' }
+            orderBy: { key: "asc" },
         });
-        return NextResponse.json(variables);
+        return NextResponse.json(variables, { headers: { "Cache-Control": VARIABLES_CACHE_CONTROL } });
     } catch {
-        return NextResponse.json([]);
+        return NextResponse.json([], { headers: { "Cache-Control": "public, max-age=30, s-maxage=60" } });
     }
 }
 

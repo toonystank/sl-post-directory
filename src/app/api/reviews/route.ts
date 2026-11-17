@@ -1,16 +1,22 @@
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
+import { checkRateLimit, rateLimiters, rateLimitHeaders } from "@/lib/rate-limiter";
+import { reviewSchema } from "@/lib/validations";
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
-
-const reviewSchema = z.object({
-    rating: z.number().int().min(1).max(5),
-    content: z.string().min(10).max(1000),
-    authorName: z.string().min(2).max(50),
-    postOfficeId: z.string().min(1),
-});
 
 export async function POST(request: NextRequest) {
     try {
+        const rateLimit = await checkRateLimit(request, rateLimiters.reviews);
+        if (rateLimit.isRateLimited) {
+            return NextResponse.json(
+                { error: "Too many review submissions. Please try again later." },
+                { status: 429, headers: rateLimitHeaders(rateLimit) }
+            );
+        }
+
+        if (!hasDatabaseUrl) {
+            return NextResponse.json({ error: "Database unavailable in preview mode" }, { status: 503 });
+        }
+
         const body = await request.json();
         const parsed = reviewSchema.safeParse(body);
 
@@ -23,7 +29,6 @@ export async function POST(request: NextRequest) {
 
         const { rating, content, authorName, postOfficeId } = parsed.data;
 
-        // Verify post office exists
         const office = await prisma.postOffice.findUnique({
             where: { id: postOfficeId },
             select: { id: true },
@@ -45,37 +50,29 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-    const postOfficeId = request.nextUrl.searchParams.get("postOfficeId");
+    const postOfficeId = request.nextUrl.searchParams.get("postOfficeId")?.trim();
 
-    if (!postOfficeId) {
-        return NextResponse.json({ error: "postOfficeId is required" }, { status: 400 });
+    if (!postOfficeId || postOfficeId.length > 64) {
+        return NextResponse.json({ error: "Valid postOfficeId is required" }, { status: 400 });
     }
 
+    const cacheHeaders = {
+        "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600",
+    };
+
     if (!hasDatabaseUrl) {
-        return NextResponse.json([], {
-            headers: {
-                'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
-            },
-        });
+        return NextResponse.json([], { headers: cacheHeaders });
     }
 
     try {
         const reviews = await prisma.review.findMany({
-            where: { postOfficeId },
+            where: { postOfficeId, status: "APPROVED" },
             orderBy: { createdAt: "desc" },
             take: 20,
         });
 
-        return NextResponse.json(reviews, {
-            headers: {
-                'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
-            },
-        });
+        return NextResponse.json(reviews, { headers: cacheHeaders });
     } catch {
-        return NextResponse.json([], {
-            headers: {
-                'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
-            },
-        });
+        return NextResponse.json([], { headers: cacheHeaders });
     }
 }

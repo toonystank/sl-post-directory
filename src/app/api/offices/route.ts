@@ -1,9 +1,8 @@
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 import { queryLocalOffices } from "@/lib/local-sqlite";
+import { clampPagination } from "@/lib/security";
 import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
-
-export const dynamic = 'force-dynamic';
 
 const FIELD_SELECT = {
     where: {
@@ -24,19 +23,21 @@ const OFFICE_SELECT = {
     fields: FIELD_SELECT,
 };
 
+const OFFICES_CACHE_CONTROL = "public, max-age=60, s-maxage=3600, stale-while-revalidate=86400";
+
 export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
-    const query = searchParams.get("q") || "";
-    const letter = searchParams.get("letter") || "";
-    const mode = searchParams.get("mode") || "name"; // "name" | "division"
-    const service = searchParams.get("service") || "";
+    const query = (searchParams.get("q") || "").slice(0, 100);
+    const letter = (searchParams.get("letter") || "").slice(0, 4);
+    const mode = searchParams.get("mode") === "division" ? "division" : "name";
+    const service = (searchParams.get("service") || "").slice(0, 60);
 
-    let cursor = parseInt(searchParams.get("cursor") || "0");
-    if (isNaN(cursor)) cursor = 0;
-
-    let limit = parseInt(searchParams.get("limit") || "12");
-    if (isNaN(limit)) limit = 12;
-    limit = Math.min(Math.max(limit, 1), 100); // Clamp between 1 and 100
+    const { cursor, limit } = clampPagination(
+        searchParams.get("cursor"),
+        searchParams.get("limit"),
+        12,
+        100
+    );
 
     if (!hasDatabaseUrl) {
         return NextResponse.json(
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
             {
                 status: 200,
                 headers: {
-                    'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+                    "Cache-Control": OFFICES_CACHE_CONTROL,
                 },
             }
         );
@@ -209,7 +210,7 @@ export async function GET(request: NextRequest) {
             {
                 status: 200,
                 headers: {
-                    'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+                    "Cache-Control": OFFICES_CACHE_CONTROL,
                 },
             }
         );
@@ -219,7 +220,7 @@ export async function GET(request: NextRequest) {
             {
                 status: 200,
                 headers: {
-                    'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+                    "Cache-Control": OFFICES_CACHE_CONTROL,
                 },
             }
         );

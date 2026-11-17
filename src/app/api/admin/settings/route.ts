@@ -3,10 +3,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 
+const SETTINGS_CACHE_CONTROL = "public, max-age=60, s-maxage=1800, stale-while-revalidate=86400";
+
 // GET: Public — anyone needs to know if ads are enabled
 export async function GET() {
     if (!hasDatabaseUrl) {
-        return NextResponse.json({ adsEnabled: true });
+        return NextResponse.json({ adsEnabled: true }, { headers: { "Cache-Control": SETTINGS_CACHE_CONTROL } });
     }
 
     try {
@@ -15,9 +17,9 @@ export async function GET() {
             update: {},
             create: { id: "default", adsEnabled: true },
         });
-        return NextResponse.json({ adsEnabled: settings.adsEnabled });
+        return NextResponse.json({ adsEnabled: settings.adsEnabled }, { headers: { "Cache-Control": SETTINGS_CACHE_CONTROL } });
     } catch {
-        return NextResponse.json({ adsEnabled: true }); // Default to true on error
+        return NextResponse.json({ adsEnabled: true }, { headers: { "Cache-Control": "public, max-age=30, s-maxage=60" } }); // Default to true on error
     }
 }
 

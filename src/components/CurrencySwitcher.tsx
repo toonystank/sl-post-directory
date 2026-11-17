@@ -1,6 +1,8 @@
 "use client";
 
+import * as React from "react";
 import { useTranslations } from "next-intl";
+import { m } from "motion/react";
 import { useCurrency } from "@/context/CurrencyContext";
 import { CURRENCY_META, type Currency } from "@/lib/currency";
 import { cn } from "@/lib/utils";
@@ -9,11 +11,12 @@ const CURRENCIES: Currency[] = ["LKR", "USD"];
 
 /**
  * Compact segmented currency switcher ("Rs. LKR | $ USD") placed beside the language selector.
- * Defaults to LKR and displays explicit currency symbols for clear price indication.
+ * Defaults to LKR and animates smoothly between options via shared layoutId.
  */
 export default function CurrencySwitcher({ className }: { className?: string }) {
     const t = useTranslations("App");
     const { currency, setCurrency } = useCurrency();
+    const switcherId = React.useId();
 
     return (
         <div
@@ -38,16 +41,22 @@ export default function CurrencySwitcher({ className }: { className?: string }) 
                         data-testid={`currency-option-${code}`}
                         onClick={() => setCurrency(code)}
                         className={cn(
-                            "tap inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[11px] font-bold leading-none min-h-[24px] transition-colors",
-                            active
-                                ? "bg-foreground text-background"
-                                : "text-muted-foreground hover:text-foreground"
+                            "tap relative inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[11px] font-bold leading-none min-h-[24px] transition-colors",
+                            active ? "text-background" : "text-muted-foreground hover:text-foreground"
                         )}
                     >
-                        <span aria-hidden="true" className="font-extrabold">
+                        {active && (
+                            <m.span
+                                layoutId={`currency-pill-${switcherId}`}
+                                transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                                className="absolute inset-0 rounded-full bg-foreground"
+                                aria-hidden="true"
+                            />
+                        )}
+                        <span aria-hidden="true" className="relative z-10 font-extrabold">
                             {meta.symbol}
                         </span>
-                        <span className="hidden min-[360px]:inline tracking-tight">
+                        <span className="relative z-10 hidden min-[360px]:inline tracking-tight">
                             {code}
                         </span>
                     </button>

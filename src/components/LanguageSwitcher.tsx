@@ -4,6 +4,7 @@ import { useLocale } from "next-intl";
 import { useRouter, usePathname } from "@/navigation";
 import { Globe } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import { m, AnimatePresence } from "motion/react";
 
 type AppLocale = "en" | "si" | "ta";
 
@@ -47,27 +48,35 @@ export default function LanguageSwitcher() {
                 <span lang={locale}>{localeLabels[locale]?.short ?? locale.toUpperCase()}</span>
             </button>
 
-            {isOpen && (
-                <div className="absolute right-0 mt-2 w-44 rounded-md border-2 border-foreground bg-card py-1 shadow-[4px_4px_0_0_hsl(var(--foreground))] z-[100] animate-in fade-in slide-in-from-top-1 duration-150">
-                    {(Object.entries(localeLabels) as [AppLocale, { label: string; short: string }][]).map(([code, { label }]) => (
-                        <button
-                            key={code}
-                            onClick={() => handleSwitch(code)}
-                            lang={code}
-                            className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-3 transition-colors ${
-                                locale === code
-                                    ? "bg-secondary text-secondary-foreground font-semibold"
-                                    : "hover:bg-muted"
-                            }`}
-                        >
-                            <span>{label}</span>
-                            {locale === code && (
-                                <span className="ml-auto text-xs">✓</span>
-                            )}
-                        </button>
-                    ))}
-                </div>
-            )}
+            <AnimatePresence>
+                {isOpen && (
+                    <m.div
+                        initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                        transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                        className="absolute right-0 mt-2 w-44 rounded-md border-2 border-foreground bg-card py-1 shadow-[4px_4px_0_0_hsl(var(--foreground))] z-[100] origin-top-right"
+                    >
+                        {(Object.entries(localeLabels) as [AppLocale, { label: string; short: string }][]).map(([code, { label }]) => (
+                            <button
+                                key={code}
+                                onClick={() => handleSwitch(code)}
+                                lang={code}
+                                className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-3 transition-colors ${
+                                    locale === code
+                                        ? "bg-secondary text-secondary-foreground font-semibold"
+                                        : "hover:bg-muted"
+                                }`}
+                            >
+                                <span>{label}</span>
+                                {locale === code && (
+                                    <span className="ml-auto text-xs">✓</span>
+                                )}
+                            </button>
+                        ))}
+                    </m.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

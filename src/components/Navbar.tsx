@@ -6,6 +6,7 @@ import { useSession, signOut } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { ThemeToggle } from "./theme-toggle";
 import { ArrowLeft, LogOut, User } from "lucide-react";
+import { m } from "motion/react";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import LanguageSwitcher from "./LanguageSwitcher";
@@ -125,7 +126,13 @@ export default function Navbar() {
                                 )}
                             >
                                 {item.label}
-                                {item.active && <span className="absolute inset-x-3 -bottom-[13px] h-[3px] bg-primary" />}
+                                {item.active && (
+                                    <m.span
+                                        layoutId="desktop-nav-underline"
+                                        transition={{ type: "spring", stiffness: 460, damping: 34 }}
+                                        className="absolute inset-x-3 -bottom-[13px] h-[3px] bg-primary"
+                                    />
+                                )}
                             </Link>
                         ))}
                     </nav>

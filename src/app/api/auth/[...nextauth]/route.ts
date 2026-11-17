@@ -1,27 +1,24 @@
 import NextAuth from "next-auth";
-import { authOptions } from "./options"; // Extract authOptions to a separate file
+import { authOptions } from "./options";
 import { NextRequest, NextResponse } from "next/server";
-import { checkRateLimit, rateLimiters } from "@/lib/rate-limiter";
+import { checkRateLimit, rateLimiters, rateLimitHeaders } from "@/lib/rate-limiter";
 
 const handler = NextAuth(authOptions);
 
-// Custom POST handler to wrap NextAuth with Rate Limiting
-export async function POST(req: NextRequest, ctx: any) {
-    // We only want to rate limit the actual login attempts, not session checks
+// Custom POST handler to wrap NextAuth credentials login with rate limiting
+export async function POST(req: NextRequest, ctx: unknown) {
     if (req.nextUrl.pathname.includes("/callback/credentials")) {
-        // Enforce Rate Limit: Max 10 login attempts per 15 minutes per IP
         const rateLimit = await checkRateLimit(req, rateLimiters.login);
-        
+
         if (rateLimit.isRateLimited) {
-            // NextAuth expects a specific JSON format for errors returned from callbacks
+            const origin = process.env.NEXTAUTH_URL || req.nextUrl.origin;
             return NextResponse.json(
-                { url: `${process.env.NEXTAUTH_URL}/login?error=Too many login attempts. Try again in 15 minutes.` }, 
-                { status: 429 }
+                { url: `${origin}/login?error=Too+many+login+attempts.+Try+again+in+15+minutes.` },
+                { status: 429, headers: rateLimitHeaders(rateLimit) }
             );
         }
     }
 
-    // Forward the request to NextAuth
     return handler(req, ctx);
 }
 

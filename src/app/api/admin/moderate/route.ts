@@ -132,31 +132,42 @@ export async function POST(req: Request) {
                         }
                     });
 
-                    // Upsert only the changed fields — preserve untouched ones
-                    if (changes.fields && Array.isArray(changes.fields)) {
-                        for (const field of changes.fields) {
-                            const existing = await tx.postOfficeField.findFirst({
-                                where: {
-                                    postOfficeId: editRequest.postOfficeId,
-                                    name: field.name,
-                                }
-                            });
+                    // Upsert only the changed fields — preserve untouched ones without N+1 queries
+                    if (changes.fields && Array.isArray(changes.fields) && changes.fields.length > 0) {
+                        const existingFields = await tx.postOfficeField.findMany({
+                            where: { postOfficeId: editRequest.postOfficeId },
+                            select: { id: true, name: true },
+                        });
+                        const existingByName = new Map(existingFields.map((f) => [f.name, f.id]));
 
-                            if (existing) {
-                                await tx.postOfficeField.update({
-                                    where: { id: existing.id },
-                                    data: { value: field.value }
-                                });
+                        const updates: Promise<unknown>[] = [];
+                        const toCreate: { name: string; value: string; type: string; postOfficeId: string }[] = [];
+
+                        for (const field of changes.fields) {
+                            if (!field?.name || typeof field.value !== "string") continue;
+                            const existingId = existingByName.get(field.name);
+                            if (existingId) {
+                                updates.push(
+                                    tx.postOfficeField.update({
+                                        where: { id: existingId },
+                                        data: { value: field.value },
+                                    })
+                                );
                             } else {
-                                await tx.postOfficeField.create({
-                                    data: {
-                                        name: field.name,
-                                        value: field.value,
-                                        type: "TEXT",
-                                        postOfficeId: editRequest.postOfficeId,
-                                    }
+                                toCreate.push({
+                                    name: String(field.name),
+                                    value: field.value,
+                                    type: "TEXT",
+                                    postOfficeId: editRequest.postOfficeId,
                                 });
                             }
+                        }
+
+                        if (updates.length > 0) {
+                            await Promise.all(updates);
+                        }
+                        if (toCreate.length > 0) {
+                            await tx.postOfficeField.createMany({ data: toCreate });
                         }
                     }
                 }

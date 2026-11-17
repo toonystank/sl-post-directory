@@ -2,9 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
+import { adminCreateUserSchema } from "@/lib/validations";
 import bcrypt from "bcrypt";
-
-const VALID_ROLES = ["CONTRIBUTOR", "MODERATOR", "ADMIN", "SUPER_ADMIN"] as const;
 
 export async function POST(req: Request) {
     try {
@@ -16,15 +15,15 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { name, email, password, role } = body;
-
-        if (!name || !email || !password || !role) {
-            return NextResponse.json({ error: "All fields are required" }, { status: 400 });
+        const parsed = adminCreateUserSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: parsed.error.issues[0]?.message || "Invalid user payload" },
+                { status: 400 }
+            );
         }
 
-        if (!VALID_ROLES.includes(role)) {
-            return NextResponse.json({ error: `Invalid role. Must be one of: ${VALID_ROLES.join(", ")}` }, { status: 400 });
-        }
+        const { name, email, password, role } = parsed.data;
 
         const existingUser = await prisma.user.findUnique({ where: { email } });
         if (existingUser) {
@@ -38,19 +37,18 @@ export async function POST(req: Request) {
                 name,
                 email,
                 passwordHash,
-                role
+                role,
             },
             select: {
                 id: true,
                 name: true,
                 email: true,
-                role: true
-            }
+                role: true,
+            },
         });
 
         return NextResponse.json({ success: true, user: newUser });
-
-    } catch (error: any) {
+    } catch (error) {
         console.error("Super Admin Create User Error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }

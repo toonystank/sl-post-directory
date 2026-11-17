@@ -2,18 +2,27 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
+import { checkRateLimit, rateLimiters, rateLimitHeaders } from "@/lib/rate-limiter";
 import { generateSecret, generateURI } from "otplib";
 import QRCode from "qrcode";
 
 export async function POST(req: Request) {
     try {
+        const rateLimit = await checkRateLimit(req, rateLimiters.twoFactor);
+        if (rateLimit.isRateLimited) {
+            return NextResponse.json(
+                { error: "Too many attempts. Please try again later." },
+                { status: 429, headers: rateLimitHeaders(rateLimit) }
+            );
+        }
+
         const session = await getServerSession(authOptions);
         if (!session?.user?.email) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email }
+            where: { email: session.user.email },
         });
 
         if (!user || !["ADMIN", "MODERATOR", "SUPER_ADMIN"].includes(user.role)) {
@@ -28,18 +37,17 @@ export async function POST(req: Request) {
         const otpauthContent = generateURI({
             issuer: "SL Post Directory",
             label: user.email,
-            secret
+            secret,
         });
         const qrCodeDataUrl = await QRCode.toDataURL(otpauthContent);
 
-        // Update the user's secret temporarily without enabling it yet
         await prisma.user.update({
             where: { id: user.id },
-            data: { twoFactorSecret: secret }
+            data: { twoFactorSecret: secret },
         });
 
         return NextResponse.json({ secret, qrCode: qrCodeDataUrl });
-    } catch (error: any) {
+    } catch (error) {
         console.error("2FA Setup Error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }

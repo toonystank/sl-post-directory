@@ -13,6 +13,7 @@ import { InstallPrompt } from "@/components/InstallPrompt";
 import NextTopLoader from "nextjs-toploader";
 import AdManager from "@/components/ads/AdManager";
 import AdBanner from "@/components/ads/AdBanner";
+import MotionProvider from "@/components/motion/MotionProvider";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
 import { routing } from "@/i18n/routing";
@@ -119,6 +120,7 @@ export default async function RootLayout({
     }
 
     const messages = await getMessages();
+    const gaId = process.env.NEXT_PUBLIC_GA_ID?.trim();
 
     return (
         <html lang={locale} suppressHydrationWarning>
@@ -132,18 +134,22 @@ export default async function RootLayout({
             </head>
 
             <body className={`${archivo.variable} ${publicSans.variable} ${plexMono.variable} ${notoSinhala.variable} ${notoTamil.variable} font-sans min-h-dvh flex flex-col antialiased bg-background`} suppressHydrationWarning>
-                <Script
-                    src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`}
-                    strategy="lazyOnload"
-                />
-                <Script id="google-analytics" strategy="lazyOnload">
-                    {`
-                        window.dataLayer = window.dataLayer || [];
-                        function gtag(){dataLayer.push(arguments);}
-                        gtag('js', new Date());
-                        gtag('config', '${process.env.NEXT_PUBLIC_GA_ID}');
-                    `}
-                </Script>
+                {gaId && (
+                    <>
+                        <Script
+                            src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
+                            strategy="lazyOnload"
+                        />
+                        <Script id="google-analytics" strategy="lazyOnload">
+                            {`
+                                window.dataLayer = window.dataLayer || [];
+                                function gtag(){dataLayer.push(arguments);}
+                                gtag('js', new Date());
+                                gtag('config', '${gaId}');
+                            `}
+                        </Script>
+                    </>
+                )}
                 <NextTopLoader color="hsl(var(--primary))" showSpinner={false} height={3} />
                 <NextIntlClientProvider messages={messages}>
                     <AuthProvider>
@@ -155,15 +161,17 @@ export default async function RootLayout({
                                     enableSystem
                                     disableTransitionOnChange
                                 >
-                                    <ServiceWorkerRegister />
-                                    <Navbar />
-                                    <main className="flex-1 pb-tabbar">
-                                        {children}
-                                    </main>
-                                    <InstallPrompt />
-                                    <SiteFooter />
-                                    <AdBanner position="sticky-bottom" />
-                                    <BottomTabBar />
+                                    <MotionProvider>
+                                        <ServiceWorkerRegister />
+                                        <Navbar />
+                                        <main className="flex-1 pb-tabbar">
+                                            {children}
+                                        </main>
+                                        <InstallPrompt />
+                                        <SiteFooter />
+                                        <AdBanner position="sticky-bottom" />
+                                        <BottomTabBar />
+                                    </MotionProvider>
                                 </ThemeProvider>
                             </AdManager>
                         </CurrencyProvider>
