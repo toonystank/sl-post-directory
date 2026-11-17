@@ -7,15 +7,18 @@ import { Button } from "@/components/ui/button";
 import AddOfficeModal from "@/components/AddOfficeModal";
 
 import { useDirectoryState } from "./directory/useDirectoryState";
-import HomeHero from "./directory/HomeHero";
+import { ModeToggle } from "./directory/HomeHero";
 import SearchBar from "./directory/SearchBar";
 import DirectorySidebar from "./directory/DirectorySidebar";
 import MobileFilters from "./directory/MobileFilters";
 import DirectoryGrid from "./directory/DirectoryGrid";
 import { useServiceLabel } from "./directory/filters";
+import { ALPHABET } from "./directory/types";
+import { cn } from "@/lib/utils";
 
 export default function SearchDirectory() {
     const t = useTranslations("Search");
+    const tBrowse = useTranslations("Browse");
     const serviceLabel = useServiceLabel();
 
     const {
@@ -126,27 +129,77 @@ export default function SearchDirectory() {
 
     return (
         <section className="relative w-full">
-            <HomeHero
-                searchRef={searchContainerRef}
-                searchMode={searchMode}
-                onModeChange={handleModeSwitch}
-                total={total}
-                activeQuery={query}
-                search={
-                    <SearchBar
-                        id="hero"
-                        inputRef={heroInputRef}
-                        query={query}
-                        onQueryChange={setQuery}
-                        searchMode={searchMode}
-                        onSubmit={submitSearch}
-                        onClear={handleClearQuery}
-                        loading={loading}
-                        onSuggestionClick={handleSuggestionClick}
-                        containerRef={searchContainerRef}
-                    />
-                }
-            />
+            {/* Browse Directory Header */}
+            <div className="border-b-2 border-foreground bg-card/40 md:paper-grain">
+                <div className="container mx-auto px-4 py-5 md:py-8">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                        <div className="min-w-0">
+                            <h1 className="display text-2xl sm:text-3xl md:text-5xl break-words">
+                                {tBrowse("title")}
+                            </h1>
+                            <p className="mt-1 text-sm md:text-base text-muted-foreground max-w-2xl">
+                                {tBrowse("lede")}
+                            </p>
+                        </div>
+                        <ModeToggle searchMode={searchMode} onModeChange={handleModeSwitch} className="self-start md:self-auto shrink-0" />
+                    </div>
+
+                    <div ref={searchContainerRef} className="mt-4 max-w-3xl">
+                        <SearchBar
+                            id="browse-hero"
+                            inputRef={heroInputRef}
+                            query={query}
+                            onQueryChange={setQuery}
+                            searchMode={searchMode}
+                            onSubmit={submitSearch}
+                            onClear={handleClearQuery}
+                            loading={loading}
+                            onSuggestionClick={handleSuggestionClick}
+                            containerRef={searchContainerRef}
+                        />
+                    </div>
+
+                    {/* Mobile quick A-Z strip */}
+                    <div className="mt-4 lg:hidden">
+                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar" role="group" aria-label={tBrowse("byLetter")}>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (activeLetter) handleLetterFilter(activeLetter);
+                                }}
+                                aria-pressed={!activeLetter}
+                                className={cn(
+                                    "tap shrink-0 rounded-[5px] border-[1.5px] border-foreground px-2.5 h-9 font-mono text-xs font-bold transition-colors",
+                                    !activeLetter
+                                        ? "bg-foreground text-background"
+                                        : "bg-card text-foreground hover:bg-secondary/40"
+                                )}
+                            >
+                                ALL
+                            </button>
+                            {ALPHABET.map((letter) => {
+                                const isSelected = activeLetter === letter;
+                                return (
+                                    <button
+                                        key={letter}
+                                        type="button"
+                                        onClick={() => handleLetterFilter(letter)}
+                                        aria-pressed={isSelected}
+                                        className={cn(
+                                            "tap shrink-0 flex h-9 w-9 items-center justify-center rounded-[5px] border-[1.5px] border-foreground font-mono text-xs font-bold transition-colors",
+                                            isSelected
+                                                ? "bg-primary text-primary-foreground"
+                                                : "bg-card text-foreground hover:bg-secondary/40"
+                                        )}
+                                    >
+                                        {letter}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             {showStickySearch && (
                 <div

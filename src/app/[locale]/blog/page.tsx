@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { getAllPosts } from "@/lib/blog";
 import BlogCard from "@/components/BlogCard";
 import { BookOpen } from "lucide-react";
@@ -10,16 +11,17 @@ export const metadata: Metadata = {
 
 export default async function BlogPage() {
     const posts = await getAllPosts();
+    const t = await getTranslations("Blog");
 
     return (
         <div className="container mx-auto px-4 py-6 md:py-12 min-h-[calc(100vh-4rem)]">
             <header className="mb-8 md:mb-10">
-                <p className="label-mono mb-2">Reference & Dispatch</p>
+                <p className="label-mono mb-2">{t("kicker")}</p>
                 <h1 className="display text-3xl md:text-5xl">
-                    Postal Guides & Tips
+                    {t("title")}
                 </h1>
                 <p className="text-muted-foreground mt-2 max-w-2xl">
-                    Helpful articles about Sri Lanka Post services, shipping, and postal codes.
+                    {t("lede")}
                 </p>
             </header>
 
@@ -40,8 +42,8 @@ export default async function BlogPage() {
             ) : (
                 <div className="text-center py-16 bg-card rounded-md border-2 border-dashed border-foreground/30">
                     <BookOpen className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-                    <h3 className="font-heading text-xl font-extrabold [font-stretch:82%] mb-1">No articles yet</h3>
-                    <p className="text-sm text-muted-foreground">Check back soon for helpful postal guides and tips.</p>
+                    <h3 className="font-heading text-xl font-extrabold [font-stretch:82%] mb-1">{t("noArticles")}</h3>
+                    <p className="text-sm text-muted-foreground">{t("noArticlesBody")}</p>
                 </div>
             )}
         </div>

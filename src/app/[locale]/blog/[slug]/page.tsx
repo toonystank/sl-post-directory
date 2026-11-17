@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { getPostBySlug } from "@/lib/blog";
 import { getVariablesMap, replacePlaceholders } from "@/lib/variables";
 import { ArrowLeft, Calendar, Clock, User } from "lucide-react";
@@ -32,6 +33,7 @@ export default async function BlogArticlePage({ params }: { params: Promise<{ sl
         notFound();
     }
 
+    const t = await getTranslations("Blog");
     const variables = await getVariablesMap();
     const htmlContent = replacePlaceholders(post.contentHtml, variables);
 
@@ -70,7 +72,7 @@ export default async function BlogArticlePage({ params }: { params: Promise<{ sl
                 className="hidden md:inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors mb-6"
             >
                 <ArrowLeft className="w-4 h-4" />
-                Back to Guides
+                {t("backToGuides")}
             </Link>
 
             <header className="mb-8">
@@ -100,7 +102,7 @@ export default async function BlogArticlePage({ params }: { params: Promise<{ sl
                     </span>
                     <span className="flex items-center gap-1.5">
                         <Clock className="w-3.5 h-3.5" aria-hidden="true" />
-                        {post.readingTime} min read
+                        {t("minRead", { minutes: post.readingTime })}
                     </span>
                 </div>
             </header>
@@ -113,14 +115,14 @@ export default async function BlogArticlePage({ params }: { params: Promise<{ sl
             <div className="mt-12 pt-4">
                 <div className="rounded-md border-2 border-foreground bg-card p-6 shadow-[4px_4px_0_0_hsl(var(--foreground))] text-center">
                     <h3 className="font-heading text-xl font-extrabold [font-stretch:82%] mb-2">
-                        Find Your Nearest Post Office
+                        {t("ctaTitle")}
                     </h3>
                     <p className="text-sm text-muted-foreground mb-5 max-w-md mx-auto">
-                        Use our directory to search for any post office in Sri Lanka with contact details and operating hours.
+                        {t("ctaBody")}
                     </p>
                     <Button asChild>
                         <Link href="/">
-                            Search Directory
+                            {t("ctaButton")}
                         </Link>
                     </Button>
                 </div>

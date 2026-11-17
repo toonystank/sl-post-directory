@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { Plus, Send, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,11 +9,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Separator } from "@/components/ui/separator";
 import { Turnstile } from "@marsidev/react-turnstile";
 import { useSession } from "next-auth/react";
-import Link from "next/link";
-import { useEffect } from "react";
+import { Link } from "@/navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function AddOfficeModal({ children }: { children: React.ReactNode }) {
+    const t = useTranslations("Suggest");
     const { status } = useSession();
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -90,10 +91,10 @@ export default function AddOfficeModal({ children }: { children: React.ReactNode
             <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-                        <Plus className="w-5 h-5 text-primary" /> Add a New Post Office
+                        <Plus className="w-5 h-5 text-primary" /> {t("addOfficeTitle")}
                     </DialogTitle>
                     <DialogDescription>
-                        Know a post office that isn&apos;t listed? Submit its details below. All submissions are verified by moderators.
+                        {t("addOfficeDesc")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -102,7 +103,7 @@ export default function AddOfficeModal({ children }: { children: React.ReactNode
                         <div className="w-16 h-16 bg-status-open/10 text-status-open border border-status-open/40 rounded-full flex items-center justify-center mx-auto mb-4">
                             <Send className="w-8 h-8" />
                         </div>
-                        <h3 className="font-heading text-xl font-extrabold [font-stretch:82%] text-foreground">Success!</h3>
+                        <h3 className="font-heading text-xl font-extrabold [font-stretch:82%] text-foreground">{t("successTitle")}</h3>
                         <p className="text-muted-foreground">{message}</p>
                     </div>
                 ) : (
@@ -119,27 +120,27 @@ export default function AddOfficeModal({ children }: { children: React.ReactNode
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                         <div>
                                             <h3 className="font-heading font-extrabold text-lg text-primary flex items-center gap-2">
-                                                <Lock className="w-5 h-5" /> Sign up to Contribute
+                                                <Lock className="w-5 h-5" /> {t("signUpTitle")}
                                             </h3>
-                                            <p className="text-sm text-muted-foreground">Create an account to track your edits.</p>
+                                            <p className="text-sm text-muted-foreground">{t("signUpSub")}</p>
                                         </div>
                                         <Button variant="outline" size="sm" asChild>
-                                            <Link href="/login">Already have an account?</Link>
+                                            <Link href="/login">{t("alreadyAccount")}</Link>
                                         </Button>
                                     </div>
                                     <Separator />
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
-                                            <label className="block text-sm font-medium text-muted-foreground mb-1.5">Your Name</label>
+                                            <label className="block text-sm font-medium text-muted-foreground mb-1.5">{t("yourName")}</label>
                                             <Input type="text" name="submitterName" required className="bg-background" placeholder="Kasun Perera" />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-muted-foreground mb-1.5">Your Email</label>
+                                            <label className="block text-sm font-medium text-muted-foreground mb-1.5">{t("yourEmail")}</label>
                                             <Input type="email" name="submitterEmail" required className="bg-background" placeholder="you@example.com" />
                                         </div>
                                         <div className="md:col-span-2">
-                                            <label className="block text-sm font-medium text-muted-foreground mb-1.5">Create a Password</label>
+                                            <label className="block text-sm font-medium text-muted-foreground mb-1.5">{t("createPassword")}</label>
                                             <Input type="password" name="submitterPassword" required className="bg-background" placeholder="••••••••" minLength={8} />
                                         </div>
                                     </div>
@@ -147,23 +148,23 @@ export default function AddOfficeModal({ children }: { children: React.ReactNode
                             )}
 
                             <div className="space-y-4">
-                                <h3 className="font-heading font-extrabold text-lg">Office Information</h3>
+                                <h3 className="font-heading font-extrabold text-lg">{t("basicInfo")}</h3>
                                 <Separator />
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
-                                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">Office Name *</label>
+                                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">{t("officeName")} *</label>
                                         <Input type="text" name="name" required placeholder="e.g. Colombo Main Post Office" />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">Postal Code *</label>
+                                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">{t("postalCode")} *</label>
                                         <Input type="text" name="postalCode" required placeholder="e.g. 00100" />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">Division</label>
+                                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">{t("division")}</label>
                                         <Select name="field_Division">
                                             <SelectTrigger className="w-full h-10 bg-card text-sm">
-                                                <SelectValue placeholder="Select Division" />
+                                                <SelectValue placeholder={t("selectDivision")} />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 {divisions.map(div => (
@@ -173,10 +174,10 @@ export default function AddOfficeModal({ children }: { children: React.ReactNode
                                         </Select>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">Type</label>
+                                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">{t("type")}</label>
                                         <Select name="field_Type" defaultValue="Post office">
                                             <SelectTrigger className="w-full h-10 bg-card text-sm">
-                                                <SelectValue placeholder="Select Type" />
+                                                <SelectValue placeholder={t("selectType")} />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="Post office">Post office</SelectItem>
@@ -188,19 +189,19 @@ export default function AddOfficeModal({ children }: { children: React.ReactNode
                                         </Select>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">Delivery Facility</label>
+                                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">{t("deliveryFacility")}</label>
                                         <Select name="field_Delivery" defaultValue="No">
                                             <SelectTrigger className="w-full h-10 bg-card text-sm">
-                                                <SelectValue placeholder="Select Delivery" />
+                                                <SelectValue placeholder={t("selectDelivery")} />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="Yes">Yes</SelectItem>
-                                                <SelectItem value="No">No</SelectItem>
+                                                <SelectItem value="Yes">{t("yes")}</SelectItem>
+                                                <SelectItem value="No">{t("no")}</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
                                     <div className="md:col-span-2">
-                                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">Notes or Reason (Optional)</label>
+                                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">{t("notesOptional")}</label>
                                         <Input type="text" name="reason" placeholder="e.g. This is a newly opened sub post office" />
                                     </div>
                                 </div>
@@ -222,7 +223,7 @@ export default function AddOfficeModal({ children }: { children: React.ReactNode
                             )}
 
                             <Button type="submit" disabled={loading} size="lg" className="w-full h-11 text-base">
-                                {loading ? "Submitting..." : "Submit New Office"}
+                                {loading ? t("submitting") : t("submitNewOffice")}
                             </Button>
                         </form>
                     </div>

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/navigation";
-import { Search, LayoutGrid, Calculator, BookOpen, Menu } from "lucide-react";
+import { Home, FolderOpen, Calculator, Package, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MoreSheet from "./MoreSheet";
 
@@ -11,7 +11,7 @@ const HIDDEN_ON = ["/login", "/register", "/dashboard"];
 
 /**
  * App-style bottom navigation for phones (hidden from md up).
- * Search · Browse · Rates · Guides · More
+ * Home · Rates · Browse · Track · More
  */
 export default function BottomTabBar() {
     const t = useTranslations("App");
@@ -21,10 +21,10 @@ export default function BottomTabBar() {
     if (HIDDEN_ON.some((p) => pathname.startsWith(p))) return null;
 
     const tabs = [
-        { href: "/", label: t("tabSearch"), icon: Search, active: pathname === "/" || pathname.startsWith("/office") },
-        { href: "/browse", label: t("tabBrowse"), icon: LayoutGrid, active: pathname.startsWith("/browse") },
+        { href: "/", label: t("tabHome"), icon: Home, active: pathname === "/" },
         { href: "/calculator", label: t("tabRates"), icon: Calculator, active: pathname.startsWith("/calculator") },
-        { href: "/blog", label: t("tabGuides"), icon: BookOpen, active: pathname.startsWith("/blog") },
+        { href: "/browse", label: t("tabBrowse"), icon: FolderOpen, active: pathname.startsWith("/browse") || pathname.startsWith("/office") },
+        { href: "/track", label: t("tabTrack"), icon: Package, active: pathname.startsWith("/track") },
     ];
 
     return (

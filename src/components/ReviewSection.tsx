@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Star, Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +51,7 @@ function formatDate(dateStr: string): string {
 }
 
 export default function ReviewSection({ reviews: initialReviews, officeId }: ReviewSectionProps) {
+    const t = useTranslations("Reviews");
     const [reviews, setReviews] = useState<Review[]>(initialReviews);
     const [rating, setRating] = useState(0);
     const [authorName, setAuthorName] = useState("");
@@ -62,7 +64,7 @@ export default function ReviewSection({ reviews: initialReviews, officeId }: Rev
         e.preventDefault();
         if (rating === 0) {
             setError(true);
-            setMessage("Please select a star rating.");
+            setMessage(t("selectRatingError"));
             return;
         }
 
@@ -83,7 +85,7 @@ export default function ReviewSection({ reviews: initialReviews, officeId }: Rev
                 setRating(0);
                 setAuthorName("");
                 setContent("");
-                setMessage("Thank you for your review!");
+                setMessage(t("thankYou"));
                 setError(false);
             } else {
                 const errData = await res.json();
@@ -107,11 +109,11 @@ export default function ReviewSection({ reviews: initialReviews, officeId }: Rev
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                 <div>
-                    <h2 className="font-heading text-xl font-extrabold [font-stretch:82%] mb-1">Community Reviews</h2>
+                    <h2 className="font-heading text-xl font-extrabold [font-stretch:82%] mb-1">{t("title")}</h2>
                     <p className="text-sm text-muted-foreground">
                         {reviews.length > 0
-                            ? `${reviews.length} review${reviews.length !== 1 ? "s" : ""} · ${avgRating.toFixed(1)} average rating`
-                            : "No reviews yet. Be the first to share your experience!"}
+                            ? t("summary", { count: reviews.length, rating: avgRating.toFixed(1) })
+                            : t("noReviews")}
                     </p>
                 </div>
             </div>
@@ -144,14 +146,14 @@ export default function ReviewSection({ reviews: initialReviews, officeId }: Rev
 
             {/* Submit Review Form */}
             <div className="bg-card border border-border rounded-md p-6">
-                <h3 className="font-heading text-lg font-extrabold [font-stretch:82%] mb-4">Write a Review</h3>
+                <h3 className="font-heading text-lg font-extrabold [font-stretch:82%] mb-4">{t("writeReview")}</h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-muted-foreground mb-2">Your Rating</label>
+                        <label className="block text-sm font-medium text-muted-foreground mb-2">{t("yourRating")}</label>
                         <StarRating rating={rating} interactive onChange={setRating} />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">Your Name</label>
+                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">{t("yourName")}</label>
                         <Input
                             type="text"
                             value={authorName}
@@ -164,11 +166,11 @@ export default function ReviewSection({ reviews: initialReviews, officeId }: Rev
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">Your Review</label>
+                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">{t("yourReview")}</label>
                         <textarea
                             value={content}
                             onChange={(e) => setContent(e.target.value)}
-                            placeholder="Share your experience with this post office..."
+                            placeholder={t("reviewPlaceholder")}
                             required
                             minLength={10}
                             maxLength={1000}
@@ -183,9 +185,9 @@ export default function ReviewSection({ reviews: initialReviews, officeId }: Rev
                     )}
                     <Button type="submit" disabled={loading} className="w-full sm:w-auto">
                         {loading ? (
-                            <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Submitting...</>
+                            <><Loader2 className="w-4 h-4 animate-spin mr-2" /> {t("submitting")}</>
                         ) : (
-                            <><Send className="w-4 h-4 mr-2" /> Submit Review</>
+                            <><Send className="w-4 h-4 mr-2" /> {t("submitReview")}</>
                         )}
                     </Button>
                 </form>

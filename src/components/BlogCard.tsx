@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import { Link } from "@/navigation";
 
 interface BlogCardProps {
@@ -10,6 +11,7 @@ interface BlogCardProps {
 }
 
 export default function BlogCard({ slug, title, excerpt, date, readingTime, tags }: BlogCardProps) {
+    const t = useTranslations("Blog");
     const formattedDate = new Date(date).toLocaleDateString("en-US", {
         year: "numeric",
         month: "short",
@@ -23,7 +25,7 @@ export default function BlogCard({ slug, title, excerpt, date, readingTime, tags
         >
             <div>
                 <p className="font-mono text-xs text-muted-foreground">
-                    {formattedDate} &middot; {readingTime} min read
+                    {formattedDate} &middot; {t("minRead", { minutes: readingTime })}
                 </p>
                 <h3 className="font-heading text-xl font-extrabold leading-snug [font-stretch:85%] group-hover:text-primary mt-2 mb-2 line-clamp-2">
                     {title}

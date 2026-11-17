@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useRouter } from "@/navigation";
 import { PostOffice, SearchMode, SearchResponse } from "./types";
 
 export function useDirectoryState() {
@@ -32,7 +33,7 @@ export function useDirectoryState() {
         if (letter) params.set("letter", letter);
         if (service) params.set("service", service);
         const paramString = params.toString();
-        const newUrl = paramString ? `/?${paramString}` : "/";
+        const newUrl = paramString ? `/browse?${paramString}` : "/browse";
         router.replace(newUrl, { scroll: false });
     }, [router]);
 

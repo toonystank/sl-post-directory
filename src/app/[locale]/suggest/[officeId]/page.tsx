@@ -1,5 +1,6 @@
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 import { getLocalOfficeById } from "@/lib/local-sqlite";
+import { getTranslations } from "next-intl/server";
 import { ArrowLeft, Edit } from "lucide-react";
 import { Link } from "@/navigation";
 import { notFound } from "next/navigation";
@@ -33,11 +34,13 @@ export default async function SuggestEditPage({ params }: { params: Promise<{ of
         notFound();
     }
 
+    const t = await getTranslations("Suggest");
+
     return (
         <div className="container mx-auto px-4 py-6 md:py-12 max-w-3xl min-h-[calc(100vh-4rem)]">
             <Button variant="ghost" asChild className="hidden md:inline-flex mb-6 -ml-3 text-muted-foreground hover:text-foreground">
                 <Link href={`/office/${office.slug}`}>
-                    <ArrowLeft className="w-4 h-4 mr-2" /> Back to {office.name}
+                    <ArrowLeft className="w-4 h-4 mr-2" /> {t("backToOffice", { name: office.name })}
                 </Link>
             </Button>
 
@@ -49,8 +52,8 @@ export default async function SuggestEditPage({ params }: { params: Promise<{ of
                             <Edit className="w-5 h-5" />
                         </div>
                         <div>
-                            <h1 className="display text-2xl md:text-3xl">Suggest Edits</h1>
-                            <p className="text-sm text-muted-foreground mt-0.5">For: {office.name}</p>
+                            <h1 className="display text-2xl md:text-3xl">{t("pageTitle")}</h1>
+                            <p className="text-sm text-muted-foreground mt-0.5">{t("forOffice", { name: office.name })}</p>
                         </div>
                     </div>
                 </div>

@@ -4,6 +4,7 @@ import { Archivo, Public_Sans, IBM_Plex_Mono, Noto_Sans_Sinhala, Noto_Sans_Tamil
 import "../globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import AuthProvider from "@/context/AuthContext";
+import { CurrencyProvider } from "@/context/CurrencyContext";
 import Navbar from "@/components/Navbar";
 import BottomTabBar from "@/components/shell/BottomTabBar";
 import SiteFooter from "@/components/shell/SiteFooter";
@@ -146,24 +147,26 @@ export default async function RootLayout({
                 <NextTopLoader color="hsl(var(--primary))" showSpinner={false} height={3} />
                 <NextIntlClientProvider messages={messages}>
                     <AuthProvider>
-                        <AdManager>
-                            <ThemeProvider
-                                attribute="class"
-                                defaultTheme="system"
-                                enableSystem
-                                disableTransitionOnChange
-                            >
-                                <ServiceWorkerRegister />
-                                <Navbar />
-                                <main className="flex-1 pb-tabbar">
-                                    {children}
-                                </main>
-                                <InstallPrompt />
-                                <SiteFooter />
-                                <AdBanner position="sticky-bottom" />
-                                <BottomTabBar />
-                            </ThemeProvider>
-                        </AdManager>
+                        <CurrencyProvider>
+                            <AdManager>
+                                <ThemeProvider
+                                    attribute="class"
+                                    defaultTheme="system"
+                                    enableSystem
+                                    disableTransitionOnChange
+                                >
+                                    <ServiceWorkerRegister />
+                                    <Navbar />
+                                    <main className="flex-1 pb-tabbar">
+                                        {children}
+                                    </main>
+                                    <InstallPrompt />
+                                    <SiteFooter />
+                                    <AdBanner position="sticky-bottom" />
+                                    <BottomTabBar />
+                                </ThemeProvider>
+                            </AdManager>
+                        </CurrencyProvider>
                     </AuthProvider>
                 </NextIntlClientProvider>
             </body>

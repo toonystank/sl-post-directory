@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import PillarBox from "@/components/brand/PillarBox";
 import { PostOffice, SearchMode } from "./types";
-import PostOfficeCard, { ROW_COLS } from "./PostOfficeCard";
+import PostOfficeCard from "./PostOfficeCard";
 
 interface DirectoryGridProps {
     offices: PostOffice[];
@@ -32,14 +32,17 @@ export default function DirectoryGrid({
 
     if (initialLoading) {
         return (
-            <div className="divide-y divide-border border-t-2 border-foreground" aria-busy="true" aria-label={t("searching")}>
+            <div className="space-y-2.5" aria-busy="true" aria-label={t("searching")}>
                 {Array.from({ length: 8 }).map((_, i) => (
-                    <div key={i} className="py-4 flex items-center justify-between gap-4">
+                    <div key={i} className="rounded-xl border-2 border-foreground/30 bg-card px-4 py-3.5 flex items-center justify-between gap-4">
                         <div className="flex-1 min-w-0 space-y-2">
                             <div className="h-4 w-48 max-w-full bg-muted animate-pulse rounded-sm" />
-                            <div className="h-3 w-32 bg-muted animate-pulse rounded-sm" />
+                            <div className="h-3 w-36 bg-muted animate-pulse rounded-sm" />
                         </div>
-                        <div className="h-6 w-14 bg-muted animate-pulse rounded-sm shrink-0" />
+                        <div className="flex items-center gap-2 shrink-0">
+                            <div className="h-8 w-20 bg-muted animate-pulse rounded-md" />
+                            <div className="h-8 w-8 bg-muted animate-pulse rounded-md" />
+                        </div>
                     </div>
                 ))}
             </div>
@@ -48,7 +51,7 @@ export default function DirectoryGrid({
 
     if (offices.length === 0) {
         return (
-            <div className="rounded-md border-2 border-dashed border-foreground/30 bg-card/50 p-10 text-center">
+            <div className="rounded-xl border-2 border-dashed border-foreground/30 bg-card/50 p-10 text-center">
                 <PillarBox className="w-20 mx-auto mb-4" />
                 <h3 className="font-heading text-2xl font-extrabold [font-stretch:82%] mb-1">
                     {t("noResults")}
@@ -67,16 +70,7 @@ export default function DirectoryGrid({
 
     return (
         <>
-            <div className={cn("hidden lg:grid items-center gap-x-4 border-b-2 border-foreground pb-2 label-mono", ROW_COLS)}>
-                <span>Name</span>
-                <span>Postcode</span>
-                <span>Division</span>
-                <span>Status</span>
-                <span>Phone</span>
-                <span />
-            </div>
-
-            <ul className="border-t-2 border-foreground lg:border-t-0">
+            <ul className="space-y-2.5">
                 {offices.map((po, index) => (
                     <PostOfficeCard key={po.id} office={po} index={index} />
                 ))}
