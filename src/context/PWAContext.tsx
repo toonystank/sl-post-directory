@@ -66,6 +66,7 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
     const [localAssetsCached, setLocalAssetsCached] = useState(false);
     const [updateAvailable, setUpdateAvailable] = useState(false);
     const [offlineOfficesCount, setOfflineOfficesCount] = useState(0);
+    const [isOfflineFallbackPage, setIsOfflineFallbackPage] = useState(false);
 
     const refreshOfflineCount = useCallback(() => {
         setOfflineOfficesCount(getCachedOfficesList().length);
@@ -283,11 +284,13 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
                 localAssetsCached,
                 updateAvailable,
                 offlineOfficesCount,
+                isOfflineFallbackPage,
                 triggerInstall,
                 dismissBanner,
                 closeInstallModal,
                 warmLocalAssets,
                 applyUpdate,
+                setOfflineFallbackPage: setIsOfflineFallbackPage,
             }}
         >
             {children}
