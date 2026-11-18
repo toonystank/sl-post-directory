@@ -14,8 +14,8 @@ import NextTopLoader from "nextjs-toploader";
 import AdManager from "@/components/ads/AdManager";
 import AdBanner from "@/components/ads/AdBanner";
 import MotionProvider from "@/components/motion/MotionProvider";
-import { NextIntlClientProvider } from "next-intl";
-import { getMessages } from "next-intl/server";
+import { InstantLocaleProvider } from "@/context/InstantLocaleContext";
+import { PWAProvider } from "@/context/PWAContext";
 import { routing } from "@/i18n/routing";
 import { notFound } from "next/navigation";
 import { hasLocale } from "next-intl";
@@ -43,7 +43,7 @@ const plexMono = IBM_Plex_Mono({
     display: "swap",
 });
 
-// Sinhala / Tamil — not preloaded; unicode-range means they only download when needed
+// Sinhala / Tamil — preloaded with explicit weights so switching languages is instant
 const notoSinhala = Noto_Sans_Sinhala({
     subsets: ["sinhala"],
     weight: ["400", "500", "600", "700"],
@@ -76,6 +76,10 @@ export const metadata: Metadata = {
         capable: true,
         statusBarStyle: "default",
         title: "Lanka Post",
+    },
+    icons: {
+        icon: "/icon-192x192.png",
+        apple: "/apple-touch-icon.png",
     },
     formatDetection: {
         telephone: false,
@@ -121,12 +125,14 @@ export default async function RootLayout({
         notFound();
     }
 
-    const messages = await getMessages();
     const gaId = process.env.NEXT_PUBLIC_GA_ID?.trim();
 
     return (
         <html lang={locale} suppressHydrationWarning>
             <head>
+                <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+                <meta name="mobile-web-app-capable" content="yes" />
+                <meta name="apple-mobile-web-app-capable" content="yes" />
                 <script
                     suppressHydrationWarning
                     dangerouslySetInnerHTML={{
@@ -153,7 +159,7 @@ export default async function RootLayout({
                     </>
                 )}
                 <NextTopLoader color="hsl(var(--primary))" showSpinner={false} height={3} />
-                <NextIntlClientProvider messages={messages}>
+                <InstantLocaleProvider initialLocale={locale}>
                     <AuthProvider>
                         <CurrencyProvider>
                             <AdManager>
@@ -164,21 +170,23 @@ export default async function RootLayout({
                                     disableTransitionOnChange
                                 >
                                     <MotionProvider>
-                                        <ServiceWorkerRegister />
-                                        <Navbar />
-                                        <main className="flex-1 pb-tabbar">
-                                            {children}
-                                        </main>
-                                        <InstallPrompt />
-                                        <SiteFooter />
-                                        <AdBanner position="sticky-bottom" />
-                                        <BottomTabBar />
+                                        <PWAProvider>
+                                            <ServiceWorkerRegister />
+                                            <Navbar />
+                                            <main className="flex-1 pb-tabbar">
+                                                {children}
+                                            </main>
+                                            <InstallPrompt />
+                                            <SiteFooter />
+                                            <AdBanner position="sticky-bottom" />
+                                            <BottomTabBar />
+                                        </PWAProvider>
                                     </MotionProvider>
                                 </ThemeProvider>
                             </AdManager>
                         </CurrencyProvider>
                     </AuthProvider>
-                </NextIntlClientProvider>
+                </InstantLocaleProvider>
             </body>
         </html>
     );

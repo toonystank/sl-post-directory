@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 export default function SearchDirectory() {
     const t = useTranslations("Search");
     const tBrowse = useTranslations("Browse");
+    const tInstall = useTranslations("Install");
     const serviceLabel = useServiceLabel();
 
     const {
@@ -28,6 +29,7 @@ export default function SearchDirectory() {
         activeService, setActiveService,
         offices, total, nextCursor,
         loading, initialLoading,
+        isOfflineFallback,
         updateUrl, fetchOffices,
     } = useDirectoryState();
 
@@ -248,7 +250,11 @@ export default function SearchDirectory() {
                                         : t("allOffices")}
                                 </h2>
                                 <p className="mt-0.5 font-mono text-xs text-muted-foreground">
-                                    {initialLoading ? t("searching") : t("found", { count: total.toLocaleString() })}
+                                    {initialLoading
+                                        ? t("searching")
+                                        : isOfflineFallback
+                                            ? tInstall("offlineShowingSaved", { count: total.toLocaleString() })
+                                            : t("found", { count: total.toLocaleString() })}
                                 </p>
                             </div>
 

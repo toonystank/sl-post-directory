@@ -1,15 +1,32 @@
 "use client";
 
 import * as React from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useTheme } from "next-themes";
 import { useSession, signOut } from "next-auth/react";
-import { Link, usePathname, useRouter } from "@/navigation";
-import { Sun, Moon, MonitorSmartphone, LogIn, LogOut, User, LayoutDashboard, Github, Check, BookOpen } from "lucide-react";
+import { Link, usePathname } from "@/navigation";
+import {
+    Sun,
+    Moon,
+    MonitorSmartphone,
+    LogIn,
+    LogOut,
+    User,
+    LayoutDashboard,
+    Github,
+    Check,
+    BookOpen,
+    Download,
+    RefreshCw,
+    CheckCircle2,
+} from "lucide-react";
 import { Sheet, SheetContent } from "./Sheet";
 import { useCurrency } from "@/context/CurrencyContext";
+import { useInstantLocale } from "@/context/InstantLocaleContext";
+import { usePWA } from "@/context/PWAContext";
 import { CURRENCY_META, type Currency } from "@/lib/currency";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 const LOCALES = [
     { code: "en", label: "English", short: "EN" },
@@ -39,43 +56,117 @@ function Row({ children, className, ...props }: React.ComponentProps<"button">) 
 export default function MoreSheet({ open, onOpenChange }: MoreSheetProps) {
     const t = useTranslations("More");
     const tNav = useTranslations("Nav");
-    const locale = useLocale();
-    const router = useRouter();
+    const tInstall = useTranslations("Install");
+    const { locale, setLocale } = useInstantLocale();
     const pathname = usePathname();
     const { theme, setTheme } = useTheme();
     const { currency, setCurrency } = useCurrency();
+    const {
+        isInstalled,
+        isCachingLocalAssets,
+        localAssetsCached,
+        offlineOfficesCount,
+        updateAvailable,
+        triggerInstall,
+        warmLocalAssets,
+        applyUpdate,
+    } = usePWA();
     const { data: session } = useSession();
     const user = session?.user as { name?: string | null; role?: string } | undefined;
     const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN" || user?.role === "MODERATOR";
     const [mounted, setMounted] = React.useState(false);
-    const [, startTransition] = React.useTransition();
-    const [optimisticLocale, setOptimisticLocale] = React.useState(locale);
     React.useEffect(() => setMounted(true), []);
-    React.useEffect(() => setOptimisticLocale(locale), [locale]);
 
     const close = () => onOpenChange(false);
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent title={t("title")}>
-                {/* Language */}
+                {/* App & Offline */}
+                <section className="mb-5 rounded-lg border-2 border-foreground bg-card p-3.5">
+                    <div className="flex items-center justify-between gap-2 mb-2.5">
+                        <h3 className="label-mono">{tInstall("sectionTitle")}</h3>
+                        {isInstalled && (
+                            <span className="inline-flex items-center gap-1 text-xs font-bold text-[hsl(var(--status-open))]">
+                                <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                                {tInstall("installedBadge")}
+                            </span>
+                        )}
+                    </div>
+
+                    <div className="space-y-2.5">
+                        {!isInstalled && (
+                            <Button
+                                type="button"
+                                className="w-full justify-center gap-2"
+                                data-testid="more-install-app-btn"
+                                onClick={() => {
+                                    close();
+                                    void triggerInstall();
+                                }}
+                            >
+                                <Download className="h-4 w-4" aria-hidden="true" />
+                                <span>{tInstall("installApp")}</span>
+                            </Button>
+                        )}
+
+                        {updateAvailable && (
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                className="w-full justify-center gap-2"
+                                onClick={applyUpdate}
+                            >
+                                <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                                <span>{tInstall("updateTitle")} · {tInstall("updateAction")}</span>
+                            </Button>
+                        )}
+
+                        <div className="flex flex-col gap-2 pt-1 text-xs text-muted-foreground">
+                            <div className="min-w-0">
+                                <p className="font-medium text-foreground">
+                                    {isCachingLocalAssets
+                                        ? tInstall("cachingAssets")
+                                        : localAssetsCached
+                                            ? tInstall("cachedReady")
+                                            : tInstall("badge")}
+                                </p>
+                                {offlineOfficesCount > 0 && (
+                                    <p className="text-[11px] text-muted-foreground">
+                                        {tInstall("cachedOffices", { count: offlineOfficesCount })}
+                                    </p>
+                                )}
+                            </div>
+                            <button
+                                type="button"
+                                disabled={isCachingLocalAssets}
+                                onClick={() => void warmLocalAssets()}
+                                data-testid="more-sync-offline-btn"
+                                className="tap self-start inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50"
+                            >
+                                <RefreshCw
+                                    className={cn("h-3.5 w-3.5", isCachingLocalAssets && "animate-spin")}
+                                    aria-hidden="true"
+                                />
+                                <span>{isCachingLocalAssets ? tInstall("syncing") : tInstall("syncOffline")}</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Language (instant 0ms switch) */}
                 <section className="mb-5">
                     <h3 className="label-mono mb-2">{t("language")}</h3>
                     <div className="grid grid-cols-3 gap-2">
                         {LOCALES.map((l) => {
-                            const active = optimisticLocale === l.code;
+                            const active = locale === l.code;
                             return (
                                 <button
                                     key={l.code}
                                     type="button"
                                     onMouseDown={(e) => e.preventDefault()}
                                     onClick={() => {
-                                        setOptimisticLocale(l.code);
-                                        const search = typeof window !== "undefined" ? window.location.search : "";
-                                        const target = search ? `${pathname}${search}` : pathname;
-                                        startTransition(() => {
-                                            router.replace(target, { locale: l.code, scroll: false });
-                                        });
+                                        setLocale(l.code);
                                         close();
                                     }}
                                     className={cn(
