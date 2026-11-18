@@ -35,13 +35,15 @@ export async function GET(request: NextRequest) {
     try {
         let suggestions: string[] = [];
 
-        if (mode === "name") {
-            // Find post offices using tiered matching (pg_trgm)
+        if (mode === "name" || mode === "all") {
+            // Find post offices using tiered matching (pg_trgm) + postalCode prefix
             const offices = await prisma.$queryRaw<{ name: string }[]>`
                 SELECT name FROM (
                     SELECT DISTINCT name, similarity(name, ${q}) as sim
                     FROM "PostOffice"
-                    WHERE name ILIKE ${q + '%'} OR similarity(name, ${q}) > 0.15
+                    WHERE name ILIKE ${q + '%'}
+                       OR "postalCode" ILIKE ${q + '%'}
+                       OR similarity(name, ${q}) > 0.15
                 ) as subquery
                 ORDER BY
                   CASE
@@ -53,6 +55,31 @@ export async function GET(request: NextRequest) {
                 LIMIT 5;
             `;
             suggestions = offices.map((o) => o.name);
+
+            if (mode === "all" && suggestions.length < 5) {
+                const fields = await prisma.postOfficeField.findMany({
+                    where: {
+                        name: "Division",
+                        value: {
+                            startsWith: q,
+                            mode: "insensitive",
+                        },
+                    },
+                    distinct: ["value"],
+                    take: 5 - suggestions.length,
+                    select: {
+                        value: true,
+                    },
+                    orderBy: {
+                        value: "asc",
+                    },
+                });
+                for (const f of fields) {
+                    if (!suggestions.includes(f.value)) {
+                        suggestions.push(f.value);
+                    }
+                }
+            }
         } else if (mode === "division") {
             // Find distinct area names (Division fields) starting with 'q'
             const fields = await prisma.postOfficeField.findMany({

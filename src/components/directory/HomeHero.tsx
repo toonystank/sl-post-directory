@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { m } from "motion/react";
 import { Link, useRouter } from "@/navigation";
 import { BookOpen, FolderOpen, Plane, Banknote, Mail, ChevronRight } from "lucide-react";
@@ -57,23 +57,17 @@ export function ModeToggle({ searchMode, onModeChange, className }: { searchMode
     );
 }
 
-export default function HomeHero({ search, searchMode: controlledMode, onModeChange, total = 4158, activeQuery, searchRef }: HomeHeroProps) {
+export default function HomeHero({ search, searchMode: controlledMode, total = 4158, activeQuery, searchRef }: HomeHeroProps) {
     const t = useTranslations("Home");
+    const locale = useLocale();
+    const isIndic = locale === "si" || locale === "ta";
     const router = useRouter();
     const [localQuery, setLocalQuery] = React.useState("");
-    const [localMode, setLocalMode] = React.useState<SearchMode>("name");
+    const [localMode] = React.useState<SearchMode>("name");
     const localSearchContainerRef = React.useRef<HTMLDivElement>(null);
 
     const effectiveMode = controlledMode ?? localMode;
     const effectiveQuery = activeQuery ?? localQuery;
-
-    const handleModeChange = (mode: SearchMode) => {
-        if (onModeChange) {
-            onModeChange(mode);
-        } else {
-            setLocalMode(mode);
-        }
-    };
 
     const navigateToBrowse = (q: string, mode: SearchMode) => {
         const trimmed = q.trim();
@@ -87,37 +81,52 @@ export default function HomeHero({ search, searchMode: controlledMode, onModeCha
     return (
         <section className="relative border-b-2 border-foreground md:paper-grain">
             <div className="container mx-auto px-4">
-                <div className="grid items-center gap-6 md:gap-8 md:grid-cols-[minmax(0,1fr)_auto] pt-2 pb-2 md:pt-10 md:pb-6 lg:pt-12 lg:pb-8">
+                <div className="grid items-start md:items-center gap-3 md:gap-8 md:grid-cols-[minmax(0,1fr)_auto] pt-2 pb-2 md:pt-8 md:pb-6 lg:pt-10 lg:pb-8">
                     {/* Copy + search */}
                     <div className="min-w-0">
-                        <p className="label-mono hidden md:block mb-4">{t("kicker")}</p>
-
-                        {/* Mobile Top Split: Headline + Name|Area toggle on left, PillarBox + Postmarks on right */}
-                        <div className="flex items-end justify-between gap-2 md:block">
-                            <div className="min-w-0 flex-1">
-                                <h1 className="display text-[clamp(1.65rem,7vw,2.35rem)] leading-[1.02] md:text-6xl lg:text-7xl break-words">
+                        {/* Mobile & Desktop Top Split: Text at top-left, Signature PillarBox + Postmarks at top-right on mobile */}
+                        <div className="flex items-start justify-between gap-2 md:block">
+                            <div className="min-w-0 flex-1 pt-0.5">
+                                <p
+                                    className={cn(
+                                        "font-mono font-bold uppercase tracking-wider text-primary mb-1 md:mb-2",
+                                        isIndic ? "text-[9.5px] md:text-xs" : "text-[10px] md:text-xs"
+                                    )}
+                                >
+                                    {t("kicker")}
+                                </p>
+                                <h1
+                                    className={cn(
+                                        "break-words font-extrabold",
+                                        isIndic
+                                            ? "text-[1.08rem] sm:text-[1.25rem] leading-[1.2] md:text-3xl lg:text-4xl"
+                                            : "display text-[1.28rem] sm:text-[1.5rem] leading-[1.08] md:text-4xl lg:text-5xl"
+                                    )}
+                                >
                                     <span className="md:hidden">{t("headlineMobile")}</span>
                                     <span className="hidden md:inline">{t("headlineDesktop")}</span>
                                 </h1>
-                                <p className="hidden md:block mt-4 max-w-xl text-lg text-muted-foreground">{t("lede")}</p>
-
-                                <div className="mt-3 md:mt-7 mb-1.5 md:mb-2">
-                                    <ModeToggle searchMode={effectiveMode} onModeChange={handleModeChange} />
-                                </div>
+                                <p
+                                    className={cn(
+                                        "max-w-xl text-muted-foreground",
+                                        isIndic
+                                            ? "mt-1 md:mt-2.5 text-[10.5px] sm:text-xs md:text-sm leading-[1.35] md:leading-relaxed"
+                                            : "mt-1.5 md:mt-3 text-[11.5px] sm:text-xs md:text-base leading-snug md:leading-relaxed"
+                                    )}
+                                >
+                                    {t("lede")}
+                                </p>
                             </div>
 
-                            {/* Mobile illustration beside headline + ModeToggle (explicit dimensions, no overflow) */}
-                            <m.div
-                                initial={{ opacity: 0.9, y: 6 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.35, ease: "easeOut" }}
-                                className="relative shrink-0 md:hidden w-[132px] h-[120px] flex items-end justify-center select-none pointer-events-none"
+                            {/* Signature Mobile PillarBox + Colombo & Kandy Postmarks top-aligned on right */}
+                            <div
+                                className="relative shrink-0 md:hidden w-[118px] h-[106px] flex items-end justify-center select-none pointer-events-none"
                                 aria-hidden="true"
                             >
                                 <Postmark
                                     code="00100"
                                     size="md"
-                                    boxSize={66}
+                                    boxSize={58}
                                     tone="ink"
                                     rotate={14}
                                     label="COLOMBO GPO"
@@ -125,12 +134,12 @@ export default function HomeHero({ search, searchMode: controlledMode, onModeCha
                                     date="17 NOV 26"
                                     time="AM 10.30"
                                     bay="A"
-                                    className="absolute right-0 top-0.5 z-0 rounded-full bg-background"
+                                    className="absolute right-0 top-0 z-0 rounded-full bg-background"
                                 />
                                 <Postmark
                                     code="20000"
                                     size="md"
-                                    boxSize={66}
+                                    boxSize={58}
                                     tone="ink"
                                     rotate={-16}
                                     label="KANDY"
@@ -138,19 +147,20 @@ export default function HomeHero({ search, searchMode: controlledMode, onModeCha
                                     date="17 NOV 26"
                                     time="PM 14.00"
                                     bay="C"
-                                    className="absolute left-0 bottom-2 z-0 rounded-full bg-background"
+                                    className="absolute left-0 bottom-1.5 z-0 rounded-full bg-background"
                                 />
-                                <PillarBox className="relative z-10 w-[80px] h-auto" />
-                            </m.div>
+                                <PillarBox className="relative z-10 w-[70px] h-auto" />
+                            </div>
                         </div>
 
-                        <div ref={searchRef ?? localSearchContainerRef} className="mt-1.5 md:mt-0 md:max-w-2xl">
+                        <div ref={searchRef ?? localSearchContainerRef} className="mt-2 md:mt-5 md:max-w-2xl">
                             {search ?? (
                                 <SearchBar
                                     id="home-hero"
                                     query={localQuery}
                                     onQueryChange={(val) => setLocalQuery(val)}
                                     searchMode={effectiveMode}
+                                    enableSmartHomeSearch
                                     onSubmit={() => navigateToBrowse(localQuery, effectiveMode)}
                                     onClear={() => setLocalQuery("")}
                                     loading={false}
@@ -169,10 +179,7 @@ export default function HomeHero({ search, searchMode: controlledMode, onModeCha
                     </div>
 
                     {/* Desktop illustration */}
-                    <m.div
-                        initial={{ opacity: 0.9, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.4, ease: "easeOut" }}
+                    <div
                         className="relative hidden md:block w-[290px] lg:w-[330px]"
                         aria-hidden="true"
                     >
@@ -201,100 +208,143 @@ export default function HomeHero({ search, searchMode: controlledMode, onModeCha
                             className="absolute left-0 bottom-7 z-0 rounded-full bg-background"
                         />
                         <PillarBox className="relative z-10 w-[190px] lg:w-[215px] mx-auto" />
-                    </m.div>
+                    </div>
                 </div>
 
                 {/* Quick tools — calculator first (International + COD + Local, then Directory & Guides) */}
-                <div className="pt-3 pb-5 md:pt-2 md:pb-10">
-                    <h2 className="font-heading text-lg md:text-xl font-extrabold [font-stretch:82%] mb-2.5 md:mb-3">{t("quickTools")}</h2>
+                <div className="pt-2.5 pb-4 md:pt-2 md:pb-10">
+                    <h2
+                        className={cn(
+                            "font-heading font-extrabold [font-stretch:82%] mb-2 md:mb-3",
+                            isIndic ? "text-base md:text-xl" : "text-lg md:text-xl"
+                        )}
+                    >
+                        {t("quickTools")}
+                    </h2>
 
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 md:gap-4">
                         {/* International — airmail envelope */}
-                        <m.div
-                            whileHover={{ y: -2 }}
-                            whileTap={{ scale: 0.985 }}
-                            transition={{ type: "spring", stiffness: 450, damping: 28 }}
-                        >
+                        <div>
                             <Link
                                 href={{ pathname: "/calculator", query: { mode: "intl" } }}
-                                className="tap block h-full rounded-xl border-2 border-foreground par-avion-stripe p-[5px] md:p-[6px] shadow-[0_3px_0_0_hsl(var(--foreground))]"
+                                className="tap block h-full rounded-xl border-2 border-foreground par-avion-stripe p-[4px] md:p-[6px] shadow-[0_3px_0_0_hsl(var(--foreground))] md:hover:-translate-y-0.5 transition-transform"
                             >
-                                <span className="flex h-full min-h-[122px] md:min-h-[150px] flex-col items-center justify-center gap-1.5 md:gap-2 rounded-lg bg-[#1D4E9E] px-2 py-3 md:py-4 text-center text-white">
-                                    <span className="flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full bg-white/15">
-                                        <Plane className="h-7 w-7 md:h-9 md:w-9" strokeWidth={2.2} aria-hidden="true" />
+                                <span className="flex h-full min-h-[112px] md:min-h-[146px] flex-col items-center justify-center gap-1 md:gap-2 rounded-lg bg-[#1D4E9E] px-2 py-2.5 md:py-4 text-center text-white">
+                                    <span className="flex h-10 w-10 md:h-14 md:w-14 items-center justify-center rounded-full bg-white/15">
+                                        <Plane className="h-6 w-6 md:h-9 md:w-9" strokeWidth={2.2} aria-hidden="true" />
                                     </span>
-                                    <span className="font-heading text-base md:text-lg font-extrabold leading-tight [font-stretch:85%]">{t("toolIntl")}</span>
-                                    <span className="text-[11px] font-medium leading-tight text-white/85">{t("toolIntlSub")}</span>
+                                    <span
+                                        className={cn(
+                                            "font-heading font-extrabold leading-tight [font-stretch:85%]",
+                                            isIndic ? "text-[14px] md:text-lg" : "text-base md:text-lg"
+                                        )}
+                                    >
+                                        {t("toolIntl")}
+                                    </span>
+                                    <span
+                                        className={cn(
+                                            "font-medium leading-tight text-white/85",
+                                            isIndic ? "text-[10px] md:text-xs" : "text-[11px] md:text-xs"
+                                        )}
+                                    >
+                                        {t("toolIntlSub")}
+                                    </span>
                                 </span>
                             </Link>
-                        </m.div>
+                        </div>
 
                         {/* COD — money green */}
-                        <m.div
-                            whileHover={{ y: -2 }}
-                            whileTap={{ scale: 0.985 }}
-                            transition={{ type: "spring", stiffness: 450, damping: 28 }}
-                        >
+                        <div>
                             <Link
                                 href={{ pathname: "/calculator", query: { mode: "cod" } }}
-                                className="tap block h-full rounded-xl border-2 border-foreground bg-[#15803D] shadow-[0_3px_0_0_hsl(var(--foreground))]"
+                                className="tap block h-full rounded-xl border-2 border-foreground bg-[#15803D] shadow-[0_3px_0_0_hsl(var(--foreground))] md:hover:-translate-y-0.5 transition-transform"
                             >
-                                <span className="flex h-full min-h-[122px] md:min-h-[150px] flex-col items-center justify-center gap-1.5 md:gap-2 px-2 py-3 md:py-4 text-center text-white">
-                                    <span className="flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full bg-white/15">
-                                        <Banknote className="h-7 w-7 md:h-9 md:w-9" strokeWidth={2.2} aria-hidden="true" />
+                                <span className="flex h-full min-h-[112px] md:min-h-[146px] flex-col items-center justify-center gap-1 md:gap-2 px-2 py-2.5 md:py-4 text-center text-white">
+                                    <span className="flex h-10 w-10 md:h-14 md:w-14 items-center justify-center rounded-full bg-white/15">
+                                        <Banknote className="h-6 w-6 md:h-9 md:w-9" strokeWidth={2.2} aria-hidden="true" />
                                     </span>
-                                    <span className="font-heading text-base md:text-lg font-extrabold leading-tight [font-stretch:85%]">{t("toolCod")}</span>
-                                    <span className="text-[11px] font-medium leading-tight text-white/85">{t("toolCodSub")}</span>
+                                    <span
+                                        className={cn(
+                                            "font-heading font-extrabold leading-tight [font-stretch:85%]",
+                                            isIndic ? "text-[14px] md:text-lg" : "text-base md:text-lg"
+                                        )}
+                                    >
+                                        {t("toolCod")}
+                                    </span>
+                                    <span
+                                        className={cn(
+                                            "font-medium leading-tight text-white/85",
+                                            isIndic ? "text-[10px] md:text-xs" : "text-[11px] md:text-xs"
+                                        )}
+                                    >
+                                        {t("toolCodSub")}
+                                    </span>
                                 </span>
                             </Link>
-                        </m.div>
+                        </div>
 
                         {/* Local — SL Post red, full width on mobile, 3rd card on desktop */}
-                        <m.div
-                            whileHover={{ y: -2 }}
-                            whileTap={{ scale: 0.985 }}
-                            transition={{ type: "spring", stiffness: 450, damping: 28 }}
-                            className="col-span-2 md:col-span-1"
-                        >
+                        <div className="col-span-2 md:col-span-1">
                             <Link
                                 href={{ pathname: "/calculator", query: { mode: "local" } }}
-                                className="tap flex h-full items-center gap-3 rounded-xl border-2 border-foreground bg-primary px-3.5 py-2.5 text-white shadow-[0_3px_0_0_hsl(var(--foreground))] md:min-h-[150px] md:flex-col md:justify-center md:gap-2 md:px-2 md:py-4 md:text-center"
+                                className="tap flex h-full items-center gap-2.5 rounded-xl border-2 border-foreground bg-primary px-3 py-2 text-white shadow-[0_3px_0_0_hsl(var(--foreground))] md:min-h-[146px] md:flex-col md:justify-center md:gap-2 md:px-2 md:py-4 md:text-center md:hover:-translate-y-0.5 transition-transform"
                             >
-                                <span className="flex h-10 w-10 md:h-14 md:w-14 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
+                                <span className="flex h-9 w-9 md:h-14 md:w-14 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
                                     <Mail className="h-5 w-5 md:h-9 md:w-9" strokeWidth={2.2} aria-hidden="true" />
                                 </span>
                                 <span className="min-w-0 flex-1 md:flex-initial">
-                                    <span className="block font-heading text-base md:text-lg font-extrabold leading-tight [font-stretch:85%]">{t("toolLocal")}</span>
-                                    <span className="block text-[11px] font-medium leading-tight opacity-85 truncate md:whitespace-normal">{t("toolLocalSub")}</span>
+                                    <span
+                                        className={cn(
+                                            "block font-heading font-extrabold leading-tight [font-stretch:85%]",
+                                            isIndic ? "text-[14px] md:text-lg" : "text-base md:text-lg"
+                                        )}
+                                    >
+                                        {t("toolLocal")}
+                                    </span>
+                                    <span
+                                        className={cn(
+                                            "block font-medium leading-tight opacity-85 truncate md:whitespace-normal",
+                                            isIndic ? "text-[10px] md:text-xs" : "text-[11px] md:text-xs"
+                                        )}
+                                    >
+                                        {t("toolLocalSub")}
+                                    </span>
                                 </span>
                                 <ChevronRight className="h-5 w-5 shrink-0 md:hidden" aria-hidden="true" />
                             </Link>
-                        </m.div>
+                        </div>
                     </div>
 
                     {/* Secondary tools — Directory & Guides side-by-side */}
                     <div className="mt-2.5 md:mt-3 grid grid-cols-2 gap-2.5 md:gap-4">
-                        <m.div whileHover={{ y: -1 }} whileTap={{ scale: 0.985 }} transition={{ type: "spring", stiffness: 450, damping: 28 }}>
+                        <div>
                             <Link
                                 href="/browse"
-                                className="tap flex w-full items-center justify-center gap-2 rounded-xl border-2 border-foreground bg-card px-3 py-2.5 text-sm font-bold shadow-[0_2px_0_0_hsl(var(--foreground))] hover:bg-secondary/30 transition-colors"
+                                className={cn(
+                                    "tap flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-foreground bg-card px-2.5 py-2 font-bold shadow-[0_2px_0_0_hsl(var(--foreground))] hover:bg-secondary/30 md:hover:-translate-y-0.5 transition-all",
+                                    isIndic ? "text-xs md:text-sm" : "text-sm"
+                                )}
                             >
                                 <FolderOpen className="h-4 w-4 shrink-0 text-primary" strokeWidth={2.2} aria-hidden="true" />
                                 <span className="truncate">{t("toolDirectory")}</span>
                             </Link>
-                        </m.div>
-                        <m.div whileHover={{ y: -1 }} whileTap={{ scale: 0.985 }} transition={{ type: "spring", stiffness: 450, damping: 28 }}>
+                        </div>
+                        <div>
                             <Link
                                 href="/blog"
-                                className="tap flex w-full items-center justify-center gap-2 rounded-xl border-2 border-foreground bg-card px-3 py-2.5 text-sm font-bold shadow-[0_2px_0_0_hsl(var(--foreground))] hover:bg-secondary/30 transition-colors"
+                                className={cn(
+                                    "tap flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-foreground bg-card px-2.5 py-2 font-bold shadow-[0_2px_0_0_hsl(var(--foreground))] hover:bg-secondary/30 md:hover:-translate-y-0.5 transition-all",
+                                    isIndic ? "text-xs md:text-sm" : "text-sm"
+                                )}
                             >
                                 <BookOpen className="h-4 w-4 shrink-0 text-primary" strokeWidth={2.2} aria-hidden="true" />
                                 <span className="truncate">{t("toolGuides")}</span>
                             </Link>
-                        </m.div>
+                        </div>
                     </div>
                 </div>
             </div>
         </section>
     );
 }
+

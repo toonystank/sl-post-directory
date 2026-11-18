@@ -349,7 +349,11 @@ export function autocompleteLocalOffices(q: string, mode = "name"): string[] {
             exact.push(item.record);
         } else if (item.nameLower.startsWith(qLower) || item.record.postalCode.startsWith(trimmed)) {
             prefix.push(item.record);
-        } else if (item.nameLower.includes(qLower) || item.record.postalCode.includes(trimmed)) {
+        } else if (
+            item.nameLower.includes(qLower) ||
+            item.record.postalCode.includes(trimmed) ||
+            (mode === "all" && item.divisionLower.includes(qLower))
+        ) {
             contains.push(item.record);
         }
     }
