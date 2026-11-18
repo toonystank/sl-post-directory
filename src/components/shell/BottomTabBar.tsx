@@ -6,6 +6,7 @@ import { Link, usePathname } from "@/navigation";
 import { Home, FolderOpen, Calculator, Package, Menu } from "lucide-react";
 import { m } from "motion/react";
 import { cn } from "@/lib/utils";
+import { usePWA } from "@/context/PWAContext";
 import MoreSheet from "./MoreSheet";
 
 const HIDDEN_ON = ["/login", "/register", "/dashboard"];
@@ -17,15 +18,26 @@ const HIDDEN_ON = ["/login", "/register", "/dashboard"];
 export default function BottomTabBar() {
     const t = useTranslations("App");
     const pathname = usePathname() || "/";
+    const { isOfflineFallbackPage } = usePWA();
     const [moreOpen, setMoreOpen] = React.useState(false);
+    const [hasMounted, setHasMounted] = React.useState(false);
 
-    if (HIDDEN_ON.some((p) => pathname.startsWith(p))) return null;
+    React.useEffect(() => {
+        setHasMounted(true);
+    }, []);
+
+    const isOfflineFallback =
+        pathname.startsWith("/offline") ||
+        isOfflineFallbackPage ||
+        (!hasMounted && typeof document !== "undefined" && Boolean(document.getElementById("slpost-offline-fallback")));
+
+    if (!isOfflineFallback && HIDDEN_ON.some((p) => pathname.startsWith(p))) return null;
 
     const tabs = [
-        { href: "/", label: t("tabHome"), icon: Home, active: pathname === "/" },
-        { href: "/calculator", label: t("tabRates"), icon: Calculator, active: pathname.startsWith("/calculator") },
-        { href: "/browse", label: t("tabBrowse"), icon: FolderOpen, active: pathname.startsWith("/browse") || pathname.startsWith("/office") },
-        { href: "/track", label: t("tabTrack"), icon: Package, active: pathname.startsWith("/track") },
+        { href: "/", label: t("tabHome"), icon: Home, active: !isOfflineFallback && pathname === "/" },
+        { href: "/calculator", label: t("tabRates"), icon: Calculator, active: !isOfflineFallback && pathname.startsWith("/calculator") },
+        { href: "/browse", label: t("tabBrowse"), icon: FolderOpen, active: !isOfflineFallback && (pathname.startsWith("/browse") || pathname.startsWith("/office")) },
+        { href: "/track", label: t("tabTrack"), icon: Package, active: !isOfflineFallback && pathname.startsWith("/track") },
     ];
 
     return (
