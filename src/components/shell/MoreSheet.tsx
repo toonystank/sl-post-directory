@@ -48,7 +48,10 @@ export default function MoreSheet({ open, onOpenChange }: MoreSheetProps) {
     const user = session?.user as { name?: string | null; role?: string } | undefined;
     const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN" || user?.role === "MODERATOR";
     const [mounted, setMounted] = React.useState(false);
+    const [, startTransition] = React.useTransition();
+    const [optimisticLocale, setOptimisticLocale] = React.useState(locale);
     React.useEffect(() => setMounted(true), []);
+    React.useEffect(() => setOptimisticLocale(locale), [locale]);
 
     const close = () => onOpenChange(false);
 
@@ -59,24 +62,34 @@ export default function MoreSheet({ open, onOpenChange }: MoreSheetProps) {
                 <section className="mb-5">
                     <h3 className="label-mono mb-2">{t("language")}</h3>
                     <div className="grid grid-cols-3 gap-2">
-                        {LOCALES.map((l) => (
-                            <button
-                                key={l.code}
-                                onClick={() => {
-                                    router.replace(pathname, { locale: l.code });
-                                    close();
-                                }}
-                                className={cn(
-                                    "tap flex h-14 flex-col items-center justify-center rounded-md border-2 text-sm font-semibold",
-                                    locale === l.code
-                                        ? "border-foreground bg-secondary text-secondary-foreground"
-                                        : "border-border hover:border-foreground/40"
-                                )}
-                                aria-pressed={locale === l.code}
-                            >
-                                <span lang={l.code}>{l.label}</span>
-                            </button>
-                        ))}
+                        {LOCALES.map((l) => {
+                            const active = optimisticLocale === l.code;
+                            return (
+                                <button
+                                    key={l.code}
+                                    type="button"
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={() => {
+                                        setOptimisticLocale(l.code);
+                                        const search = typeof window !== "undefined" ? window.location.search : "";
+                                        const target = search ? `${pathname}${search}` : pathname;
+                                        startTransition(() => {
+                                            router.replace(target, { locale: l.code, scroll: false });
+                                        });
+                                        close();
+                                    }}
+                                    className={cn(
+                                        "tap flex h-12 flex-col items-center justify-center rounded-md border-2 text-sm font-semibold",
+                                        active
+                                            ? "border-foreground bg-secondary text-secondary-foreground"
+                                            : "border-border hover:border-foreground/40"
+                                    )}
+                                    aria-pressed={active}
+                                >
+                                    <span lang={l.code}>{l.label}</span>
+                                </button>
+                            );
+                        })}
                     </div>
                 </section>
 

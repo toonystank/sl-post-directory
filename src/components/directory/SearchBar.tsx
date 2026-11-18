@@ -1,14 +1,42 @@
-import React, { useRef, useState, useCallback, useEffect } from "react";
-import { useTranslations } from "next-intl";
-import { Search, MapPin, Building2, Loader2, X, CornerDownLeft } from "lucide-react";
+"use client";
+
+import React, { useRef, useState, useCallback, useEffect, useMemo } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import {
+    Search,
+    MapPin,
+    Building2,
+    Loader2,
+    X,
+    CornerDownLeft,
+    Plane,
+    Banknote,
+    Mail,
+    ArrowRight,
+    Scale,
+} from "lucide-react";
 import { m, AnimatePresence } from "motion/react";
+import { Link, useRouter } from "@/navigation";
 import { cn } from "@/lib/utils";
+import CountryFlag from "@/components/brand/CountryFlag";
+import NuwaraEliyaPostOffice from "@/components/brand/NuwaraEliyaPostOffice";
+import { useCurrency } from "@/context/CurrencyContext";
+import { formatCurrencyAmount } from "@/lib/currency";
+import {
+    SMART_WEIGHT_CHIPS,
+    formatWeightLabel,
+    getSearchCyclingExamples,
+    parseSmartSearchIntent,
+    type SmartSearchIntent,
+} from "@/lib/smart-search";
 import { SearchMode } from "./types";
 
 interface SearchBarProps {
     id: string;
     /** Compact variant used when docked under the mobile app bar / in the sidebar */
     isSticky?: boolean;
+    /** Enables Nuwara Eliya illustration backdrop, stroked cycling examples, smart rate preview, and in-flow push-down drawer */
+    enableSmartHomeSearch?: boolean;
     query: string;
     onQueryChange: (val: string, id: string) => void;
     searchMode: SearchMode;
@@ -22,96 +50,230 @@ interface SearchBarProps {
 }
 
 export default function SearchBar({
-    id, isSticky = false, query, onQueryChange, searchMode, onSubmit,
-    onClear, loading, onSuggestionClick, containerRef, sidebarRef, inputRef
+    id,
+    isSticky = false,
+    enableSmartHomeSearch = false,
+    query,
+    onQueryChange,
+    searchMode,
+    onSubmit,
+    onClear,
+    loading,
+    onSuggestionClick,
+    containerRef,
+    sidebarRef,
+    inputRef,
 }: SearchBarProps) {
     const t = useTranslations("Search");
+    const tc = useTranslations("Calculator");
+    const tHome = useTranslations("Home");
+    const locale = useLocale();
+    const router = useRouter();
+    const { currency, lkrPerUsd } = useCurrency();
+
     const [suggestions, setSuggestions] = useState<string[]>([]);
-    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [showDropdown, setShowDropdown] = useState(false);
     const [suggestionsLoading, setSuggestionsLoading] = useState(false);
     const [isActive, setIsActive] = useState(false);
     const [highlight, setHighlight] = useState(-1);
+    const [exampleIndex, setExampleIndex] = useState(0);
+    const [weightOverrideGrams, setWeightOverrideGrams] = useState<number | null>(null);
 
     const suggestionCache = useRef<Record<string, string[]>>({});
     const suggestDebounce = useRef<NodeJS.Timeout | null>(null);
     const suggestAbort = useRef<AbortController | null>(null);
     const localContainerRef = useRef<HTMLDivElement>(null);
+    const searchFormRef = useRef<HTMLFormElement>(null);
+    const drawerBoxRef = useRef<HTMLDivElement>(null);
     const actualContainerRef = containerRef || localContainerRef;
     const listId = `suggestions-${id}`;
 
-    const fetchSuggestions = useCallback(async (val: string, mode: SearchMode) => {
-        if (!val.trim()) {
+    const cyclingExamples = useMemo(
+        () => getSearchCyclingExamples(locale),
+        [locale]
+    );
+
+    // Cycle example placeholder texts smoothly when on Home search and input is empty
+    useEffect(() => {
+        if (!enableSmartHomeSearch || query.trim().length > 0) return;
+        const timer = setInterval(() => {
+            setExampleIndex((prev) => (prev + 1) % cyclingExamples.length);
+        }, 2800);
+        return () => clearInterval(timer);
+    }, [enableSmartHomeSearch, query, cyclingExamples.length]);
+
+    // Reset manual weight chip override whenever the user edits the query text
+    useEffect(() => {
+        setWeightOverrideGrams(null);
+    }, [query]);
+
+    const smartIntent: SmartSearchIntent | null = useMemo(() => {
+        if (!enableSmartHomeSearch || !query.trim()) return null;
+        return parseSmartSearchIntent(query, locale, weightOverrideGrams);
+    }, [enableSmartHomeSearch, query, locale, weightOverrideGrams]);
+
+    const effectiveAutocompleteMode = enableSmartHomeSearch ? "all" : searchMode;
+
+    const fetchSuggestions = useCallback(
+        async (val: string, mode: string) => {
+            if (!val.trim()) {
+                suggestAbort.current?.abort();
+                setSuggestions([]);
+                return;
+            }
+            const cacheKey = `${mode}-${val.trim().toLowerCase()}`;
+            if (suggestionCache.current[cacheKey]) {
+                setSuggestions(suggestionCache.current[cacheKey]);
+                return;
+            }
             suggestAbort.current?.abort();
-            setSuggestions([]);
-            setShowSuggestions(false);
-            return;
-        }
-        const cacheKey = `${mode}-${val.trim().toLowerCase()}`;
-        if (suggestionCache.current[cacheKey]) {
-            setSuggestions(suggestionCache.current[cacheKey]);
-            setShowSuggestions(true);
-            return;
-        }
-        suggestAbort.current?.abort();
-        const controller = new AbortController();
-        suggestAbort.current = controller;
-        setSuggestionsLoading(true);
-        try {
-            const res = await fetch(`/api/autocomplete?q=${encodeURIComponent(val)}&mode=${mode}`, {
-                signal: controller.signal,
-            });
-            if (res.ok && !controller.signal.aborted) {
-                const data = await res.json();
-                suggestionCache.current[cacheKey] = data.suggestions || [];
-                setSuggestions(data.suggestions || []);
-                setShowSuggestions(data.suggestions?.length > 0);
+            const controller = new AbortController();
+            suggestAbort.current = controller;
+            setSuggestionsLoading(true);
+            try {
+                const res = await fetch(
+                    `/api/autocomplete?q=${encodeURIComponent(val)}&mode=${mode}`,
+                    { signal: controller.signal }
+                );
+                if (res.ok && !controller.signal.aborted) {
+                    const data = await res.json();
+                    const list: string[] = data.suggestions || [];
+                    suggestionCache.current[cacheKey] = list;
+                    setSuggestions(list);
+                }
+            } catch (err) {
+                if ((err as { name?: string })?.name !== "AbortError") {
+                    console.error("Autocomplete error:", err);
+                }
+            } finally {
+                if (!controller.signal.aborted) {
+                    setSuggestionsLoading(false);
+                }
             }
-        } catch (err) {
-            if ((err as { name?: string })?.name !== "AbortError") {
-                console.error("Autocomplete error:", err);
-            }
-        } finally {
-            if (!controller.signal.aborted) {
-                setSuggestionsLoading(false);
-            }
-        }
-    }, []);
+        },
+        []
+    );
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
         onQueryChange(val, id);
         setHighlight(-1);
+        if (!val.trim()) {
+            if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
+            setSuggestions([]);
+            setShowDropdown(false);
+            return;
+        }
+        setIsActive(true);
+        setShowDropdown(true);
         if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
-        suggestDebounce.current = setTimeout(() => fetchSuggestions(val, searchMode), 140);
+        suggestDebounce.current = setTimeout(
+            () => fetchSuggestions(val, effectiveAutocompleteMode),
+            120
+        );
     };
+
+    const navigateToSmartCalculator = (intent: SmartSearchIntent) => {
+        setShowDropdown(false);
+        setIsActive(false);
+        const params = new URLSearchParams(intent.calculatorHref.query);
+        router.push(`/calculator?${params.toString()}`);
+    };
+
+    const visibleSuggestions = React.useMemo(() => {
+        if (!enableSmartHomeSearch || !smartIntent) {
+            return suggestions;
+        }
+        // When a user types an explicit weight or COD query (e.g. "thaiwan 5kg", "cod 5000 1kg"),
+        // suppress unrelated trigram post-office matches so the rate card is crisp and focused.
+        if (smartIntent.hasExplicitWeight || smartIntent.kind === "cod") {
+            return [];
+        }
+        const qLower = query.trim().toLowerCase();
+        return suggestions.filter((s) => s.toLowerCase().includes(qLower)).slice(0, 2);
+    }, [enableSmartHomeSearch, smartIntent, suggestions, query]);
 
     const handleSubmit = () => {
         if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
-        setShowSuggestions(false);
+        setShowDropdown(false);
+        setIsActive(false);
+        // If on Home Page and user typed a clear rate query (like "thaiwan 5kg") with no matching post offices, jump straight to the pre-filled calculator
+        if (enableSmartHomeSearch && smartIntent && visibleSuggestions.length === 0) {
+            navigateToSmartCalculator(smartIntent);
+            return;
+        }
         onSubmit();
     };
 
     const handleSuggestClick = (s: string) => {
-        setShowSuggestions(false);
+        setShowDropdown(false);
+        setIsActive(false);
         if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
         onSuggestionClick(s);
     };
 
-    const open = showSuggestions && isActive && suggestions.length > 0;
+    const handleCloseDropdownOnly = () => {
+        if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
+        setShowDropdown(false);
+        setIsActive(false);
+    };
+
+    const handleClearAndClose = () => {
+        if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
+        setSuggestions([]);
+        setShowDropdown(false);
+        setIsActive(false);
+        onClear();
+    };
+
+    const hasDropdownContent =
+        Boolean(query.trim()) &&
+        (Boolean(smartIntent) || visibleSuggestions.length > 0);
+    const open = showDropdown && isActive && hasDropdownContent;
+
+    // Automatically scroll down so the dropdown fits on screen, while clamping so the search bar itself never goes off the top of the screen
+    useEffect(() => {
+        if (!enableSmartHomeSearch || !open) return;
+        const timer = window.setTimeout(() => {
+            const formEl = searchFormRef.current;
+            const drawerEl = drawerBoxRef.current;
+            if (!formEl || !drawerEl) return;
+
+            const formRect = formEl.getBoundingClientRect();
+            const drawerRect = drawerEl.getBoundingClientRect();
+            const stickyTopOffset = 62;
+            const bottomBarOffset = window.innerWidth < 768 ? 64 : 16;
+            const viewportBottom = window.innerHeight - bottomBarOffset;
+
+            const overflowBottom = drawerRect.bottom - viewportBottom;
+            const maxAllowedScrollDelta = Math.max(0, formRect.top - stickyTopOffset);
+
+            if (overflowBottom > 0 && maxAllowedScrollDelta > 4) {
+                const scrollDelta = Math.min(overflowBottom + 10, maxAllowedScrollDelta);
+                window.scrollBy({ top: scrollDelta, behavior: "smooth" });
+            }
+        }, 180);
+
+        return () => window.clearTimeout(timer);
+    }, [enableSmartHomeSearch, open, query, smartIntent, visibleSuggestions.length]);
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (open && e.key === "ArrowDown") {
             e.preventDefault();
-            setHighlight((h) => Math.min(h + 1, suggestions.length - 1));
+            setHighlight((h) => Math.min(h + 1, visibleSuggestions.length - 1));
         } else if (open && e.key === "ArrowUp") {
             e.preventDefault();
             setHighlight((h) => Math.max(h - 1, -1));
         } else if (e.key === "Escape") {
-            setShowSuggestions(false);
+            e.preventDefault();
+            handleCloseDropdownOnly();
         } else if (e.key === "Enter") {
             e.preventDefault();
-            if (open && highlight >= 0) handleSuggestClick(suggestions[highlight]);
-            else handleSubmit();
+            if (open && highlight >= 0 && visibleSuggestions[highlight]) {
+                handleSuggestClick(visibleSuggestions[highlight]);
+            } else {
+                handleSubmit();
+            }
         }
     };
 
@@ -121,7 +283,7 @@ export default function SearchBar({
             const inThis = actualContainerRef.current?.contains(target);
             const inSidebar = sidebarRef?.current?.contains(target);
             if (!inThis && !inSidebar && isActive) {
-                setShowSuggestions(false);
+                setShowDropdown(false);
                 setIsActive(false);
             }
         };
@@ -130,106 +292,573 @@ export default function SearchBar({
     }, [actualContainerRef, sidebarRef, isActive]);
 
     useEffect(() => {
-        setSuggestions([]);
-        setShowSuggestions(false);
-    }, [searchMode]);
+        if (!enableSmartHomeSearch) {
+            setSuggestions([]);
+            setShowDropdown(false);
+        }
+    }, [searchMode, enableSmartHomeSearch]);
+
+    const showCyclingOverlay = enableSmartHomeSearch && query.length === 0;
 
     return (
         <div className="relative w-full" id={`search-container-${id}`} ref={actualContainerRef}>
             <form
+                ref={searchFormRef}
                 role="search"
-                onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSubmit();
+                }}
                 className={cn(
-                    "flex items-stretch overflow-hidden rounded-md border-2 border-foreground bg-card transition-shadow",
+                    "relative flex items-stretch overflow-hidden rounded-md border-2 border-foreground bg-card transition-shadow",
                     "focus-within:shadow-[3px_3px_0_0_hsl(var(--foreground))]",
-                    isSticky ? "h-11" : "h-14"
+                    isSticky ? "h-11" : enableSmartHomeSearch ? "h-12 sm:h-14 md:h-15" : "h-14"
                 )}
             >
-                <label htmlFor={`search-${id}`} className="flex flex-1 items-center gap-2.5 pl-3.5 min-w-0">
+                {/* Embedded Scroll-Reactive Nuwara Eliya Post Office Illustration Inside the Home Search Bar */}
+                {enableSmartHomeSearch && <NuwaraEliyaPostOffice />}
+
+                <label
+                    htmlFor={`search-${id}`}
+                    className="relative z-10 flex flex-1 items-center gap-2 pl-2.5 md:pl-3.5 min-w-0 cursor-text"
+                >
                     <span className="sr-only">{t("submit")}</span>
-                    {searchMode === "name"
-                        ? <Building2 className="h-[1.1rem] w-[1.1rem] shrink-0 text-muted-foreground" aria-hidden="true" />
-                        : <MapPin className="h-[1.1rem] w-[1.1rem] shrink-0 text-muted-foreground" aria-hidden="true" />}
-                    <input
-                        id={`search-${id}`}
-                        ref={inputRef}
-                        type="search"
-                        inputMode="search"
-                        enterKeyHint="search"
-                        autoComplete="off"
-                        value={query}
-                        onChange={handleChange}
-                        onKeyDown={handleKeyDown}
-                        onFocus={() => {
-                            setIsActive(true);
-                            if (suggestions.length > 0 && query.trim()) setShowSuggestions(true);
-                        }}
-                        placeholder={searchMode === "name" ? t("placeholderName") : t("placeholderArea")}
-                        role="combobox"
-                        aria-expanded={open}
-                        aria-controls={listId}
-                        aria-autocomplete="list"
-                        aria-activedescendant={open && highlight >= 0 ? `${listId}-${highlight}` : undefined}
+                    <span
                         className={cn(
-                            "h-full w-full min-w-0 bg-transparent outline-none placeholder:text-muted-foreground/80 [&::-webkit-search-cancel-button]:hidden",
-                            isSticky ? "text-base" : "text-[1.05rem]"
+                            "flex items-center justify-center shrink-0",
+                            enableSmartHomeSearch
+                                ? "h-6 w-6 sm:h-7 sm:w-7 rounded-full border border-foreground/40 bg-card/95 text-foreground shadow-2xs"
+                                : "text-muted-foreground"
                         )}
-                    />
+                        aria-hidden="true"
+                    >
+                        {enableSmartHomeSearch ? (
+                            <Search className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={2.5} />
+                        ) : searchMode === "name" ? (
+                            <Building2 className="h-[1.1rem] w-[1.1rem]" />
+                        ) : (
+                            <MapPin className="h-[1.1rem] w-[1.1rem]" />
+                        )}
+                    </span>
+
+                    <div className="relative flex-1 h-full flex items-center min-w-0">
+                        {/* Smoothly Cycling Mobile-First Example Texts when Home Search Input is Empty */}
+                        {showCyclingOverlay && (
+                            <div
+                                aria-hidden="true"
+                                data-testid="cycling-search-placeholder"
+                                className="pointer-events-none absolute inset-0 flex items-center overflow-hidden pr-1.5"
+                            >
+                                <AnimatePresence mode="wait" initial={false}>
+                                    <m.span
+                                        key={exampleIndex}
+                                        initial={{ y: 10, opacity: 0 }}
+                                        animate={{ y: 0, opacity: 1 }}
+                                        exit={{ y: -10, opacity: 0 }}
+                                        transition={{
+                                            duration: 0.3,
+                                            ease: [0.16, 1, 0.3, 1],
+                                        }}
+                                        className={cn(
+                                            "block w-full truncate font-semibold tracking-normal text-foreground drop-shadow-[0_1px_0_hsl(var(--card))]",
+                                            locale === "si" || locale === "ta"
+                                                ? "text-[10.5px] sm:text-[12.5px] md:text-[14px]"
+                                                : "text-[11.5px] sm:text-[13px] md:text-[14.5px]"
+                                        )}
+                                    >
+                                        {cyclingExamples[exampleIndex]}
+                                    </m.span>
+                                </AnimatePresence>
+                            </div>
+                        )}
+
+                        <input
+                            id={`search-${id}`}
+                            ref={inputRef}
+                            type="search"
+                            inputMode="search"
+                            enterKeyHint="search"
+                            autoComplete="off"
+                            value={query}
+                            onChange={handleChange}
+                            onKeyDown={handleKeyDown}
+                            onFocus={() => {
+                                setIsActive(true);
+                                if (query.trim()) setShowDropdown(true);
+                            }}
+                            placeholder={
+                                enableSmartHomeSearch
+                                    ? ""
+                                    : searchMode === "name"
+                                        ? t("placeholderName")
+                                        : t("placeholderArea")
+                            }
+                            aria-label={
+                                enableSmartHomeSearch
+                                    ? cyclingExamples[exampleIndex]
+                                    : searchMode === "name"
+                                        ? t("placeholderName")
+                                        : t("placeholderArea")
+                            }
+                            role="combobox"
+                            aria-expanded={open}
+                            aria-controls={listId}
+                            aria-autocomplete="list"
+                            aria-activedescendant={
+                                open && highlight >= 0 ? `${listId}-${highlight}` : undefined
+                            }
+                            className={cn(
+                                "relative z-10 h-full w-full min-w-0 bg-transparent outline-none [&::-webkit-search-cancel-button]:hidden",
+                                isSticky
+                                    ? "text-base"
+                                    : enableSmartHomeSearch
+                                        ? "text-[13.5px] sm:text-[15px] md:text-[16px] font-bold text-foreground drop-shadow-[0_1px_0_hsl(var(--card))]"
+                                        : "text-[1.05rem] md:text-[1.12rem] placeholder:text-muted-foreground/80"
+                            )}
+                        />
+                    </div>
                 </label>
-                <div className="flex items-center gap-1 pr-1.5">
-                    {(loading || suggestionsLoading) && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden="true" />}
+
+                <div className="relative z-10 flex items-center gap-1 pr-1.5">
+                    {(loading || suggestionsLoading) && (
+                        <span className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-card/90">
+                            <Loader2
+                                className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin text-foreground"
+                                aria-hidden="true"
+                            />
+                        </span>
+                    )}
                     {query && (
-                        <button type="button" onClick={onClear} className="tap rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={t("clear")}>
-                            <X className="h-4 w-4" />
+                        <button
+                            type="button"
+                            onClick={handleClearAndClose}
+                            data-testid="search-clear-button"
+                            className={cn(
+                                "tap flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full transition-colors",
+                                enableSmartHomeSearch
+                                    ? "border border-foreground bg-card text-foreground hover:bg-secondary"
+                                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                            )}
+                            aria-label={t("clear")}
+                        >
+                            <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={2.5} />
                         </button>
                     )}
                 </div>
+
                 <button
                     type="submit"
                     className={cn(
-                        "tap flex shrink-0 items-center justify-center gap-2 bg-primary font-semibold text-primary-foreground hover:bg-primary/90",
-                        isSticky ? "w-11" : "w-14 md:w-auto md:px-6"
+                        "tap relative z-10 flex shrink-0 items-center justify-center gap-2 border-l-2 border-foreground bg-primary font-semibold text-primary-foreground hover:bg-primary/90",
+                        isSticky ? "w-11" : "w-12 sm:w-14 md:w-auto md:px-6"
                     )}
                     aria-label={t("submit")}
                 >
-                    <Search className="h-5 w-5" strokeWidth={2.4} />
+                    <Search className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.4} />
                     {!isSticky && <span className="hidden md:inline">{t("submit")}</span>}
                 </button>
             </form>
 
-            <AnimatePresence>
-                {open && (
-                    <m.ul
-                        id={listId}
-                        role="listbox"
-                        initial={{ opacity: 0, y: -4, scale: 0.99 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -4, scale: 0.99 }}
-                        transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
-                        className="absolute left-0 right-0 top-full z-[60] mt-1.5 overflow-hidden rounded-md border-2 border-foreground bg-card py-1 shadow-[4px_4px_0_0_hsl(var(--foreground))]"
-                    >
-                        {suggestions.map((s, i) => (
-                            <li key={s + i} id={`${listId}-${i}`} role="option" aria-selected={highlight === i}>
-                                <button
-                                    type="button"
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={() => handleSuggestClick(s)}
-                                    className={cn(
-                                        "flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left text-[0.95rem] last:border-0",
-                                        highlight === i ? "bg-secondary/30" : "hover:bg-muted"
-                                    )}
+            {/* Home Page: In-Flow Push-Down Smart Search Drawer (shifts UI elements below downward when open, jumps back up when closed) */}
+            {enableSmartHomeSearch ? (
+                <AnimatePresence initial={false}>
+                    {open && (
+                        <m.div
+                            key="home-inflow-smart-drawer"
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                            className="overflow-hidden"
+                        >
+                            <div
+                                ref={drawerBoxRef}
+                                id={listId}
+                                role="region"
+                                aria-label="Smart search results"
+                                data-testid="smart-search-inflow-drawer"
+                                className="mt-2 overflow-hidden rounded-xl border-2 border-foreground bg-card shadow-[3px_3px_0_0_hsl(var(--foreground))]"
+                            >
+                                {/* Top Drawer Bar with Explicit [X] Close Button */}
+                                <div className="flex items-center justify-between gap-2 border-b-[1.5px] border-foreground bg-muted/60 px-2.5 py-1.5 sm:px-3.5 sm:py-2">
+                                    <span className="font-mono text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-foreground truncate">
+                                        {smartIntent
+                                            ? smartIntent.kind === "international"
+                                                ? t("smartPreviewIntl")
+                                                : smartIntent.kind === "cod"
+                                                    ? t("smartPreviewCod")
+                                                    : t("smartPreviewLocal")
+                                            : t("resultsFor", { query })}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={handleCloseDropdownOnly}
+                                        data-testid="smart-drawer-close-button"
+                                        aria-label="Close search results"
+                                        className="tap inline-flex h-6 w-6 sm:h-7 sm:w-7 shrink-0 items-center justify-center rounded-md border-[1.5px] border-foreground bg-card text-foreground hover:bg-secondary transition-colors"
+                                    >
+                                        <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={2.5} />
+                                    </button>
+                                </div>
+
+                                {/* 1. Smart Rate Preview Section (International / COD / Domestic) */}
+                                {smartIntent && (
+                                    <div className="p-2 sm:p-3.5 border-b border-border space-y-2">
+                                        {smartIntent.kind === "international" && (
+                                            <div
+                                                data-testid="smart-rate-preview-intl"
+                                                className="rounded-lg border-2 border-foreground par-avion-stripe p-[3px] sm:p-1"
+                                            >
+                                                <div className="rounded-md bg-card p-2 sm:p-3 space-y-2">
+                                                    <div className="flex items-center justify-between gap-1.5">
+                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                            <CountryFlag
+                                                                code={smartIntent.countryCode}
+                                                                title={smartIntent.countryName}
+                                                                className="h-3.5 w-5 sm:h-4 sm:w-6 shrink-0"
+                                                            />
+                                                            <div className="min-w-0">
+                                                                <div className="flex flex-wrap items-center gap-1">
+                                                                    <span className="font-heading text-sm sm:text-base font-extrabold text-foreground leading-tight">
+                                                                        {smartIntent.countryName}
+                                                                    </span>
+                                                                    {smartIntent.isFuzzyMatch && (
+                                                                        <span className="rounded bg-secondary/45 px-1 py-px font-mono text-[9px] sm:text-[10px] font-bold text-foreground">
+                                                                            {t("smartMatched", { token: smartIntent.matchedQueryToken })}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <p className="font-mono text-[10px] sm:text-[11px] text-muted-foreground leading-tight truncate">
+                                                                    {smartIntent.zoneLabel} ·{" "}
+                                                                    <strong className="text-foreground">
+                                                                        {formatWeightLabel(smartIntent.weightGrams)}
+                                                                    </strong>{" "}
+                                                                    ({smartIntent.weightGrams.toLocaleString()}g)
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#1D4E9E] px-2 py-0.5 font-mono text-[9px] sm:text-[10px] font-bold uppercase text-white">
+                                                            <Plane className="h-2.5 w-2.5 sm:h-3 sm:w-3" aria-hidden="true" />
+                                                            <span>{tc("modeIntl")}</span>
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Compact Mobile-First Quotes Grid (2 or 3 columns side-by-side even on mobile) */}
+                                                    <div
+                                                        className={cn(
+                                                            "grid gap-1.5 sm:gap-2",
+                                                            smartIntent.quotes.length >= 3
+                                                                ? "grid-cols-3"
+                                                                : "grid-cols-2"
+                                                        )}
+                                                    >
+                                                        {smartIntent.quotes.map((q) => (
+                                                            <Link
+                                                                key={q.serviceId}
+                                                                href={{
+                                                                    pathname: "/calculator",
+                                                                    query: {
+                                                                        mode: "intl",
+                                                                        country: smartIntent.countryCode,
+                                                                        weight: String(smartIntent.weightGrams),
+                                                                        transport: q.transport ?? "air",
+                                                                        service: q.serviceId,
+                                                                    },
+                                                                }}
+                                                                onClick={() => handleCloseDropdownOnly()}
+                                                                className="tap flex flex-col justify-between rounded-md border-[1.5px] border-foreground bg-background px-1.5 py-1.5 sm:px-2.5 sm:py-2 hover:bg-secondary/20 transition-colors min-w-0"
+                                                            >
+                                                                <div className="flex items-center justify-between gap-0.5 min-w-0">
+                                                                    <span className="font-bold text-[10px] sm:text-xs text-foreground truncate">
+                                                                        {q.shortName}
+                                                                    </span>
+                                                                    {q.isCheapest ? (
+                                                                        <span className="rounded bg-green-100 px-1 py-px font-mono text-[7.5px] sm:text-[8.5px] font-bold uppercase text-green-800 dark:bg-green-900/50 dark:text-green-300 shrink-0">
+                                                                            {tHome("cheapest")}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="font-mono text-[8px] sm:text-[9.5px] text-muted-foreground shrink-0">
+                                                                            {q.transport === "sea" ? tc("sea") : tc("air")}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="mt-0.5">
+                                                                    <span className="block font-mono text-[11.5px] sm:text-base font-extrabold text-[#1D4E9E] dark:text-blue-300 tabular-nums whitespace-nowrap">
+                                                                        {formatCurrencyAmount(
+                                                                            q.totalLkr,
+                                                                            currency,
+                                                                            lkrPerUsd
+                                                                        )}
+                                                                    </span>
+                                                                </div>
+                                                            </Link>
+                                                        ))}
+                                                    </div>
+
+                                                    {/* Interactive Weight Chips + Full-Width Deep-Link Button */}
+                                                    <div className="flex flex-col gap-2 pt-0.5">
+                                                        <div className="flex flex-wrap items-center gap-1">
+                                                            <span className="inline-flex shrink-0 items-center gap-0.5 font-mono text-[10px] font-bold text-muted-foreground mr-0.5">
+                                                                <Scale className="h-2.5 w-2.5" aria-hidden="true" />
+                                                                <span>{tc("step1Title")}:</span>
+                                                            </span>
+                                                            {SMART_WEIGHT_CHIPS.map((w) => {
+                                                                const active = smartIntent.weightGrams === w;
+                                                                return (
+                                                                    <button
+                                                                        key={w}
+                                                                        type="button"
+                                                                        onMouseDown={(e) => e.preventDefault()}
+                                                                        onClick={() => setWeightOverrideGrams(w)}
+                                                                        className={cn(
+                                                                            "tap shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[10px] font-bold transition-colors",
+                                                                            active
+                                                                                ? "border-foreground bg-foreground text-background"
+                                                                                : "border-foreground/40 bg-background text-foreground hover:border-foreground"
+                                                                        )}
+                                                                    >
+                                                                        {formatWeightLabel(w)}
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+
+                                                        <Link
+                                                            href={smartIntent.calculatorHref}
+                                                            data-testid="smart-rate-open-calculator"
+                                                            onClick={() => handleCloseDropdownOnly()}
+                                                            className="tap inline-flex w-full items-center justify-center gap-1.5 rounded-md border-2 border-foreground bg-[#1D4E9E] px-3 py-1.5 text-xs font-bold text-white shadow-[0_2px_0_0_hsl(var(--foreground))] hover:opacity-95"
+                                                        >
+                                                            <span>
+                                                                {t("smartOpenCalc", {
+                                                                    country: smartIntent.countryName,
+                                                                    weight: formatWeightLabel(smartIntent.weightGrams),
+                                                                })}
+                                                            </span>
+                                                            <ArrowRight className="h-3.5 w-3.5 shrink-0" />
+                                                        </Link>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {smartIntent.kind === "cod" && (
+                                            <div
+                                                data-testid="smart-rate-preview-cod"
+                                                className="rounded-lg border-2 border-foreground bg-[#15803D]/10 p-3 space-y-2.5"
+                                            >
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                    <div>
+                                                        <span className="inline-flex items-center gap-1.5 font-heading text-base font-extrabold text-foreground">
+                                                            <Banknote className="h-4 w-4 text-[#15803D]" />
+                                                            <span>{tc("codTitle")}</span>
+                                                        </span>
+                                                        <p className="font-mono text-xs text-muted-foreground">
+                                                            <strong className="text-foreground">
+                                                                {formatWeightLabel(smartIntent.weightGrams)}
+                                                            </strong>{" "}
+                                                            ·{" "}
+                                                            <strong className="text-foreground">
+                                                                Rs. {smartIntent.codAmountLkr.toLocaleString()}
+                                                            </strong>
+                                                        </p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="block font-mono text-[10px] uppercase text-muted-foreground">
+                                                            {tc("total")}
+                                                        </span>
+                                                        <span className="font-mono text-xl font-extrabold text-[#15803D] tabular-nums">
+                                                            {formatCurrencyAmount(
+                                                                smartIntent.result.totalCost,
+                                                                currency,
+                                                                lkrPerUsd
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-foreground/20">
+                                                    <span className="font-mono text-xs text-foreground">
+                                                        {tc("netRemittance", {
+                                                            amount: formatCurrencyAmount(
+                                                                smartIntent.result.netRemittance,
+                                                                currency,
+                                                                lkrPerUsd
+                                                            ),
+                                                        })}
+                                                    </span>
+                                                    <Link
+                                                        href={smartIntent.calculatorHref}
+                                                        data-testid="smart-rate-open-calculator"
+                                                        onClick={() => handleCloseDropdownOnly()}
+                                                        className="tap inline-flex items-center gap-1.5 rounded-md border-2 border-foreground bg-[#15803D] px-3.5 py-1.5 text-xs font-bold text-white shadow-[0_2px_0_0_hsl(var(--foreground))]"
+                                                    >
+                                                        <span>
+                                                            {t("smartOpenCodCalc", {
+                                                                weight: formatWeightLabel(smartIntent.weightGrams),
+                                                                amount: smartIntent.codAmountLkr.toLocaleString(),
+                                                            })}
+                                                        </span>
+                                                        <ArrowRight className="h-3.5 w-3.5 shrink-0" />
+                                                    </Link>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {smartIntent.kind === "domestic" && (
+                                            <div
+                                                data-testid="smart-rate-preview-domestic"
+                                                className="rounded-lg border-2 border-foreground bg-primary/5 p-3 space-y-2.5"
+                                            >
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className="inline-flex items-center gap-1.5 font-heading text-base font-extrabold text-foreground">
+                                                        <Mail className="h-4 w-4 text-primary" />
+                                                        <span>
+                                                            {tHome("toolLocal")} ·{" "}
+                                                            {formatWeightLabel(smartIntent.weightGrams)}
+                                                        </span>
+                                                    </span>
+                                                    <Link
+                                                        href={smartIntent.calculatorHref}
+                                                        data-testid="smart-rate-open-calculator"
+                                                        onClick={() => handleCloseDropdownOnly()}
+                                                        className="tap inline-flex items-center gap-1.5 rounded-md border-2 border-foreground bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-[0_2px_0_0_hsl(var(--foreground))]"
+                                                    >
+                                                        <span>{t("smartOpenLocalCalc")}</span>
+                                                        <ArrowRight className="h-3.5 w-3.5 shrink-0" />
+                                                    </Link>
+                                                </div>
+                                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                                                    {smartIntent.quotes.map((q) => (
+                                                        <Link
+                                                            key={q.serviceId}
+                                                            href={{
+                                                                pathname: "/calculator",
+                                                                query: {
+                                                                    mode: "local",
+                                                                    weight: String(smartIntent.weightGrams),
+                                                                    service: q.serviceId,
+                                                                },
+                                                            }}
+                                                            onClick={() => handleCloseDropdownOnly()}
+                                                            className="tap rounded-md border border-foreground/50 bg-card px-2.5 py-1.5 hover:border-foreground"
+                                                        >
+                                                            <span className="block text-[11px] font-bold text-foreground truncate">
+                                                                {q.shortName}
+                                                            </span>
+                                                            <span className="block font-mono text-sm font-extrabold text-primary tabular-nums">
+                                                                {formatCurrencyAmount(
+                                                                    q.totalLkr,
+                                                                    currency,
+                                                                    lkrPerUsd
+                                                                )}
+                                                            </span>
+                                                        </Link>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* 2. Matching Post Offices List */}
+                                {visibleSuggestions.length > 0 && (
+                                    <ul role="listbox" className="divide-y divide-border">
+                                        {visibleSuggestions.map((s, i) => (
+                                            <li
+                                                key={s + i}
+                                                id={`${listId}-${i}`}
+                                                role="option"
+                                                aria-selected={highlight === i}
+                                            >
+                                                <button
+                                                    type="button"
+                                                    onMouseDown={(e) => e.preventDefault()}
+                                                    onClick={() => handleSuggestClick(s)}
+                                                    className={cn(
+                                                        "flex w-full items-center gap-3 px-4 py-2.5 text-left text-[0.95rem] transition-colors",
+                                                        highlight === i
+                                                            ? "bg-secondary/30"
+                                                            : "hover:bg-muted"
+                                                    )}
+                                                >
+                                                    <Building2 className="h-4 w-4 shrink-0 text-primary" />
+                                                    <span className="flex-1 font-semibold truncate">{s}</span>
+                                                    <CornerDownLeft
+                                                        className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60"
+                                                        aria-hidden="true"
+                                                    />
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+
+                                {/* Footer Directory Search Action */}
+                                <div className="bg-muted/40 px-3.5 py-2 border-t border-border flex items-center justify-between">
+                                    <button
+                                        type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => onSubmit()}
+                                        className="tap inline-flex items-center gap-1.5 text-xs font-bold text-foreground hover:text-primary transition-colors"
+                                    >
+                                        <Building2 className="h-3.5 w-3.5 shrink-0 text-primary" />
+                                        <span>
+                                            {t("smartSearchDirectoryFor", { query: query.trim() })}
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
+                        </m.div>
+                    )}
+                </AnimatePresence>
+            ) : (
+                /* Standard Overlay Autocomplete Dropdown for /browse Page */
+                <AnimatePresence>
+                    {open && suggestions.length > 0 && (
+                        <m.ul
+                            id={listId}
+                            role="listbox"
+                            initial={{ opacity: 0, y: -4, scale: 0.99 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -4, scale: 0.99 }}
+                            transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
+                            className="absolute left-0 right-0 top-full z-[60] mt-1.5 overflow-hidden rounded-md border-2 border-foreground bg-card py-1 shadow-[4px_4px_0_0_hsl(var(--foreground))]"
+                        >
+                            {suggestions.map((s, i) => (
+                                <li
+                                    key={s + i}
+                                    id={`${listId}-${i}`}
+                                    role="option"
+                                    aria-selected={highlight === i}
                                 >
-                                    {searchMode === "name"
-                                        ? <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                        : <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />}
-                                    <span className="flex-1 truncate">{s}</span>
-                                    <CornerDownLeft className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" aria-hidden="true" />
-                                </button>
-                            </li>
-                        ))}
-                    </m.ul>
-                )}
-            </AnimatePresence>
+                                    <button
+                                        type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => handleSuggestClick(s)}
+                                        className={cn(
+                                            "flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left text-[0.95rem] last:border-0",
+                                            highlight === i ? "bg-secondary/30" : "hover:bg-muted"
+                                        )}
+                                    >
+                                        {searchMode === "name" ? (
+                                            <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                        ) : (
+                                            <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                        )}
+                                        <span className="flex-1 truncate">{s}</span>
+                                        <CornerDownLeft
+                                            className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60"
+                                            aria-hidden="true"
+                                        />
+                                    </button>
+                                </li>
+                            ))}
+                        </m.ul>
+                    )}
+                </AnimatePresence>
+            )}
         </div>
     );
 }

@@ -247,7 +247,25 @@ function ServiceCard({
     );
 }
 
-export default function PostageCalculator({ initialMode = "ems" }: { initialMode?: Destination }) {
+export interface PostageCalculatorProps {
+    initialMode?: Destination;
+    initialCountry?: string;
+    initialWeight?: string;
+    initialCodAmount?: string;
+    initialService?: string;
+    initialTransport?: InternationalTransport;
+    initialRegistered?: boolean;
+}
+
+export default function PostageCalculator({
+    initialMode = "ems",
+    initialCountry,
+    initialWeight,
+    initialCodAmount,
+    initialService,
+    initialTransport,
+    initialRegistered,
+}: PostageCalculatorProps) {
     const locale = useLocale();
     const isIndic = locale === "si" || locale === "ta";
     const tHome = useTranslations("Home");
@@ -255,15 +273,39 @@ export default function PostageCalculator({ initialMode = "ems" }: { initialMode
     const { currency, lkrPerUsd } = useCurrency();
     const [config, setConfig] = useState<RateConfig>(DEFAULT_RATE_CONFIG);
     const [destination, setDestination] = useState<Destination>(initialMode);
-    const [serviceId, setServiceId] = useState<string>("letter");
-    const [emsCountryCode, setEmsCountryCode] = useState<string>("GB");
-    const [intlTransport, setIntlTransport] = useState<InternationalTransport>("air");
-    const [intlServiceId, setIntlServiceId] = useState<InternationalServiceId>("ems");
-    const [intlRegistered, setIntlRegistered] = useState(false);
+    const [serviceId, setServiceId] = useState<string>(
+        initialMode === "domestic" && initialService ? initialService : "letter"
+    );
+    const [emsCountryCode, setEmsCountryCode] = useState<string>(
+        initialCountry && DEFAULT_RATE_CONFIG.emsCountries.some((c) => c.code === initialCountry)
+            ? initialCountry
+            : "GB"
+    );
+    const [intlTransport, setIntlTransport] = useState<InternationalTransport>(initialTransport ?? "air");
+    const [intlServiceId, setIntlServiceId] = useState<InternationalServiceId>(
+        initialMode === "ems" && initialService
+            ? (initialService as InternationalServiceId)
+            : initialTransport === "sea"
+                ? "sea_letter"
+                : "ems"
+    );
+    const [intlRegistered, setIntlRegistered] = useState(Boolean(initialMode === "ems" && initialRegistered));
     const [showCountryWhyNote, setShowCountryWhyNote] = useState(false);
-    const [weight, setWeight] = useState<string>(initialMode === "cod" ? "250" : initialMode === "ems" ? "20" : "30");
-    const [codAmount, setCodAmount] = useState<string>("2500");
-    const [registered, setRegistered] = useState(false);
+    const [weight, setWeight] = useState<string>(
+        initialWeight && /^\d+$/.test(initialWeight) && Number(initialWeight) > 0
+            ? initialWeight
+            : initialMode === "cod"
+                ? "250"
+                : initialMode === "ems"
+                    ? "20"
+                    : "30"
+    );
+    const [codAmount, setCodAmount] = useState<string>(
+        initialCodAmount && /^\d+$/.test(initialCodAmount) && Number(initialCodAmount) > 0
+            ? initialCodAmount
+            : "2500"
+    );
+    const [registered, setRegistered] = useState(Boolean(initialMode === "domestic" && initialRegistered));
     const [arReceipt, setArReceipt] = useState(false);
 
     const uid = useId();
@@ -487,11 +529,6 @@ export default function PostageCalculator({ initialMode = "ems" }: { initialMode
         setIntlRegistered(false);
         setShowCountryWhyNote(false);
     };
-
-    useEffect(() => {
-        resetCalculatorForMode(initialMode);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [initialMode]);
 
     const handleModeChange = (mode: Destination) => {
         resetCalculatorForMode(mode);

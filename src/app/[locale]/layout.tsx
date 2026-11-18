@@ -46,6 +46,7 @@ const plexMono = IBM_Plex_Mono({
 // Sinhala / Tamil — not preloaded; unicode-range means they only download when needed
 const notoSinhala = Noto_Sans_Sinhala({
     subsets: ["sinhala"],
+    weight: ["400", "500", "600", "700"],
     variable: "--font-sinhala",
     display: "swap",
     preload: false,
@@ -53,6 +54,7 @@ const notoSinhala = Noto_Sans_Sinhala({
 
 const notoTamil = Noto_Sans_Tamil({
     subsets: ["tamil"],
+    weight: ["400", "500", "600", "700"],
     variable: "--font-tamil",
     display: "swap",
     preload: false,
