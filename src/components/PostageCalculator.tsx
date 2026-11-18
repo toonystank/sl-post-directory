@@ -323,6 +323,49 @@ export default function PostageCalculator({
     ];
 
     useEffect(() => {
+        if (typeof window === "undefined" || !window.location.search) return;
+        const sp = new URLSearchParams(window.location.search);
+        const m = sp.get("mode");
+        const mode: Destination =
+            m === "cod" ? "cod" : m === "local" ? "domestic" : m === "intl" || m === "ems" ? "ems" : initialMode;
+        if (m) setDestination(mode);
+
+        const c = sp.get("country")?.toUpperCase();
+        if (c && DEFAULT_RATE_CONFIG.emsCountries.some((item) => item.code === c)) {
+            setEmsCountryCode(c);
+        }
+
+        const w = sp.get("weight");
+        if (w && /^\d+$/.test(w) && Number(w) > 0) {
+            setWeight(w);
+        }
+
+        const cod = sp.get("codAmount");
+        if (cod && /^\d+$/.test(cod) && Number(cod) > 0) {
+            setCodAmount(cod);
+        }
+
+        const tr = sp.get("transport");
+        if (tr === "sea" || tr === "air") {
+            setIntlTransport(tr);
+        }
+
+        const svc = sp.get("service");
+        if (svc) {
+            if (mode === "domestic") setServiceId(svc);
+            else if (mode === "ems") setIntlServiceId(svc as InternationalServiceId);
+        } else if (tr === "sea" && mode === "ems") {
+            setIntlServiceId("sea_letter");
+        }
+
+        const reg = sp.get("registered");
+        if (reg === "1" || reg === "true") {
+            if (mode === "domestic") setRegistered(true);
+            else if (mode === "ems") setIntlRegistered(true);
+        }
+    }, [initialMode]);
+
+    useEffect(() => {
         let active = true;
         if (cachedRateConfig && Date.now() - cachedRateConfigTimestamp < RATE_CACHE_TTL_MS) {
             setConfig(cachedRateConfig);
