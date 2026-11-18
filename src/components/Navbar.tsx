@@ -5,13 +5,14 @@ import { Link, usePathname, useRouter } from "@/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { ThemeToggle } from "./theme-toggle";
-import { ArrowLeft, LogOut, User } from "lucide-react";
+import { ArrowLeft, Download, LogOut, User } from "lucide-react";
 import { m } from "motion/react";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import LanguageSwitcher from "./LanguageSwitcher";
 import CurrencySwitcher from "./CurrencySwitcher";
 import StampLogo from "./brand/StampLogo";
+import { usePWA } from "@/context/PWAContext";
 
 /**
  * Global header.
@@ -24,24 +25,34 @@ export default function Navbar() {
     const { data: session } = useSession();
     const t = useTranslations("Nav");
     const tApp = useTranslations("App");
+    const tInstall = useTranslations("Install");
+    const { isInstalled, canNativePrompt, isIOS, triggerInstall, isOfflineFallbackPage } = usePWA();
     const [scrolled, setScrolled] = React.useState(false);
+    const [hasMounted, setHasMounted] = React.useState(false);
 
     React.useEffect(() => {
+        setHasMounted(true);
         const onScroll = () => setScrolled(window.scrollY > 4);
         onScroll();
         window.addEventListener("scroll", onScroll, { passive: true });
         return () => window.removeEventListener("scroll", onScroll);
     }, []);
 
+    const isOfflineFallback =
+        pathname.startsWith("/offline") ||
+        isOfflineFallbackPage ||
+        (!hasMounted && typeof document !== "undefined" && Boolean(document.getElementById("slpost-offline-fallback")));
+
     const user = session?.user as { name?: string | null; role?: string } | undefined;
     const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN" || user?.role === "MODERATOR";
 
-    const isHome = pathname === "/";
-    const isRatesPage = pathname.startsWith("/calculator");
-    const isTabRoot = ["/", "/browse", "/calculator", "/track", "/blog"].includes(pathname);
+    const isHome = !isOfflineFallback && pathname === "/";
+    const isRatesPage = !isOfflineFallback && pathname.startsWith("/calculator");
+    const isTabRoot = !isOfflineFallback && ["/", "/browse", "/calculator", "/track", "/blog"].includes(pathname);
 
     const mobileTitle =
-        pathname.startsWith("/browse") ? tApp("tabBrowse")
+        isOfflineFallback ? tInstall("offlinePageTitle")
+        : pathname.startsWith("/browse") ? tApp("tabBrowse")
         : pathname.startsWith("/calculator") ? tApp("titleRates")
         : pathname.startsWith("/track") ? tApp("titleTrack")
         : pathname === "/blog" ? tApp("titleGuides")
@@ -56,11 +67,11 @@ export default function Navbar() {
 
     const navItems = [
         { href: "/", label: t("home"), active: isHome },
-        { href: "/calculator", label: t("calculator"), active: pathname.startsWith("/calculator") },
-        { href: "/browse", label: t("browse"), active: pathname.startsWith("/browse") || pathname.startsWith("/office") },
-        { href: "/track", label: t("track"), active: pathname.startsWith("/track") },
-        { href: "/blog", label: t("blog"), active: pathname.startsWith("/blog") },
-        ...(isAdmin ? [{ href: "/dashboard", label: t("dashboard"), active: pathname.startsWith("/dashboard") }] : []),
+        { href: "/calculator", label: t("calculator"), active: !isOfflineFallback && pathname.startsWith("/calculator") },
+        { href: "/browse", label: t("browse"), active: !isOfflineFallback && (pathname.startsWith("/browse") || pathname.startsWith("/office")) },
+        { href: "/track", label: t("track"), active: !isOfflineFallback && pathname.startsWith("/track") },
+        { href: "/blog", label: t("blog"), active: !isOfflineFallback && pathname.startsWith("/blog") },
+        ...(isAdmin ? [{ href: "/dashboard", label: t("dashboard"), active: !isOfflineFallback && pathname.startsWith("/dashboard") }] : []),
     ];
 
     const goBack = () => {
@@ -121,7 +132,7 @@ export default function Navbar() {
                                 href={item.href}
                                 aria-current={item.active ? "page" : undefined}
                                 className={cn(
-                                    "relative px-3 py-2 transition-colors",
+                                    "relative px-3 py-2 transition-colors whitespace-nowrap shrink-0",
                                     item.active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                                 )}
                             >
@@ -137,7 +148,20 @@ export default function Navbar() {
                         ))}
                     </nav>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
+                        {!isInstalled && (canNativePrompt || isIOS) && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => void triggerInstall()}
+                                data-testid="navbar-install-btn"
+                                className="rounded-full gap-1.5 px-3 whitespace-nowrap shrink-0 border-foreground/40"
+                            >
+                                <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                                <span>{tInstall("install")}</span>
+                            </Button>
+                        )}
                         {isRatesPage && <CurrencySwitcher />}
                         <LanguageSwitcher />
                         <ThemeToggle />

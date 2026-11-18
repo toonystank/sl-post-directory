@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useRouter } from "@/navigation";
+import { saveOfficesToOfflineCache, searchOfflineOfficesCache } from "@/lib/pwa";
 import { PostOffice, SearchMode, SearchResponse } from "./types";
 
 export function useDirectoryState() {
@@ -17,6 +18,7 @@ export function useDirectoryState() {
     const [nextCursor, setNextCursor] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
+    const [isOfflineFallback, setIsOfflineFallback] = useState(false);
 
     const isRestoringRef = useRef(false);
     const activeAbortRef = useRef<AbortController | null>(null);
@@ -69,8 +71,16 @@ export function useDirectoryState() {
             const data: SearchResponse = await res.json();
             if (controller.signal.aborted) return;
 
+            const incomingOffices = data?.offices || [];
+            if (incomingOffices.length > 0) {
+                saveOfficesToOfflineCache(incomingOffices);
+                if (typeof window !== "undefined") {
+                    window.dispatchEvent(new CustomEvent("slpost-offline-cache-updated"));
+                }
+            }
+
+            setIsOfflineFallback(false);
             setOffices((prev) => {
-                const incomingOffices = data?.offices || [];
                 if (!append) return incomingOffices;
                 const existingIds = new Set(prev.map(o => o.id));
                 const newOffices = incomingOffices.filter(o => !existingIds.has(o.id));
@@ -81,9 +91,23 @@ export function useDirectoryState() {
             setNextCursor(data?.nextCursor ?? null);
         } catch (err) {
             if ((err as { name?: string })?.name === "AbortError") return;
-            setOffices([]);
-            setTotal(0);
-            setNextCursor(null);
+            const offlineMatches = searchOfflineOfficesCache({
+                q: searchQuery,
+                mode,
+                letter,
+                service,
+            });
+            if (offlineMatches.length > 0) {
+                setOffices(offlineMatches);
+                setTotal(offlineMatches.length);
+                setNextCursor(null);
+                setIsOfflineFallback(true);
+            } else {
+                setOffices([]);
+                setTotal(0);
+                setNextCursor(null);
+                setIsOfflineFallback(typeof navigator !== "undefined" && !navigator.onLine);
+            }
         } finally {
             if (!controller.signal.aborted) {
                 setLoading(false);
@@ -171,6 +195,7 @@ export function useDirectoryState() {
         activeService, setActiveService,
         offices, total, nextCursor,
         loading, initialLoading,
+        isOfflineFallback,
         updateUrl, fetchOffices
     };
 }

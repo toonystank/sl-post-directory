@@ -29,6 +29,7 @@ import {
     parseSmartSearchIntent,
     type SmartSearchIntent,
 } from "@/lib/smart-search";
+import { searchOfflineOfficesCache } from "@/lib/pwa";
 import { SearchMode } from "./types";
 
 interface SearchBarProps {
@@ -140,10 +141,24 @@ export default function SearchBar({
                     const list: string[] = data.suggestions || [];
                     suggestionCache.current[cacheKey] = list;
                     setSuggestions(list);
+                } else if (!controller.signal.aborted) {
+                    const offlineMatches = searchOfflineOfficesCache({
+                        q: val,
+                        mode: mode === "division" ? "division" : "name",
+                    })
+                        .map((o) => o.name)
+                        .slice(0, 5);
+                    setSuggestions(offlineMatches);
                 }
             } catch (err) {
                 if ((err as { name?: string })?.name !== "AbortError") {
-                    console.error("Autocomplete error:", err);
+                    const offlineMatches = searchOfflineOfficesCache({
+                        q: val,
+                        mode: mode === "division" ? "division" : "name",
+                    })
+                        .map((o) => o.name)
+                        .slice(0, 5);
+                    setSuggestions(offlineMatches);
                 }
             } finally {
                 if (!controller.signal.aborted) {
