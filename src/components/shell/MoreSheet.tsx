@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { Sheet, SheetContent } from "./Sheet";
 import { useCurrency } from "@/context/CurrencyContext";
-import { useInstantLocale } from "@/context/InstantLocaleContext";
+import { useInstantLocale, stripLocalePrefix } from "@/context/InstantLocaleContext";
 import { usePWA } from "@/context/PWAContext";
 import { CURRENCY_META, type Currency } from "@/lib/currency";
 import { cn } from "@/lib/utils";
@@ -58,7 +58,7 @@ export default function MoreSheet({ open, onOpenChange }: MoreSheetProps) {
     const tNav = useTranslations("Nav");
     const tInstall = useTranslations("Install");
     const { locale, setLocale } = useInstantLocale();
-    const pathname = usePathname();
+    const pathname = stripLocalePrefix(usePathname() || "/");
     const { theme, setTheme } = useTheme();
     const { currency, setCurrency } = useCurrency();
     const {

@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v5";
+const CACHE_VERSION = "v6";
 const STATIC_CACHE = `sl-post-static-${CACHE_VERSION}`;
 const PAGES_CACHE = `sl-post-pages-${CACHE_VERSION}`;
 const RSC_CACHE = `sl-post-rsc-${CACHE_VERSION}`;
@@ -109,8 +109,13 @@ function extractStaticAssetsFromHtml(html) {
 
 async function cachePageWithStaticAssets(url, pagesCache, staticCache) {
   try {
-    const res = await fetch(url, { credentials: "same-origin" });
-    if (!res.ok) return;
+    // Use credentials: "omit" + X-SW-Precache so precaching /si or /ta NEVER mutates
+    // the user's NEXT_LOCALE cookie and NEVER follows a cookie-based locale redirect.
+    const res = await fetch(url, {
+      credentials: "omit",
+      headers: { "X-SW-Precache": "1" },
+    });
+    if (!res.ok || res.redirected) return;
     const contentType = res.headers.get("content-type") || "";
     if (contentType.includes("text/html")) {
       const html = await res.clone().text();
@@ -120,8 +125,8 @@ async function cachePageWithStaticAssets(url, pagesCache, staticCache) {
         staticAssets.map(async (assetUrl) => {
           const existing = await staticCache.match(assetUrl);
           if (existing) return;
-          const assetRes = await fetch(assetUrl, { credentials: "same-origin" });
-          if (assetRes.ok) {
+          const assetRes = await fetch(assetUrl, { credentials: "omit" });
+          if (assetRes.ok && !assetRes.redirected) {
             await staticCache.put(assetUrl, assetRes);
           }
         })
@@ -141,8 +146,8 @@ self.addEventListener("install", (event) => {
         await Promise.allSettled(
           PRECACHE_SHELL_URLS.map((url) =>
             STATIC_EXT_RE.test(url)
-              ? fetch(url, { credentials: "same-origin" }).then((res) => {
-                  if (res.ok) return staticCache.put(url, res);
+              ? fetch(url, { credentials: "omit" }).then((res) => {
+                  if (res.ok && !res.redirected) return staticCache.put(url, res);
                 })
               : cachePageWithStaticAssets(url, pagesCache, staticCache)
           )
@@ -195,8 +200,8 @@ self.addEventListener("message", (event) => {
             if (typeof url !== "string") return;
             if (url.startsWith("/api/")) {
               try {
-                const res = await fetch(url, { credentials: "same-origin" });
-                if (res.ok) await apiCache.put(url, res);
+                const res = await fetch(url, { credentials: "omit" });
+                if (res.ok && !res.redirected) await apiCache.put(url, res);
               } catch {
                 // Ignore
               }
@@ -206,8 +211,8 @@ self.addEventListener("message", (event) => {
               try {
                 const existing = await staticCache.match(url);
                 if (!existing) {
-                  const res = await fetch(url, { credentials: "same-origin" });
-                  if (res.ok) await staticCache.put(url, res);
+                  const res = await fetch(url, { credentials: "omit" });
+                  if (res.ok && !res.redirected) await staticCache.put(url, res);
                 }
               } catch {
                 // Ignore
@@ -335,7 +340,7 @@ self.addEventListener("fetch", (event) => {
       caches.open(PAGES_CACHE).then(async (cache) => {
         try {
           const networkRes = await fetchWithTimeout(request, 2500);
-          if (networkRes.ok) {
+          if (networkRes.ok && !networkRes.redirected) {
             cache.put(request, networkRes.clone());
             if (!url.search) {
               cache.put(url.pathname, networkRes.clone());

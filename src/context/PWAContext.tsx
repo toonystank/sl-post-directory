@@ -36,7 +36,7 @@ interface PWAContextValue {
 const PWAContext = createContext<PWAContextValue | null>(null);
 
 const DISMISSED_SESSION_KEY = "sl-post-pwa-prompt-dismissed-session";
-const ASSETS_CACHED_KEY = "sl-post-pwa-assets-cached-v5";
+const ASSETS_CACHED_KEY = "sl-post-pwa-assets-cached-v6";
 
 const CORE_ROUTES_TO_WARM = [
     "/",
@@ -106,7 +106,7 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
 
             // 3. Also warm Cache Storage directly for visual assets
             if ("caches" in window) {
-                const cache = await caches.open("sl-post-static-v5").catch(() => null);
+                const cache = await caches.open("sl-post-static-v6").catch(() => null);
                 if (cache) {
                     await Promise.allSettled(CORE_VISUAL_ASSETS.map((url) => cache.add(url)));
                 }
