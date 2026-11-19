@@ -132,6 +132,18 @@ export default function Navbar() {
                             <Link
                                 key={item.href}
                                 href={item.href}
+                                onPointerEnter={() => {
+                                    try {
+                                        router.prefetch(item.href);
+                                    } catch {
+                                        // Ignore prefetch errors
+                                    }
+                                    if (item.href === "/browse") {
+                                        void import("@/lib/office-index-client").then((m) =>
+                                            m.ensureLocalOfficeIndex()
+                                        );
+                                    }
+                                }}
                                 aria-current={item.active ? "page" : undefined}
                                 className={cn(
                                     "relative px-3 py-2 transition-colors whitespace-nowrap shrink-0",

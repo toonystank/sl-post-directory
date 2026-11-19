@@ -2,12 +2,13 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { Link, usePathname } from "@/navigation";
+import { Link, usePathname, useRouter } from "@/navigation";
 import { Home, FolderOpen, Calculator, Package, Menu } from "lucide-react";
 import { m } from "motion/react";
 import { cn } from "@/lib/utils";
 import { usePWA } from "@/context/PWAContext";
 import { stripLocalePrefix } from "@/lib/locale";
+import { ensureLocalOfficeIndex } from "@/lib/office-index-client";
 import MoreSheet from "./MoreSheet";
 
 const HIDDEN_ON = ["/login", "/register", "/dashboard"];
@@ -19,6 +20,7 @@ const HIDDEN_ON = ["/login", "/register", "/dashboard"];
 export default function BottomTabBar() {
     const t = useTranslations("App");
     const pathname = stripLocalePrefix(usePathname() || "/");
+    const router = useRouter();
     const { isOfflineFallbackPage } = usePWA();
     const [moreOpen, setMoreOpen] = React.useState(false);
     const [hasMounted, setHasMounted] = React.useState(false);
@@ -41,6 +43,17 @@ export default function BottomTabBar() {
         { href: "/track", label: t("tabTrack"), icon: Package, active: !isOfflineFallback && pathname.startsWith("/track") },
     ];
 
+    const prefetchTab = (href: string) => {
+        try {
+            router.prefetch(href);
+        } catch {
+            // Ignore prefetch errors
+        }
+        if (href === "/browse") {
+            void ensureLocalOfficeIndex();
+        }
+    };
+
     return (
         <>
             <nav
@@ -52,6 +65,8 @@ export default function BottomTabBar() {
                         <li key={href}>
                             <Link
                                 href={href}
+                                onTouchStart={() => prefetchTab(href)}
+                                onPointerEnter={() => prefetchTab(href)}
                                 aria-current={active ? "page" : undefined}
                                 className={cn(
                                     "tap flex h-full flex-col items-center justify-center gap-1 text-[0.68rem] font-semibold",

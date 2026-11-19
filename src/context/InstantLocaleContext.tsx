@@ -4,8 +4,6 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { useRouter as useNextRouter } from "next/navigation";
 import { NextIntlClientProvider, type AbstractIntlMessages } from "next-intl";
 import enMessages from "../../messages/en.json";
-import siMessages from "../../messages/si.json";
-import taMessages from "../../messages/ta.json";
 import {
     type AppLocale,
     LOCALE_COOKIE_NAME,
@@ -19,17 +17,45 @@ import {
 
 export { type AppLocale, stripLocalePrefix, buildLocalizedUrl };
 
-const ALL_MESSAGES: Record<AppLocale, AbstractIntlMessages> = {
+// Keep English inline as the fast default; lazy-load & cache Sinhala/Tamil chunks on demand.
+const messageCache: Partial<Record<AppLocale, AbstractIntlMessages>> = {
     en: enMessages as unknown as AbstractIntlMessages,
-    si: siMessages as unknown as AbstractIntlMessages,
-    ta: taMessages as unknown as AbstractIntlMessages,
 };
 
-const LOCAL_STORAGE_BUNDLE_KEY = "sl-post-i18n-bundle-v6";
+const inFlightLocaleLoads: Partial<Record<AppLocale, Promise<AbstractIntlMessages>>> = {};
+
+async function loadLocaleMessages(target: AppLocale): Promise<AbstractIntlMessages> {
+    if (messageCache[target]) {
+        return messageCache[target]!;
+    }
+    if (inFlightLocaleLoads[target]) {
+        return inFlightLocaleLoads[target]!;
+    }
+
+    const loader = (async () => {
+        const mod =
+            target === "si"
+                ? await import("../../messages/si.json")
+                : target === "ta"
+                    ? await import("../../messages/ta.json")
+                    : { default: enMessages };
+        const msgs = (mod.default ?? mod) as unknown as AbstractIntlMessages;
+        messageCache[target] = msgs;
+        return msgs;
+    })().finally(() => {
+        delete inFlightLocaleLoads[target];
+    });
+
+    inFlightLocaleLoads[target] = loader;
+    return loader;
+}
+
+const LOCAL_STORAGE_BUNDLE_KEY = "sl-post-i18n-bundle-v7";
 
 interface InstantLocaleContextValue {
     locale: AppLocale;
     setLocale: (next: AppLocale) => void;
+    prefetchLocale: (target: AppLocale) => void;
     allMessagesCached: boolean;
 }
 
@@ -54,45 +80,82 @@ function persistLocalePreference(nextLocale: AppLocale) {
 }
 
 /**
- * Provides instant client-side language switching across English, Sinhala, and Tamil
- * while staying 100% synchronized with Next.js App Router & Server Components.
+ * Provides fast client-side language switching across English, Sinhala, and Tamil
+ * while keeping the initial JS payload lean:
  *
- * - Client Components update synchronously in 0ms via pre-bundled messages.
- * - Server Components sync immediately via `nextRouter.replace(targetUrl, { scroll: false })`.
+ * - Only the active SSR locale (plus English fallback) is loaded at startup.
+ * - Alternate locale chunks (`si`, `ta`) load lazily on hover/touchstart or click and stay cached in memory.
+ * - Server Components sync non-blockingly via `startTransition(() => nextRouter.replace(...))`.
  * - User preference is persisted in both cookie and localStorage; defaults to English.
  */
 export function InstantLocaleProvider({
     initialLocale,
+    initialMessages,
     children,
 }: {
     initialLocale: string;
+    initialMessages?: AbstractIntlMessages;
     children: React.ReactNode;
 }) {
     const nextRouter = useNextRouter();
     const [, startTransition] = useTransition();
     const normalizedInitial = normalizeAppLocale(initialLocale);
 
+    // Hydrate module cache synchronously with SSR-provided messages for the initial locale
+    if (initialMessages && !messageCache[normalizedInitial]) {
+        messageCache[normalizedInitial] = initialMessages;
+    }
+
     const [locale, setLocaleState] = useState<AppLocale>(normalizedInitial);
-    const [allMessagesCached, setAllMessagesCached] = useState(true);
+    const [activeMessages, setActiveMessages] = useState<AbstractIntlMessages>(
+        () => initialMessages || messageCache[normalizedInitial] || messageCache.en!
+    );
+    const [allMessagesCached, setAllMessagesCached] = useState(
+        Boolean(messageCache.en && messageCache.si && messageCache.ta)
+    );
     const pendingLocaleRef = useRef<AppLocale | null>(null);
+
+    const prefetchLocale = useCallback((target: AppLocale) => {
+        if (messageCache[target]) return;
+        void loadLocaleMessages(target).then(() => {
+            if (messageCache.en && messageCache.si && messageCache.ta) {
+                setAllMessagesCached(true);
+            }
+        });
+    }, []);
 
     // Sync with Next.js route locale changes (e.g., browser Back/Forward or completed router.replace)
     useEffect(() => {
+        if (initialMessages && !messageCache[normalizedInitial]) {
+            messageCache[normalizedInitial] = initialMessages;
+        }
+
         if (pendingLocaleRef.current) {
             if (normalizedInitial === pendingLocaleRef.current) {
                 pendingLocaleRef.current = null;
                 setLocaleState(normalizedInitial);
+                if (messageCache[normalizedInitial]) {
+                    setActiveMessages(messageCache[normalizedInitial]!);
+                }
                 if (typeof document !== "undefined") {
                     document.documentElement.lang = normalizedInitial;
                 }
             }
             return;
         }
+
         setLocaleState(normalizedInitial);
+        if (messageCache[normalizedInitial]) {
+            setActiveMessages(messageCache[normalizedInitial]!);
+        } else {
+            void loadLocaleMessages(normalizedInitial).then((msgs) => {
+                setActiveMessages(msgs);
+            });
+        }
         if (typeof document !== "undefined") {
             document.documentElement.lang = normalizedInitial;
         }
-    }, [normalizedInitial]);
+    }, [normalizedInitial, initialMessages]);
 
     // Safety net: if cookie was cleared on PWA cold start while localStorage has a saved
     // preference (or offline shell served /), restore the user's remembered language.
@@ -103,13 +166,12 @@ export function InstantLocaleProvider({
                 localStorage.setItem(
                     LOCAL_STORAGE_BUNDLE_KEY,
                     JSON.stringify({
-                        version: 6,
+                        version: 7,
                         locales: ["en", "si", "ta"],
                         cachedAt: Date.now(),
                     })
                 );
             }
-            setAllMessagesCached(true);
 
             const explicitUrlLocale = getLocaleFromPathname(window.location.pathname || "/");
             const cookieLocale = readLocaleCookie();
@@ -119,7 +181,10 @@ export function InstantLocaleProvider({
             if (!explicitUrlLocale && !cookieLocale && (stored === "si" || stored === "ta")) {
                 persistLocalePreference(stored);
                 pendingLocaleRef.current = stored;
-                setLocaleState(stored);
+                void loadLocaleMessages(stored).then((msgs) => {
+                    setLocaleState(stored);
+                    setActiveMessages(msgs);
+                });
                 const targetUrl = buildLocalizedUrl(
                     window.location.pathname || "/",
                     stored,
@@ -142,8 +207,22 @@ export function InstantLocaleProvider({
     const setLocale = useCallback(
         (nextLocale: AppLocale) => {
             pendingLocaleRef.current = nextLocale;
-            setLocaleState(nextLocale);
             persistLocalePreference(nextLocale);
+
+            const applySwitch = (msgs: AbstractIntlMessages) => {
+                setLocaleState(nextLocale);
+                setActiveMessages(msgs);
+                if (messageCache.en && messageCache.si && messageCache.ta) {
+                    setAllMessagesCached(true);
+                }
+            };
+
+            const cached = messageCache[nextLocale];
+            if (cached) {
+                applySwitch(cached);
+            } else {
+                void loadLocaleMessages(nextLocale).then(applySwitch);
+            }
 
             if (typeof window === "undefined") return;
 
@@ -159,7 +238,7 @@ export function InstantLocaleProvider({
             }
 
             if (navigator.onLine) {
-                // Keep Next.js App Router & Server Components strictly synchronized with the chosen locale
+                // Keep Next.js App Router & Server Components strictly synchronized without blocking paint
                 startTransition(() => {
                     nextRouter.replace(targetUrl, { scroll: false });
                 });
@@ -172,10 +251,10 @@ export function InstantLocaleProvider({
     );
 
     return (
-        <InstantLocaleContext.Provider value={{ locale, setLocale, allMessagesCached }}>
+        <InstantLocaleContext.Provider value={{ locale, setLocale, prefetchLocale, allMessagesCached }}>
             <NextIntlClientProvider
                 locale={locale}
-                messages={ALL_MESSAGES[locale]}
+                messages={activeMessages}
                 timeZone="Asia/Colombo"
             >
                 {children}

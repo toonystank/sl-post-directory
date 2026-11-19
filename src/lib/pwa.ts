@@ -18,11 +18,13 @@ export interface MinimalRequestInfo {
 }
 
 const STATIC_EXT_RE = /\.(?:png|jpg|jpeg|webp|avif|svg|ico|woff2?|css|js|webmanifest)$/i;
+const DEV_CHUNK_RE = /^\/_next\/static\/(?:development\/|chunks\/(?:%5B|\[|src_|app_|node_modules_|turbopack-|_))/i;
 const CACHEABLE_API_PREFIXES = [
     "/api/autocomplete",
     "/api/offices",
     "/api/exchange-rate",
     "/api/posts",
+    "/api/public/config",
 ];
 
 /**
@@ -46,8 +48,10 @@ export function classifySwRequest(info: MinimalRequestInfo): SwCacheStrategy {
     if (
         pathname.startsWith("/_next/webpack-hmr") ||
         pathname.includes("hot-update") ||
+        DEV_CHUNK_RE.test(pathname) ||
         pathname.startsWith("/api/auth") ||
-        pathname.startsWith("/api/admin")
+        pathname.startsWith("/api/admin") ||
+        pathname.startsWith("/.well-known/")
     ) {
         return "ignore";
     }
@@ -126,6 +130,24 @@ export function isStandaloneDisplayMode(
         matchesQuery("(display-mode: minimal-ui)") ||
         navigatorStandalone === true
     );
+}
+
+/**
+ * Detects whether the PWA is currently running inside an Android Trusted Web Activity (TWA)
+ * launched from a Google Play Store wrapper package (`document.referrer` begins with `android-app://`).
+ */
+export function isTwaRuntime(
+    referrer?: string,
+    matchesQuery?: (query: string) => boolean
+): boolean {
+    const ref = (referrer || "").trim().toLowerCase();
+    if (ref.startsWith("android-app://")) {
+        return true;
+    }
+    if (matchesQuery && matchesQuery("(display-mode: standalone)") && ref.includes("android-app")) {
+        return true;
+    }
+    return false;
 }
 
 // ---------------------------------------------------------------------------

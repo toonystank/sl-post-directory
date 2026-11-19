@@ -20,7 +20,7 @@ interface PostOfficeCardProps {
  * Left: Bold Office Name + "Type · Division · StatusDot (Open/Closed)"
  * Right: Copyable dashed postcode badge ([ 20000 📋 ] or —), 1-tap Phone Call button ([ 📞 ]), and Chevron (>).
  */
-export default function PostOfficeCard({ office }: PostOfficeCardProps) {
+const PostOfficeCard = React.memo(function PostOfficeCard({ office }: PostOfficeCardProps) {
     const [isExpanded, setIsExpanded] = useState(false);
     const [copied, setCopied] = useState(false);
     const locale = useLocale();
@@ -164,4 +164,6 @@ export default function PostOfficeCard({ office }: PostOfficeCardProps) {
             )}
         </li>
     );
-}
+});
+
+export default PostOfficeCard;

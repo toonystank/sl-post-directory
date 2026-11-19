@@ -4,6 +4,8 @@ import { getAllPosts } from "@/lib/blog";
 import BlogCard from "@/components/BlogCard";
 import { BookOpen } from "lucide-react";
 
+export const revalidate = 3600;
+
 export const metadata: Metadata = {
     title: "Postal Guides & Tips",
     description: "Postal guides, tips, and helpful articles about Sri Lanka Post services, postal codes, shipping, and more.",

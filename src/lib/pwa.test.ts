@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
     classifySwRequest,
     isStandaloneDisplayMode,
+    isTwaRuntime,
     resolveOfflinePageLookupKeys,
     saveOfficesToOfflineCache,
     searchOfflineOfficesCache,
@@ -51,8 +52,20 @@ test("classifySwRequest separates static assets, APIs, RSC payloads, and page na
     const origin = "https://lankapost.vercel.app";
 
     assert.equal(
-        classifySwRequest({ url: `${origin}/_next/static/chunks/app.js`, origin, method: "GET" }),
+        classifySwRequest({ url: `${origin}/_next/static/chunks/a1b2c3d4.js`, origin, method: "GET" }),
         "cache-first-static"
+    );
+    assert.equal(
+        classifySwRequest({ url: `${origin}/_next/static/chunks/src_components_analytics_DeferredAnalytics_tsx_.js`, origin, method: "GET" }),
+        "ignore"
+    );
+    assert.equal(
+        classifySwRequest({ url: `${origin}/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client.js`, origin, method: "GET" }),
+        "ignore"
+    );
+    assert.equal(
+        classifySwRequest({ url: `${origin}/.well-known/assetlinks.json`, origin, method: "GET" }),
+        "ignore"
     );
     assert.equal(
         classifySwRequest({ url: `${origin}/icon-192x192.png`, origin, method: "GET" }),
@@ -64,6 +77,14 @@ test("classifySwRequest separates static assets, APIs, RSC payloads, and page na
     );
     assert.equal(
         classifySwRequest({ url: `${origin}/api/offices?q=kandy`, origin, method: "GET" }),
+        "api-swr"
+    );
+    assert.equal(
+        classifySwRequest({ url: `${origin}/api/offices/index`, origin, method: "GET" }),
+        "api-swr"
+    );
+    assert.equal(
+        classifySwRequest({ url: `${origin}/api/public/config`, origin, method: "GET" }),
         "api-swr"
     );
     assert.equal(
@@ -105,10 +126,14 @@ test("resolveOfflinePageLookupKeys returns ordered fallback chain for deep-linke
     ]);
 });
 
-test("isStandaloneDisplayMode detects Chromium standalone, fullscreen, and iOS standalone", () => {
+test("isStandaloneDisplayMode and isTwaRuntime detect PWA standalone and Play Store TWA launches", () => {
     assert.equal(isStandaloneDisplayMode(() => false, false), false);
     assert.equal(isStandaloneDisplayMode((q) => q === "(display-mode: standalone)", false), true);
     assert.equal(isStandaloneDisplayMode(() => false, true), true);
+
+    assert.equal(isTwaRuntime("", () => false), false);
+    assert.equal(isTwaRuntime("https://google.com", () => false), false);
+    assert.equal(isTwaRuntime("android-app://com.toonystank.slpostdirectory", () => false), true);
 });
 
 test("offline office cache stores, deduplicates, and filters by name, postcode, division, and service", () => {

@@ -26,10 +26,28 @@ export function ServiceWorkerRegister() {
         };
 
         const register = () => {
+            // In Next.js dev mode, ensure any stale SW static/page/RSC caches from older versions
+            // never serve mismatched Turbopack module factories across restarts.
+            if (process.env.NODE_ENV === "development" && "caches" in window) {
+                void caches.keys().then((keys) =>
+                    Promise.all(
+                        keys
+                            .filter(
+                                (k) =>
+                                    k.startsWith("sl-post-static-") ||
+                                    k.startsWith("sl-post-pages-") ||
+                                    k.startsWith("sl-post-rsc-")
+                            )
+                            .map((k) => caches.delete(k))
+                    )
+                ).catch(() => undefined);
+            }
+
             navigator.serviceWorker
-                .register("/sw.js", { scope: "/" })
+                .register("/sw.js", { scope: "/", updateViaCache: "none" })
                 .then((registration) => {
                     activeRegistration = registration;
+                    void registration.update().catch(() => undefined);
 
                     if (registration.waiting && navigator.serviceWorker.controller) {
                         notifyUpdateReady(registration.waiting);
@@ -72,7 +90,23 @@ export function ServiceWorkerRegister() {
             }
         };
 
+        const onSwMessage = (event: MessageEvent) => {
+            if (event.data?.type === "SW_FORCE_RELOAD_AFTER_PURGE" && !refreshing) {
+                const key = "__slp_chunk_recover_ts";
+                try {
+                    const last = Number(sessionStorage.getItem(key) || "0");
+                    if (Date.now() - last < 15000) return;
+                    sessionStorage.setItem(key, String(Date.now()));
+                } catch {
+                    // Ignore storage errors
+                }
+                refreshing = true;
+                window.location.reload();
+            }
+        };
+
         navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+        navigator.serviceWorker.addEventListener("message", onSwMessage);
         document.addEventListener("visibilitychange", onVisibilityChange);
 
         if (document.readyState === "complete") {
@@ -84,6 +118,7 @@ export function ServiceWorkerRegister() {
         return () => {
             window.removeEventListener("load", register);
             navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+            navigator.serviceWorker.removeEventListener("message", onSwMessage);
             document.removeEventListener("visibilitychange", onVisibilityChange);
         };
     }, []);
