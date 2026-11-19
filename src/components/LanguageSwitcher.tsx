@@ -15,7 +15,7 @@ const LOCALES: { code: AppLocale; label: string; short: string }[] = [
  * so all UI text updates in 0ms (<10ms) with zero server wait.
  */
 export default function LanguageSwitcher() {
-    const { locale, setLocale } = useInstantLocale();
+    const { locale, setLocale, prefetchLocale } = useInstantLocale();
 
     return (
         <div
@@ -34,6 +34,9 @@ export default function LanguageSwitcher() {
                         data-testid={`lang-btn-${code}`}
                         aria-label={`Switch language to ${label}`}
                         aria-pressed={active}
+                        onPointerEnter={() => prefetchLocale(code)}
+                        onTouchStart={() => prefetchLocale(code)}
+                        onFocus={() => prefetchLocale(code)}
                         onMouseDown={(e) => {
                             e.preventDefault();
                         }}

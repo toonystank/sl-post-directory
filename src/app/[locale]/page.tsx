@@ -2,6 +2,8 @@ import { Suspense } from "react";
 import HomeHero from "@/components/directory/HomeHero";
 import HomeBottomSection from "@/components/directory/HomeBottomSection";
 
+export const revalidate = 3600;
+
 export default async function Home() {
   const jsonLd = {
     "@context": "https://schema.org",

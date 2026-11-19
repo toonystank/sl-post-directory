@@ -47,7 +47,7 @@ const nextConfig: NextConfig = {
         ],
     },
     experimental: {
-        optimizePackageImports: ["lucide-react", "motion", "framer-motion"],
+        optimizePackageImports: ["lucide-react", "radix-ui"],
     },
     async headers() {
         return [

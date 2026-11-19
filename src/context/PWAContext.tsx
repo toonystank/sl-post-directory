@@ -2,11 +2,16 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useRouter } from "@/navigation";
+import { useInstantLocale } from "@/context/InstantLocaleContext";
 import {
     getCachedOfficesList,
     isStandaloneDisplayMode,
-    saveOfficesToOfflineCache,
+    isTwaRuntime,
 } from "@/lib/pwa";
+import {
+    ensureLocalOfficeIndex,
+    getLocalIndexStoredCount,
+} from "@/lib/office-index-client";
 
 interface BeforeInstallPromptEvent extends Event {
     prompt: () => Promise<void>;
@@ -15,6 +20,7 @@ interface BeforeInstallPromptEvent extends Event {
 
 interface PWAContextValue {
     isInstalled: boolean;
+    isTWA: boolean;
     canNativePrompt: boolean;
     isIOS: boolean;
     isOnline: boolean;
@@ -36,7 +42,7 @@ interface PWAContextValue {
 const PWAContext = createContext<PWAContextValue | null>(null);
 
 const DISMISSED_SESSION_KEY = "sl-post-pwa-prompt-dismissed-session";
-const ASSETS_CACHED_KEY = "sl-post-pwa-assets-cached-v6";
+const ASSETS_CACHED_KEY = "sl-post-pwa-assets-cached-v7";
 
 const CORE_ROUTES_TO_WARM = [
     "/",
@@ -46,18 +52,13 @@ const CORE_ROUTES_TO_WARM = [
     "/blog",
     "/offline",
 ];
-const CORE_VISUAL_ASSETS = [
-    "/icon-192x192.png",
-    "/icon-512x512.png",
-    "/icon-maskable-512x512.png",
-    "/apple-touch-icon.png",
-    "/manifest.webmanifest",
-];
 
 export function PWAProvider({ children }: { children: React.ReactNode }) {
     const router = useRouter();
+    const { locale } = useInstantLocale();
     const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
     const [isInstalled, setIsInstalled] = useState(false);
+    const [isTWA, setIsTWA] = useState(false);
     const [isIOS, setIsIOS] = useState(false);
     const [isOnline, setIsOnline] = useState(true);
     const [isBannerDismissed, setIsBannerDismissed] = useState(false);
@@ -69,15 +70,17 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
     const [isOfflineFallbackPage, setIsOfflineFallbackPage] = useState(false);
 
     const refreshOfflineCount = useCallback(() => {
-        setOfflineOfficesCount(getCachedOfficesList().length);
+        const localIndexCount = getLocalIndexStoredCount();
+        const legacyCount = getCachedOfficesList().length;
+        setOfflineOfficesCount(Math.max(localIndexCount, legacyCount));
     }, []);
 
     const warmLocalAssets = useCallback(async () => {
         if (typeof window === "undefined") return;
         setIsCachingLocalAssets(true);
         try {
-            // 1. Prefetch Next.js client routes for instant app tab switching
-            for (const route of CORE_ROUTES_TO_WARM) {
+            // 1. Prefetch primary Next.js routes for instant tab switching
+            for (const route of ["/", "/calculator", "/browse", "/track"]) {
                 try {
                     router.prefetch(route);
                 } catch {
@@ -85,47 +88,27 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
                 }
             }
 
-            // 2. Ask Service Worker to pre-cache UI shells, offline pages, visual icons & 3 locale shells
+            // 2. Hydrate compact 4,158-office local search index into IndexedDB (1 compressed fetch)
+            const engine = await ensureLocalOfficeIndex().catch(() => null);
+            if (engine) {
+                setOfflineOfficesCount(engine.totalCount);
+            }
+
+            // 3. Ask Service Worker to cache ONLY the active locale's shell routes sequentially in background
             if ("serviceWorker" in navigator) {
                 const reg = await navigator.serviceWorker.ready.catch(() => null);
+                const prefix = locale === "en" ? "" : `/${locale}`;
+                const localizedShellUrls = CORE_ROUTES_TO_WARM.map((r) =>
+                    r === "/" ? (prefix || "/") : `${prefix}${r}`
+                );
                 reg?.active?.postMessage({
                     type: "PRECACHE_APP_SHELL",
                     urls: [
-                        ...CORE_ROUTES_TO_WARM,
-                        "/si",
-                        "/ta",
-                        "/si/offline",
-                        "/ta/offline",
-                        ...CORE_VISUAL_ASSETS,
+                        ...localizedShellUrls,
+                        "/api/public/config",
                         "/api/exchange-rate",
-                        "/api/autocomplete?q=colombo&mode=all",
-                        "/api/autocomplete?q=kandy&mode=all",
                     ],
                 });
-            }
-
-            // 3. Also warm Cache Storage directly for visual assets
-            if ("caches" in window) {
-                const cache = await caches.open("sl-post-static-v6").catch(() => null);
-                if (cache) {
-                    await Promise.allSettled(CORE_VISUAL_ASSETS.map((url) => cache.add(url)));
-                }
-            }
-
-            // 4. Seed initial offline directory cache if empty and online
-            if (navigator.onLine && getCachedOfficesList().length === 0) {
-                try {
-                    const res = await fetch("/api/offices?limit=24&cursor=0");
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (Array.isArray(data?.offices) && data.offices.length > 0) {
-                            const count = saveOfficesToOfflineCache(data.offices);
-                            setOfflineOfficesCount(count);
-                        }
-                    }
-                } catch {
-                    // Ignore network seed failures
-                }
             }
 
             try {
@@ -138,7 +121,7 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
         } finally {
             setIsCachingLocalAssets(false);
         }
-    }, [router, refreshOfflineCount]);
+    }, [router, locale, refreshOfflineCount]);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -150,18 +133,21 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
         window.addEventListener("online", onOnline);
         window.addEventListener("offline", onOffline);
 
-        // Detect standalone mode (installed PWA)
+        // Detect standalone PWA mode AND Android Play Store TWA runtime
+        const matchesQuery = (q: string) => window.matchMedia(q).matches;
         const checkStandalone = () =>
             isStandaloneDisplayMode(
-                (q) => window.matchMedia(q).matches,
+                matchesQuery,
                 (window.navigator as unknown as { standalone?: boolean }).standalone
             );
+        const twaDetected = isTwaRuntime(document.referrer, matchesQuery);
 
-        setIsInstalled(checkStandalone());
+        setIsTWA(twaDetected);
+        setIsInstalled(twaDetected || checkStandalone());
 
         const displayModeMql = window.matchMedia("(display-mode: standalone)");
         const onDisplayModeChange = (e: MediaQueryListEvent) => {
-            setIsInstalled(e.matches || checkStandalone());
+            setIsInstalled(twaDetected || e.matches || checkStandalone());
         };
         displayModeMql.addEventListener?.("change", onDisplayModeChange);
 
@@ -196,7 +182,9 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
 
         const onBeforeInstallPrompt = (e: Event) => {
             e.preventDefault();
-            setDeferredPrompt(e as BeforeInstallPromptEvent);
+            if (!twaDetected) {
+                setDeferredPrompt(e as BeforeInstallPromptEvent);
+            }
         };
 
         const onAppInstalled = () => {
@@ -209,10 +197,26 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
         window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
         window.addEventListener("appinstalled", onAppInstalled);
 
-        // Warm core UI shell routes, icons & languages in idle time
-        const idleTimer = window.setTimeout(() => {
-            void warmLocalAssets();
-        }, 1200);
+        // Defer background shell + 4,158-office index warming until browser is genuinely idle post-paint
+        let idleId: number | null = null;
+        let fallbackTimer: number | null = null;
+
+        const scheduleWarm = () => {
+            if (typeof window.requestIdleCallback === "function") {
+                idleId = window.requestIdleCallback(
+                    () => {
+                        void warmLocalAssets();
+                    },
+                    { timeout: 4500 }
+                );
+            } else {
+                fallbackTimer = globalThis.setTimeout(() => {
+                    void warmLocalAssets();
+                }, 3000) as unknown as number;
+            }
+        };
+
+        const postPaintTimer = window.setTimeout(scheduleWarm, 2200);
 
         return () => {
             window.removeEventListener("online", onOnline);
@@ -222,11 +226,18 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
             window.removeEventListener("slpost-offline-cache-updated", onOfflineCacheUpdated);
             window.removeEventListener("slpost-sw-update", onSwUpdate);
             displayModeMql.removeEventListener?.("change", onDisplayModeChange);
-            window.clearTimeout(idleTimer);
+            window.clearTimeout(postPaintTimer);
+            if (idleId !== null && "cancelIdleCallback" in window) {
+                window.cancelIdleCallback(idleId);
+            }
+            if (fallbackTimer !== null) {
+                window.clearTimeout(fallbackTimer);
+            }
         };
     }, [warmLocalAssets, refreshOfflineCount]);
 
     const triggerInstall = useCallback(async () => {
+        if (isTWA) return;
         void warmLocalAssets();
 
         if (deferredPrompt) {
@@ -245,7 +256,7 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
 
         // Show step-by-step instructions modal for iOS Safari / browsers without native prompt
         setShowInstallModal(true);
-    }, [deferredPrompt, warmLocalAssets]);
+    }, [deferredPrompt, isTWA, warmLocalAssets]);
 
     const dismissBanner = useCallback(() => {
         setIsBannerDismissed(true);
@@ -275,7 +286,8 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
         <PWAContext.Provider
             value={{
                 isInstalled,
-                canNativePrompt: Boolean(deferredPrompt),
+                isTWA,
+                canNativePrompt: !isTWA && Boolean(deferredPrompt),
                 isIOS,
                 isOnline,
                 isBannerDismissed,

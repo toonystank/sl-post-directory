@@ -5,6 +5,8 @@ import { Package, Calculator, FolderOpen, Construction, CheckCircle2, Barcode } 
 import Postmark from "@/components/brand/Postmark";
 import TrackMotionCard from "@/components/directory/TrackMotionCard";
 
+export const revalidate = 3600;
+
 export const metadata: Metadata = {
     title: "Track Parcel & Mail · Coming Soon",
     description: "Unified Sri Lanka Post tracking for EMS Speed Post, Registered Post, U-Packet, and Domestic COD is coming soon.",

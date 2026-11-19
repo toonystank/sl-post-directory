@@ -3,6 +3,8 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
+    lang: "en",
+    dir: "ltr",
     name: "Lanka Post Directory",
     short_name: "Lanka Post",
     description:
@@ -12,6 +14,7 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "standalone",
     display_override: ["standalone", "minimal-ui"],
     orientation: "portrait",
+    prefer_related_applications: false,
     background_color: "#FBF7EF",
     theme_color: "#FBF7EF",
     categories: ["utilities", "navigation", "reference"],

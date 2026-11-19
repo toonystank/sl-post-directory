@@ -367,54 +367,95 @@ export default function PostageCalculator({
 
     useEffect(() => {
         let active = true;
+        const RATE_STORAGE_KEY = "sl-post-rate-config-v1";
+
+        const applyVariables = (vars: { key: string; value: string }[]) => {
+            if (!active) return;
+            const loaded: Partial<RateConfig> = {};
+            for (const v of vars) {
+                try {
+                    if (v.key === "rates_domestic_services") loaded.domesticServices = JSON.parse(v.value);
+                    if (v.key === "rates_ems_zones") loaded.emsZones = JSON.parse(v.value);
+                    if (v.key === "rates_ems_countries") loaded.emsCountries = JSON.parse(v.value);
+                    if (v.key === "rates_extra_fees") loaded.extraFees = JSON.parse(v.value);
+                } catch {
+                    // Ignore malformed JSON variable and keep defaults
+                }
+            }
+
+            const merged = mergeWithDefaultConfig(loaded);
+            cachedRateConfig = merged;
+            cachedRateConfigTimestamp = Date.now();
+            setConfig(merged);
+            setServiceId((prev) =>
+                merged.domesticServices.some((s) => s.id === prev)
+                    ? prev
+                    : (merged.domesticServices[0]?.id ?? prev)
+            );
+            setEmsCountryCode((prev) =>
+                merged.emsCountries.some((c) => c.code === prev)
+                    ? prev
+                    : (merged.emsCountries[0]?.code ?? prev)
+            );
+        };
+
         if (cachedRateConfig && Date.now() - cachedRateConfigTimestamp < RATE_CACHE_TTL_MS) {
             setConfig(cachedRateConfig);
             return;
         }
+
+        // Hydrate immediately from localStorage SWR cache so calculator opens with zero fetch delay
+        let isLocalFresh = false;
+        try {
+            const raw = window.localStorage.getItem(RATE_STORAGE_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw) as { vars?: { key: string; value: string }[]; savedAt?: number };
+                if (Array.isArray(parsed.vars)) {
+                    applyVariables(parsed.vars);
+                    if (typeof parsed.savedAt === "number" && Date.now() - parsed.savedAt < RATE_CACHE_TTL_MS) {
+                        isLocalFresh = true;
+                    }
+                }
+            }
+        } catch {
+            // Ignore storage errors
+        }
+
+        if (isLocalFresh || (typeof navigator !== "undefined" && !navigator.onLine)) {
+            return;
+        }
+
         const controller = new AbortController();
         const fetchConfig = async () => {
             try {
-                const res = await fetch("/api/admin/variables", { signal: controller.signal });
+                const res = await fetch("/api/public/config", { signal: controller.signal });
                 if (!res.ok || !active) return;
-                const vars = await res.json();
-                if (!Array.isArray(vars) || !active) return;
+                const data = (await res.json()) as { rateVariables?: { key: string; value: string }[] };
+                const vars = Array.isArray(data?.rateVariables) ? data.rateVariables : [];
+                if (!active) return;
 
-                const loaded: Partial<RateConfig> = {};
-                for (const v of vars as { key: string; value: string }[]) {
-                    try {
-                        if (v.key === "rates_domestic_services") loaded.domesticServices = JSON.parse(v.value);
-                        if (v.key === "rates_ems_zones") loaded.emsZones = JSON.parse(v.value);
-                        if (v.key === "rates_ems_countries") loaded.emsCountries = JSON.parse(v.value);
-                        if (v.key === "rates_extra_fees") loaded.extraFees = JSON.parse(v.value);
-                    } catch {
-                        // Ignore malformed JSON variable and keep defaults
-                    }
+                try {
+                    window.localStorage.setItem(
+                        RATE_STORAGE_KEY,
+                        JSON.stringify({ vars, savedAt: Date.now() })
+                    );
+                } catch {
+                    // Ignore storage quota errors
                 }
 
-                const merged = mergeWithDefaultConfig(loaded);
-                cachedRateConfig = merged;
-                cachedRateConfigTimestamp = Date.now();
-                if (active) {
-                    setConfig(merged);
-                    setServiceId((prev) =>
-                        merged.domesticServices.some((s) => s.id === prev)
-                            ? prev
-                            : (merged.domesticServices[0]?.id ?? prev)
-                    );
-                    setEmsCountryCode((prev) =>
-                        merged.emsCountries.some((c) => c.code === prev)
-                            ? prev
-                            : (merged.emsCountries[0]?.code ?? prev)
-                    );
+                if (vars.length > 0) {
+                    applyVariables(vars);
                 }
             } catch (e) {
                 if ((e as Error)?.name === "AbortError") return;
-                console.error("Failed to load rates config", e);
             }
         };
-        fetchConfig();
+
+        // Defer network check slightly so initial calculator paint & interactions stay unblocked
+        const timer = window.setTimeout(fetchConfig, 400);
         return () => {
             active = false;
+            window.clearTimeout(timer);
             controller.abort();
         };
     }, []);

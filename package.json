@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -H 0.0.0.0 -p 3000",
     "build": "prisma generate && next build",
     "postinstall": "prisma generate",
     "start": "next start",
@@ -27,7 +27,6 @@
     "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "framer-motion": "^12.34.3",
     "jodit": "^4.12.39",
     "jodit-react": "^5.3.21",
     "lucide-react": "^0.575.0",

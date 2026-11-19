@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import Script from "next/script";
 import { Archivo, Public_Sans, IBM_Plex_Mono, Noto_Sans_Sinhala, Noto_Sans_Tamil } from "next/font/google";
 import "../globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -13,12 +12,14 @@ import { InstallPrompt } from "@/components/InstallPrompt";
 import NextTopLoader from "nextjs-toploader";
 import AdManager from "@/components/ads/AdManager";
 import AdBanner from "@/components/ads/AdBanner";
+import DeferredAnalytics from "@/components/analytics/DeferredAnalytics";
 import MotionProvider from "@/components/motion/MotionProvider";
 import { InstantLocaleProvider } from "@/context/InstantLocaleContext";
 import { PWAProvider } from "@/context/PWAContext";
 import { routing } from "@/i18n/routing";
 import { notFound } from "next/navigation";
 import { hasLocale } from "next-intl";
+import { getMessages } from "next-intl/server";
 
 // Display: Archivo with the width axis so headlines can be condensed (signage feel)
 const archivo = Archivo({
@@ -126,6 +127,7 @@ export default async function RootLayout({
     }
 
     const gaId = process.env.NEXT_PUBLIC_GA_ID?.trim();
+    const initialMessages = locale === "en" ? undefined : await getMessages();
 
     return (
         <html lang={locale} suppressHydrationWarning>
@@ -139,27 +141,18 @@ export default async function RootLayout({
                         __html: `(function(){try{var a=['bis_skin_checked','bis_register','bis_id','bis_size'];function c(r){for(var i=0;i<a.length;i++){var s='['+a[i]+']';var n=r.querySelectorAll?r.querySelectorAll(s):[];for(var j=0;j<n.length;j++)n[j].removeAttribute(a[i]);if(r.removeAttribute)r.removeAttribute(a[i]);}}c(document.documentElement);if(document.addEventListener)document.addEventListener('DOMContentLoaded',function(){c(document.documentElement);},true);var o=Element.prototype.setAttribute;Element.prototype.setAttribute=function(k,v){if(a.indexOf(k)!==-1)return;return o.call(this,k,v);};new MutationObserver(function(m){for(var i=0;i<m.length;i++){var t=m[i].target;if(t&&t.removeAttribute&&m[i].attributeName&&a.indexOf(m[i].attributeName)!==-1){t.removeAttribute(m[i].attributeName);}}}).observe(document.documentElement,{attributes:true,subtree:true,attributeFilter:a});}catch(e){}})();`,
                     }}
                 />
+                <script
+                    suppressHydrationWarning
+                    dangerouslySetInnerHTML={{
+                        __html: `(function(){try{var K='__slp_chunk_recover_ts';function canReload(){var last=Number(sessionStorage.getItem(K)||'0');if(Date.now()-last<15000)return false;sessionStorage.setItem(K,String(Date.now()));return true;}function purgeAndReload(){if(!canReload())return;var jobs=[];if('caches' in window){jobs.push(caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k);}));}).catch(function(){}));}if('serviceWorker' in navigator){jobs.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.update().catch(function(){});}));}).catch(function(){}));}Promise.all(jobs).finally(function(){window.location.reload();});}function isStaleChunkErr(msg){return typeof msg==='string'&&(msg.indexOf('module factory is not available')!==-1||msg.indexOf('ChunkLoadError')!==-1||msg.indexOf('Loading chunk')!==-1);}window.addEventListener('error',function(ev){var m=(ev&&ev.message)||(ev&&ev.error&&ev.error.message)||'';if(isStaleChunkErr(m))purgeAndReload();});window.addEventListener('unhandledrejection',function(ev){var r=ev&&ev.reason;var m=(typeof r==='string'?r:(r&&r.message))||'';if(isStaleChunkErr(m))purgeAndReload();});if('serviceWorker' in navigator){navigator.serviceWorker.addEventListener('message',function(ev){if(ev&&ev.data&&ev.data.type==='SW_FORCE_RELOAD_AFTER_PURGE'&&canReload()){window.location.reload();}});}}catch(e){}})();`,
+                    }}
+                />
             </head>
 
             <body className={`${archivo.variable} ${publicSans.variable} ${plexMono.variable} ${notoSinhala.variable} ${notoTamil.variable} font-sans min-h-dvh flex flex-col antialiased bg-background`} suppressHydrationWarning>
-                {gaId && (
-                    <>
-                        <Script
-                            src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
-                            strategy="lazyOnload"
-                        />
-                        <Script id="google-analytics" strategy="lazyOnload">
-                            {`
-                                window.dataLayer = window.dataLayer || [];
-                                function gtag(){dataLayer.push(arguments);}
-                                gtag('js', new Date());
-                                gtag('config', '${gaId}');
-                            `}
-                        </Script>
-                    </>
-                )}
+                {gaId && <DeferredAnalytics gaId={gaId} />}
                 <NextTopLoader color="hsl(var(--primary))" showSpinner={false} height={3} />
-                <InstantLocaleProvider initialLocale={locale}>
+                <InstantLocaleProvider initialLocale={locale} initialMessages={initialMessages}>
                     <AuthProvider>
                         <CurrencyProvider>
                             <AdManager>

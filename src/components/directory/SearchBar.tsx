@@ -30,6 +30,10 @@ import {
     type SmartSearchIntent,
 } from "@/lib/smart-search";
 import { searchOfflineOfficesCache } from "@/lib/pwa";
+import {
+    ensureLocalOfficeIndex,
+    getLoadedOfficeIndexSync,
+} from "@/lib/office-index-client";
 import { SearchMode } from "./types";
 
 interface SearchBarProps {
@@ -113,25 +117,47 @@ export default function SearchBar({
         return parseSmartSearchIntent(query, locale, weightOverrideGrams);
     }, [enableSmartHomeSearch, query, locale, weightOverrideGrams]);
 
-    const effectiveAutocompleteMode = enableSmartHomeSearch ? "all" : searchMode;
+    const effectiveAutocompleteMode: "name" | "division" | "all" = enableSmartHomeSearch ? "all" : searchMode;
 
     const fetchSuggestions = useCallback(
-        async (val: string, mode: string) => {
-            if (!val.trim()) {
+        async (val: string, mode: "name" | "division" | "all") => {
+            const trimmed = val.trim();
+            if (!trimmed) {
                 suggestAbort.current?.abort();
                 setSuggestions([]);
                 return;
             }
-            const cacheKey = `${mode}-${val.trim().toLowerCase()}`;
+
+            // Fast Path 1: Synchronous 4,158-office local index (< 3ms, zero network)
+            const syncEngine = getLoadedOfficeIndexSync();
+            if (syncEngine) {
+                suggestAbort.current?.abort();
+                setSuggestionsLoading(false);
+                setSuggestions(syncEngine.autocomplete(trimmed, mode, 5));
+                return;
+            }
+
+            const cacheKey = `${mode}-${trimmed.toLowerCase()}`;
             if (suggestionCache.current[cacheKey]) {
                 setSuggestions(suggestionCache.current[cacheKey]);
                 return;
             }
+
             suggestAbort.current?.abort();
             const controller = new AbortController();
             suggestAbort.current = controller;
             setSuggestionsLoading(true);
+
             try {
+                // Hydrate local index once (typically from IndexedDB in < 20ms)
+                const engine = await ensureLocalOfficeIndex();
+                if (!controller.signal.aborted && engine) {
+                    const localList = engine.autocomplete(trimmed, mode, 5);
+                    suggestionCache.current[cacheKey] = localList;
+                    setSuggestions(localList);
+                    return;
+                }
+
                 const res = await fetch(
                     `/api/autocomplete?q=${encodeURIComponent(val)}&mode=${mode}`,
                     { signal: controller.signal }
@@ -182,9 +208,18 @@ export default function SearchBar({
         setIsActive(true);
         setShowDropdown(true);
         if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
+
+        // If the 4,158-office local index is already hydrated, run immediately with 0ms debounce!
+        const syncEngine = getLoadedOfficeIndexSync();
+        if (syncEngine) {
+            setSuggestionsLoading(false);
+            setSuggestions(syncEngine.autocomplete(val, effectiveAutocompleteMode, 5));
+            return;
+        }
+
         suggestDebounce.current = setTimeout(
-            () => fetchSuggestions(val, effectiveAutocompleteMode),
-            120
+            () => void fetchSuggestions(val, effectiveAutocompleteMode),
+            80
         );
     };
 
@@ -399,6 +434,7 @@ export default function SearchBar({
                             onKeyDown={handleKeyDown}
                             onFocus={() => {
                                 setIsActive(true);
+                                void ensureLocalOfficeIndex();
                                 if (query.trim()) setShowDropdown(true);
                             }}
                             placeholder={

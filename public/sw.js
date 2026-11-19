@@ -1,21 +1,18 @@
-const CACHE_VERSION = "v6";
+const CACHE_VERSION = "v9";
 const STATIC_CACHE = `sl-post-static-${CACHE_VERSION}`;
 const PAGES_CACHE = `sl-post-pages-${CACHE_VERSION}`;
 const RSC_CACHE = `sl-post-rsc-${CACHE_VERSION}`;
 const API_CACHE = `sl-post-api-${CACHE_VERSION}`;
 const ALL_CACHES = [STATIC_CACHE, PAGES_CACHE, RSC_CACHE, API_CACHE];
 
-const PRECACHE_SHELL_URLS = [
-  "/",
-  "/si",
-  "/ta",
-  "/calculator",
-  "/browse",
-  "/track",
-  "/blog",
-  "/offline",
-  "/si/offline",
-  "/ta/offline",
+const IS_DEV_HOST =
+  self.location.hostname === "localhost" ||
+  self.location.hostname === "127.0.0.1" ||
+  self.location.hostname.startsWith("ais-dev-");
+
+// Install ONLY lightweight static icons & manifest so SW install NEVER causes
+// a multi-page SSR stampede competing with the user's first paint / LCP.
+const INSTALL_STATIC_URLS = [
   "/icon-192x192.png",
   "/icon-512x512.png",
   "/icon-maskable-512x512.png",
@@ -23,13 +20,26 @@ const PRECACHE_SHELL_URLS = [
   "/manifest.webmanifest",
 ];
 
+const APP_SHELL_PATH_RE = /^\/(?:(?:si|ta)\/)?(?:|calculator|browse|track|blog|offline)$/;
+
 const STATIC_EXT_RE = /\.(?:png|jpg|jpeg|webp|avif|svg|ico|woff2?|css|js|webmanifest)$/i;
+// Next.js / Turbopack development chunks have mutable paths and `no-store` headers;
+// never cache them in the Service Worker or HMR/restarts will hit missing module factories.
+const DEV_CHUNK_RE = /^\/_next\/static\/(?:development\/|chunks\/(?:%5B|\[|src_|app_|node_modules_|turbopack-|_))/i;
 const CACHEABLE_API_PREFIXES = [
   "/api/autocomplete",
   "/api/offices",
   "/api/exchange-rate",
   "/api/posts",
+  "/api/public/config",
 ];
+
+function isCacheableResponse(res) {
+  if (!res || !res.ok || res.redirected) return false;
+  const cc = (res.headers.get("cache-control") || "").toLowerCase();
+  if (cc.includes("no-store")) return false;
+  return true;
+}
 
 function buildOfflineHtmlFallback() {
   const html = `<!doctype html>
@@ -52,7 +62,7 @@ function buildOfflineHtmlFallback() {
 <body>
   <main class="card">
     <h1>You're offline</h1>
-    <p>This page hasn't been saved for offline use yet. Your postage calculator and cached directory pages still work offline.</p>
+    <p>This page hasn't been saved for offline use yet. Your postage calculator and local 4,158-office search still work offline.</p>
     <div class="actions">
       <a class="primary" href="/calculator">Open Calculator</a>
       <a class="secondary" href="/">Go Home</a>
@@ -102,7 +112,9 @@ function extractStaticAssetsFromHtml(html) {
   const re = /(?:src|href)=["'](\/_next\/static\/[^"']+)["']/g;
   let match;
   while ((match = re.exec(html)) !== null) {
-    assets.add(match[1]);
+    if (!DEV_CHUNK_RE.test(match[1])) {
+      assets.add(match[1]);
+    }
   }
   return Array.from(assets);
 }
@@ -115,7 +127,7 @@ async function cachePageWithStaticAssets(url, pagesCache, staticCache) {
       credentials: "omit",
       headers: { "X-SW-Precache": "1" },
     });
-    if (!res.ok || res.redirected) return;
+    if (!isCacheableResponse(res)) return;
     const contentType = res.headers.get("content-type") || "";
     if (contentType.includes("text/html")) {
       const html = await res.clone().text();
@@ -126,7 +138,7 @@ async function cachePageWithStaticAssets(url, pagesCache, staticCache) {
           const existing = await staticCache.match(assetUrl);
           if (existing) return;
           const assetRes = await fetch(assetUrl, { credentials: "omit" });
-          if (assetRes.ok && !assetRes.redirected) {
+          if (isCacheableResponse(assetRes)) {
             await staticCache.put(assetUrl, assetRes);
           }
         })
@@ -141,40 +153,45 @@ async function cachePageWithStaticAssets(url, pagesCache, staticCache) {
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    Promise.all([caches.open(PAGES_CACHE), caches.open(STATIC_CACHE)]).then(
-      async ([pagesCache, staticCache]) => {
-        await Promise.allSettled(
-          PRECACHE_SHELL_URLS.map((url) =>
-            STATIC_EXT_RE.test(url)
-              ? fetch(url, { credentials: "omit" }).then((res) => {
-                  if (res.ok && !res.redirected) return staticCache.put(url, res);
-                })
-              : cachePageWithStaticAssets(url, pagesCache, staticCache)
-          )
-        );
-      }
-    )
+    caches.open(STATIC_CACHE).then(async (staticCache) => {
+      await Promise.allSettled(
+        INSTALL_STATIC_URLS.map((url) =>
+          fetch(url, { credentials: "omit" }).then((res) => {
+            if (res.ok && !res.redirected) return staticCache.put(url, res);
+          })
+        )
+      );
+    })
   );
-  // Activate immediately only on initial install (when no active SW controls clients yet)
-  if (!self.registration.active) {
-    self.skipWaiting();
-  }
+  // Activate immediately so stale cache versions (e.g. cached dev chunks) are purged right away
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((cacheNames) =>
-        Promise.all(
-          cacheNames.map((cacheName) => {
-            if (!ALL_CACHES.includes(cacheName)) {
-              return caches.delete(cacheName);
-            }
-          })
-        )
-      )
-      .then(() => self.clients.claim())
+    (async () => {
+      const cacheNames = await caches.keys();
+      let purgedLegacy = false;
+      await Promise.all(
+        cacheNames.map((cacheName) => {
+          const isStaleVersion = !ALL_CACHES.includes(cacheName);
+          const isDevStale =
+            IS_DEV_HOST &&
+            (cacheName === STATIC_CACHE || cacheName === PAGES_CACHE || cacheName === RSC_CACHE);
+          if (isStaleVersion || isDevStale) {
+            if (isStaleVersion) purgedLegacy = true;
+            return caches.delete(cacheName);
+          }
+        })
+      );
+      await self.clients.claim();
+      if (purgedLegacy) {
+        const clientList = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        for (const client of clientList) {
+          client.postMessage({ type: "SW_FORCE_RELOAD_AFTER_PURGE" });
+        }
+      }
+    })()
   );
 });
 
@@ -188,40 +205,45 @@ self.addEventListener("message", (event) => {
   }
 
   if (data.type === "PRECACHE_APP_SHELL") {
-    const urls = Array.isArray(data.urls) ? data.urls : PRECACHE_SHELL_URLS;
+    const urls = Array.isArray(data.urls) ? data.urls : INSTALL_STATIC_URLS;
     event.waitUntil(
       Promise.all([
         caches.open(PAGES_CACHE),
         caches.open(STATIC_CACHE),
         caches.open(API_CACHE),
       ]).then(async ([pagesCache, staticCache, apiCache]) => {
-        await Promise.allSettled(
-          urls.map(async (url) => {
-            if (typeof url !== "string") return;
-            if (url.startsWith("/api/")) {
-              try {
+        // Warm sequentially in small steps so background warming stays low-priority
+        for (const url of urls) {
+          if (typeof url !== "string") continue;
+          if (url.startsWith("/api/")) {
+            try {
+              const existing = await apiCache.match(url);
+              if (!existing) {
                 const res = await fetch(url, { credentials: "omit" });
                 if (res.ok && !res.redirected) await apiCache.put(url, res);
-              } catch {
-                // Ignore
               }
-              return;
+            } catch {
+              // Ignore
             }
-            if (STATIC_EXT_RE.test(url)) {
-              try {
-                const existing = await staticCache.match(url);
-                if (!existing) {
-                  const res = await fetch(url, { credentials: "omit" });
-                  if (res.ok && !res.redirected) await staticCache.put(url, res);
-                }
-              } catch {
-                // Ignore
+            continue;
+          }
+          if (STATIC_EXT_RE.test(url)) {
+            try {
+              const existing = await staticCache.match(url);
+              if (!existing) {
+                const res = await fetch(url, { credentials: "omit" });
+                if (res.ok && !res.redirected) await staticCache.put(url, res);
               }
-              return;
+            } catch {
+              // Ignore
             }
+            continue;
+          }
+          const existingPage = await pagesCache.match(url);
+          if (!existingPage) {
             await cachePageWithStaticAssets(url, pagesCache, staticCache);
-          })
-        );
+          }
+        }
       })
     );
   }
@@ -244,12 +266,26 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Never intercept Next.js HMR, auth sessions, or admin endpoints
+  // Never intercept Next.js HMR, Turbopack dev chunks, auth sessions, admin endpoints, or Digital Asset Links
   if (
     url.pathname.startsWith("/_next/webpack-hmr") ||
     url.pathname.includes("hot-update") ||
+    DEV_CHUNK_RE.test(url.pathname) ||
     url.pathname.startsWith("/api/auth") ||
-    url.pathname.startsWith("/api/admin")
+    url.pathname.startsWith("/api/admin") ||
+    url.pathname.startsWith("/.well-known/")
+  ) {
+    return;
+  }
+
+  // On dev hosts (localhost / ais-dev-*), NEVER cache or intercept Next.js chunks, HTML navigations,
+  // or RSC payloads so Turbopack rebuilds always load fresh matching module factories.
+  if (
+    IS_DEV_HOST &&
+    (url.pathname.startsWith("/_next/") ||
+      request.mode === "navigate" ||
+      request.headers.get("RSC") === "1" ||
+      url.searchParams.has("_rsc"))
   ) {
     return;
   }
@@ -262,7 +298,7 @@ self.addEventListener("fetch", (event) => {
         if (cached) return cached;
         try {
           const networkRes = await fetch(request);
-          if (networkRes.ok) {
+          if (isCacheableResponse(networkRes)) {
             cache.put(request, networkRes.clone());
           }
           return networkRes;
@@ -274,7 +310,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 2. Stale-While-Revalidate for read-only Directory, Autocomplete & Exchange Rate APIs
+  // 2. Stale-While-Revalidate for read-only Directory Index, Autocomplete, Public Config & Exchange Rate APIs
   if (CACHEABLE_API_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))) {
     event.respondWith(
       caches.open(API_CACHE).then(async (cache) => {
@@ -318,14 +354,17 @@ self.addEventListener("fetch", (event) => {
   if (isRsc) {
     event.respondWith(
       caches.open(RSC_CACHE).then(async (cache) => {
+        const cached = await cache.match(request);
         try {
-          const networkRes = await fetchWithTimeout(request, 3500);
-          if (networkRes.ok) {
+          // Only use a short timeout when we already have a cached RSC fallback
+          const networkRes = cached
+            ? await fetchWithTimeout(request, 2500)
+            : await fetch(request);
+          if (isCacheableResponse(networkRes)) {
             cache.put(request, networkRes.clone());
           }
           return networkRes;
         } catch {
-          const cached = await cache.match(request);
           if (cached) return cached;
           return Response.error();
         }
@@ -334,13 +373,20 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 4. Full document navigations: Network-First (2.5s timeout) with smart pathname & offline-page fallback
+  // 4. Full document navigations:
+  //    - If a cached app shell exists, race network (1.2s) so slow connections paint fast & refresh in background.
+  //    - If uncached, let network finish cleanly without premature timeout, falling back only on real offline/failure.
   if (request.mode === "navigate") {
     event.respondWith(
       caches.open(PAGES_CACHE).then(async (cache) => {
+        const isAppShell = !url.search && APP_SHELL_PATH_RE.test(url.pathname);
+        const existingHit = isAppShell ? await cache.match(url.pathname) : await cache.match(request);
+
         try {
-          const networkRes = await fetchWithTimeout(request, 2500);
-          if (networkRes.ok && !networkRes.redirected) {
+          const networkRes = existingHit
+            ? await fetchWithTimeout(request, isAppShell ? 1200 : 2500)
+            : await fetch(request);
+          if (isCacheableResponse(networkRes)) {
             cache.put(request, networkRes.clone());
             if (!url.search) {
               cache.put(url.pathname, networkRes.clone());
@@ -351,7 +397,19 @@ self.addEventListener("fetch", (event) => {
           const keys = resolveOfflineFallbackKeys(url);
           for (const key of keys) {
             const hit = await cache.match(key);
-            if (hit) return hit;
+            if (hit) {
+              event.waitUntil(
+                fetch(request)
+                  .then((fresh) => {
+                    if (isCacheableResponse(fresh)) {
+                      cache.put(request, fresh.clone());
+                      if (!url.search) cache.put(url.pathname, fresh.clone());
+                    }
+                  })
+                  .catch(() => {})
+              );
+              return hit;
+            }
           }
           return buildOfflineHtmlFallback();
         }
@@ -366,7 +424,7 @@ self.addEventListener("fetch", (event) => {
       const cached = await cache.match(request);
       const networkPromise = fetch(request)
         .then((networkRes) => {
-          if (networkRes.ok) {
+          if (isCacheableResponse(networkRes)) {
             cache.put(request, networkRes.clone());
           }
           return networkRes;
