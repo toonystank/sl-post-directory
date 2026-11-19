@@ -145,3 +145,60 @@ test("LocalOfficeSearchEngine searches 4,158 offices in under 25ms per query", (
     assert.equal(res3[0], "Nuwara Eliya Main");
     assert.ok(elapsedMs < 50, `Expected 3 full-index queries to run in <50ms, took ${elapsedMs.toFixed(2)}ms`);
 });
+
+test("LocalOfficeSearchEngine normalizes unpadded 00100 codes, deduplicates empty lowercase rows, and filters by division/type/24h", () => {
+    const dirtyRecords: OfficeIndexSourceRecord[] = [
+        {
+            id: "gpo",
+            slug: "colombo-gpo--100",
+            name: "Colombo G. P. O.",
+            postalCode: "100",
+            fields: [
+                { name: "Type", value: "General Post Office" },
+                { name: "Division", value: "Colombo" },
+                { name: "Phone", value: "112328301" },
+                { name: "Is24Hour", value: "true" },
+            ],
+        },
+        {
+            id: "dup-bad",
+            slug: "kabagamuwa-bad",
+            name: "kabagamuwa",
+            postalCode: "",
+            fields: [{ name: "Division", value: "Kegalle" }],
+        },
+        {
+            id: "dup-good",
+            slug: "kabagamuwa-71202",
+            name: "Kabagamuwa",
+            postalCode: "71202",
+            fields: [
+                { name: "Type", value: "Sub Post Office" },
+                { name: "Division", value: "Kegalle" },
+            ],
+        },
+    ];
+
+    const engine = new LocalOfficeSearchEngine(encodeOfficeIndex(dirtyRecords));
+    // Duplicate empty-code lowercase entry was removed
+    assert.equal(engine.totalCount, 2);
+
+    // Searching "00100" finds Colombo G. P. O. and returns normalized "00100" + formatted phone
+    const res00100 = engine.query({ q: "00100" });
+    assert.equal(res00100.total, 1);
+    assert.equal(res00100.offices[0].postalCode, "00100");
+    assert.equal(res00100.offices[0].fields.find((f) => f.name === "Phone")?.value, "011 232-8301");
+
+    // Searching legacy "100" still finds Colombo G. P. O.
+    assert.equal(engine.query({ q: "100" }).total, 1);
+
+    // Rich autocomplete includes postalCode and division
+    const rich = engine.autocompleteRich("00100", "all");
+    assert.equal(rich[0]?.postalCode, "00100");
+    assert.equal(rich[0]?.division, "Colombo");
+
+    // Division, type, and 24-hour filters work cleanly
+    assert.equal(engine.query({ division: "Kegalle" }).total, 1);
+    assert.equal(engine.query({ officeType: "Sub Post Office" }).total, 1);
+    assert.equal(engine.query({ is24Hour: true }).total, 1);
+});

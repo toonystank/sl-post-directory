@@ -130,7 +130,7 @@ export function InstallPrompt() {
             {/* 4. Step-by-Step Install Guide Modal (iOS Safari & Browsers without native prompt) */}
             <DialogPrimitive.Root open={showInstallModal} onOpenChange={(open) => !open && closeInstallModal()}>
                 <DialogPrimitive.Portal>
-                    <DialogPrimitive.Overlay className="fixed inset-0 z-[100] bg-foreground/45 backdrop-blur-[1px] data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+                    <DialogPrimitive.Overlay className="fixed inset-0 z-[100] bg-black/55 dark:bg-black/75 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in-0" />
                     <DialogPrimitive.Content
                         data-testid="pwa-install-guide-modal"
                         className="fixed left-1/2 top-1/2 z-[105] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border-2 border-foreground bg-card p-5 text-foreground shadow-[6px_6px_0_0_hsl(var(--foreground))] outline-none"

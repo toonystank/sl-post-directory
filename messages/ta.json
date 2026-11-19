@@ -290,7 +290,14 @@
     "noteSuffix": " (குறிப்பு)",
     "pricesIn": "விலைகள் {currency}",
     "exchangeRateNote": "1 USD ≈ ரூ. {rate}",
-    "lkrEquivalent": "≈ ரூ. {amount}"
+    "lkrEquivalent": "≈ ரூ. {amount}",
+    "searchCountryPlaceholder": "நாடு, குறியீடு அல்லது நகரத்தைத் தேடு...",
+    "searchCountryAria": "சேரும் நாட்டைத் தேடுங்கள்",
+    "clearCountrySearch": "தேடலை அழி",
+    "popularCountries": "பிரபலமானவை",
+    "allCountriesCount": "அனைத்து நாடுகள் ({count})",
+    "matchingCountriesCount": "{count} பொருத்தம்",
+    "noCountriesFound": "\"{query}\" க்கு நாடுகள் இல்லை"
   },
   "Blog": {
     "kicker": "குறிப்புகள் & வழிகாட்டிகள்",
@@ -435,6 +442,11 @@
     "serviceCodCode": "SLP கூரியர்",
     "meanwhile": "இப்போது தபால் கட்டணங்கள் அல்லது தபால் நிலைய தொலைபேசி எண் தேவையா?",
     "ctaRates": "தபால் கட்டணங்களைக் கணக்கிடு",
-    "ctaBrowse": "தபால் நிலையங்களை உலாவு"
+    "ctaBrowse": "தபால் நிலையங்களை உலாவு",
+    "liveBadge": "நேரடி கண்காணிப்பு · COD & SLP கூரியர்",
+    "liveSubtitle": "இலங்கை தபால் COD (BD), SLP கூரியர் (NA, BF), பதிவுத் தபால் (RA, BG) மற்றும் வெளிநாட்டு பார்சல்களைக் கண்காணிக்கவும். முதலில் COD, பின்னர் SLP கூரியர் சரிபார்க்கப்படும்.",
+    "inputLabel": "கண்காணிப்பு பார்கோடுகளை உள்ளிடவும்",
+    "inputPlaceholder": "உ-ம்: BD070817564LK, NA055922175LK, BF009065544LK",
+    "trackButton": "பார்சலை கண்காணிக்கவும்"
   }
 }

@@ -12,6 +12,12 @@ import {
     getLocalizedZoneName,
     getServiceTagline,
 } from "./calculator-ui";
+import {
+    classifyBarcode,
+    detectTrackingQuery,
+    getBarcodePrefixLabel,
+} from "./tracking/classifier";
+import type { BarcodeClassification } from "./tracking/types";
 
 export interface SmartQuoteItem {
     serviceId: string;
@@ -39,6 +45,7 @@ export interface InternationalRateIntent {
         pathname: "/calculator";
         query: Record<string, string>;
     };
+    seoRatesHref: string;
 }
 
 export interface CodRateIntent {
@@ -51,6 +58,7 @@ export interface CodRateIntent {
         pathname: "/calculator";
         query: Record<string, string>;
     };
+    seoRatesHref: string;
 }
 
 export interface DomesticRateIntent {
@@ -64,14 +72,26 @@ export interface DomesticRateIntent {
         pathname: "/calculator";
         query: Record<string, string>;
     };
+    seoRatesHref: string;
+}
+
+export interface TrackingIntent {
+    kind: "tracking";
+    barcodes: string[];
+    primaryBarcode: string;
+    classification: BarcodeClassification;
+    serviceHint: string;
+    hasExplicitWeight: false;
+    trackHref: string;
 }
 
 export type SmartSearchIntent =
+    | TrackingIntent
     | InternationalRateIntent
     | CodRateIntent
     | DomesticRateIntent;
 
-const COUNTRY_ALIASES: Record<string, string> = {
+export const COUNTRY_ALIASES: Record<string, string> = {
     // Taiwan (including the user-tested "thaiwan" typo)
     taiwan: "TW",
     thaiwan: "TW",
@@ -481,6 +501,27 @@ export function parseSmartSearchIntent(
         return null;
     }
 
+    // 0. Check Parcel / Mail Tracking barcode intent FIRST
+    // (Must run before COD/country matching so e.g. "BD070817564LK" doesn't collide with BD/Bangladesh)
+    const detectedBarcodes = detectTrackingQuery(trimmed);
+    if (detectedBarcodes.length > 0) {
+        const primaryBarcode = detectedBarcodes[0];
+        const classification = classifyBarcode(primaryBarcode);
+        const trackHref =
+            detectedBarcodes.length === 1
+                ? `/track/${encodeURIComponent(primaryBarcode)}`
+                : `/track?q=${encodeURIComponent(detectedBarcodes.join(","))}`;
+        return {
+            kind: "tracking",
+            barcodes: detectedBarcodes,
+            primaryBarcode,
+            classification,
+            serviceHint: getBarcodePrefixLabel(primaryBarcode),
+            hasExplicitWeight: false,
+            trackHref,
+        };
+    }
+
     const { weightGrams: parsedWeight, cleanedQuery } = extractWeightFromQuery(trimmed);
     const hasExplicitWeight = parsedWeight !== null;
     const lower = trimmed.toLowerCase();
@@ -519,6 +560,7 @@ export function parseSmartSearchIntent(
                     codAmount: String(codAmountLkr),
                 },
             },
+            seoRatesHref: "/rates/cod",
         };
     }
 
@@ -604,6 +646,16 @@ export function parseSmartSearchIntent(
                 ? (cheapestSea?.service.id ?? "sea_parcel")
                 : (cheapestAir?.service.id ?? "ems");
 
+        const countrySlug = country.name
+            .toLowerCase()
+            .replace(/&/g, "and")
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "");
+        const weightSlug =
+            weightGrams >= 1000
+                ? `${Number.isInteger(weightGrams / 1000) ? weightGrams / 1000 : Number((weightGrams / 1000).toFixed(2))}kg`
+                : `${Math.round(weightGrams)}g`;
+
         return {
             kind: "international",
             countryCode: country.code,
@@ -626,6 +678,7 @@ export function parseSmartSearchIntent(
                     ...(preferredServiceId ? { service: preferredServiceId } : {}),
                 },
             },
+            seoRatesHref: `/rates/${countrySlug}/${weightSlug}`,
         };
     }
 
@@ -693,6 +746,7 @@ export function parseSmartSearchIntent(
                     ...(registered ? { registered: "1" } : {}),
                 },
             },
+            seoRatesHref: "/rates/local",
         };
     }
 
@@ -720,7 +774,7 @@ export function getSearchCyclingExamples(locale: string = "en"): string[] {
             'කුරියර්: "SLP Courier 1kg"',
             'විදේශ EMS: "Japan 1kg", "UK 250g"',
             'උප කාර්යාල: "Peradeniya"',
-            'ලුහුබැඳීම (ළඟදීම): "EE123456789LK"',
+            'පාර්සල් ලුහුබැඳීම: "BD070817564LK"',
         ];
     }
     if (locale === "ta") {
@@ -736,7 +790,7 @@ export function getSearchCyclingExamples(locale: string = "en"): string[] {
             'கூரியர்: "SLP Courier 1kg"',
             'வெளிநாட்டு EMS: "Japan 1kg"',
             'உப நிலையம்: "Peradeniya"',
-            'தடம் (விரைவில்): "EE123456789LK"',
+            'பார்சல் கண்காணிப்பு: "BD070817564LK"',
         ];
     }
     return [
@@ -751,7 +805,7 @@ export function getSearchCyclingExamples(locale: string = "en"): string[] {
         'Domestic courier: "SLP Courier 1kg"',
         'Overseas EMS: "Japan 1kg", "USA 1kg"',
         'Sub offices: "Peradeniya", "Dehiwala"',
-        'Soon: Track parcel "EE123456789LK"',
+        'Track parcel: "BD070817564LK", "NA055922175LK"',
     ];
 }
 

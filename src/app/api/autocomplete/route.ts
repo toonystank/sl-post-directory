@@ -1,5 +1,6 @@
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 import { autocompleteLocalOffices } from "@/lib/local-sqlite";
+import { normalizePostalCode } from "@/lib/site";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
@@ -36,25 +37,32 @@ export async function GET(request: NextRequest) {
         let suggestions: string[] = [];
 
         if (mode === "name" || mode === "all") {
-            // Find post offices using tiered matching (pg_trgm) + postalCode prefix
-            const offices = await prisma.$queryRaw<{ name: string }[]>`
-                SELECT name FROM (
-                    SELECT DISTINCT name, similarity(name, ${q}) as sim
+            const isNumeric = /^\d+$/.test(q);
+            const strippedDigits = isNumeric ? q.replace(/^0+/, "") || q : q;
+            // Find post offices using tiered matching (pg_trgm) + zero-padded postalCode prefix
+            const offices = await prisma.$queryRaw<{ name: string; postalCode: string }[]>`
+                SELECT name, "postalCode" FROM (
+                    SELECT DISTINCT name, "postalCode", similarity(name, ${q}) as sim
                     FROM "PostOffice"
                     WHERE name ILIKE ${q + '%'}
                        OR "postalCode" ILIKE ${q + '%'}
+                       OR ("postalCode" ~ '^[0-9]+$' AND LPAD("postalCode", 5, '0') ILIKE ${q + '%'})
+                       OR "postalCode" = ${strippedDigits}
                        OR similarity(name, ${q}) > 0.15
                 ) as subquery
                 ORDER BY
                   CASE
-                    WHEN LOWER(name) = LOWER(${q}) THEN 0
-                    WHEN name ILIKE ${q + '%'} THEN 1
+                    WHEN LOWER(name) = LOWER(${q}) OR ("postalCode" ~ '^[0-9]+$' AND LPAD("postalCode", 5, '0') = LPAD(${q}, 5, '0')) OR "postalCode" = ${strippedDigits} THEN 0
+                    WHEN name ILIKE ${q + '%'} OR ("postalCode" ~ '^[0-9]+$' AND LPAD("postalCode", 5, '0') ILIKE ${q + '%'}) THEN 1
                     ELSE 2
                   END,
                   sim DESC, name ASC
                 LIMIT 5;
             `;
-            suggestions = offices.map((o) => o.name);
+            suggestions = offices.map((o) => {
+                const code = normalizePostalCode(o.postalCode);
+                return isNumeric && code ? `${o.name} (${code})` : o.name;
+            });
 
             if (mode === "all" && suggestions.length < 5) {
                 const fields = await prisma.postOfficeField.findMany({

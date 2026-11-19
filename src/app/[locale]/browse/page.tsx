@@ -2,13 +2,22 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import SearchDirectory from "@/components/SearchDirectory";
 import BrowseLoading from "./loading";
+import { buildLocalizedAlternates } from "@/lib/site";
 
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
-    title: "Browse Post Offices Directory",
-    description: "Search and browse all 4,158 Sri Lanka post offices alphabetically, by postal code, division, or postal service.",
-};
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+    const { locale } = await params;
+    return {
+        title: "Browse Post Offices Directory",
+        description: "Search and browse Sri Lanka post offices alphabetically, by 5-digit postal code, division, office type, or postal service.",
+        alternates: buildLocalizedAlternates("/browse", locale),
+    };
+}
 
 export default function BrowsePage() {
     return (

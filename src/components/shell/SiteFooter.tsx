@@ -9,7 +9,7 @@ export default function SiteFooter() {
     const t = useTranslations("Footer");
     const tNav = useTranslations("Nav");
     return (
-        <footer className="hidden md:block mt-auto border-t-2 border-foreground bg-card">
+        <footer className="hide-in-standalone hidden md:block mt-auto border-t-2 border-foreground bg-card">
             <div className="airmail-stripe h-1.5" aria-hidden="true" />
             <div className="container mx-auto grid grid-cols-[1.4fr_1fr_1fr] gap-10 px-4 py-10 text-sm">
                 <div>
@@ -22,6 +22,7 @@ export default function SiteFooter() {
                         <li><Link href="/" className="hover:text-primary">{tNav("directory")}</Link></li>
                         <li><Link href="/browse" className="hover:text-primary">{t("browse")}</Link></li>
                         <li><Link href="/calculator" className="hover:text-primary">{tNav("calculator")}</Link></li>
+                        <li><Link href="/rates" className="hover:text-primary">Postage Rate Tables</Link></li>
                         <li><Link href="/blog" className="hover:text-primary">{tNav("blog")}</Link></li>
                     </ul>
                 </div>

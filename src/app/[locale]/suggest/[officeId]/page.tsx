@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 import { getLocalOfficeById } from "@/lib/local-sqlite";
 import { getTranslations } from "next-intl/server";
@@ -6,6 +7,22 @@ import { Link } from "@/navigation";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import SuggestForm from "./SuggestForm";
+
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ officeId: string }>;
+}): Promise<Metadata> {
+    const { officeId } = await params;
+    const office = await findOfficeForSuggest(officeId);
+    return {
+        title: office ? `Suggest an Edit — ${office.name}` : "Suggest an Edit",
+        description: office
+            ? `Submit updated postal code, telephone number, or working hours for ${office.name}.`
+            : "Submit a correction for a Sri Lanka post office listing.",
+        robots: { index: false, follow: true },
+    };
+}
 
 async function findOfficeForSuggest(officeId: string) {
     if (!hasDatabaseUrl) {

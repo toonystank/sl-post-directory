@@ -14,10 +14,10 @@ import {
     Info,
     Minus,
     Plus,
-    ChevronDown,
 } from "lucide-react";
 import Postmark from "@/components/brand/Postmark";
 import CountryFlag from "@/components/brand/CountryFlag";
+import CountrySelector from "@/components/CountrySelector";
 import { useCurrency } from "@/context/CurrencyContext";
 import { CURRENCY_META, Currency, formatCurrencyAmount, splitCurrencyPrice } from "@/lib/currency";
 import { MODE_COLORS, getServiceColor, serviceStyle } from "@/lib/service-colors";
@@ -144,7 +144,7 @@ function ServiceCard({
             className={cn(
                 "svc tap relative flex flex-col justify-between overflow-hidden rounded-md text-left transition-colors min-h-[56px] md:min-h-[76px] lg:min-h-[96px]",
                 selected
-                    ? "border-2 border-[var(--c)] bg-[color-mix(in_srgb,var(--c)_13%,hsl(var(--card)))] shadow-[0_2px_0_0_var(--c)] ring-1 ring-[var(--c)]/40"
+                    ? "border-2 border-[var(--c)] bg-[color-mix(in_oklab,var(--c)_13%,hsl(var(--card)))] dark:bg-[color-mix(in_oklab,var(--c)_18%,hsl(var(--card)))] shadow-[0_2px_0_0_var(--c)] ring-1 ring-[var(--c)]/40"
                     : dimmed
                         ? "border-[1.5px] border-border/70 bg-muted/40 opacity-70 hover:border-foreground/40"
                         : "border-[1.5px] border-border bg-card hover:border-[var(--c)]"
@@ -152,7 +152,7 @@ function ServiceCard({
         >
             {/* Selected state: solid service-colored top banner */}
             {selected ? (
-                <div className="flex w-full items-center justify-between gap-1 bg-[var(--svc)] px-1.5 py-0.5 lg:px-2.5 lg:py-1 text-white">
+                <div className="flex w-full items-center justify-between gap-1 bg-[var(--svc)] dark:bg-[var(--c)] px-1.5 py-0.5 lg:px-2.5 lg:py-1 text-white dark:text-[#14110E]">
                     <span
                         className={cn(
                             "min-w-0 font-mono font-bold uppercase tracking-tight truncate",
@@ -573,13 +573,13 @@ export default function PostageCalculator({
 
     const bannerStripe =
         destination === "cod"
-            ? "bg-[var(--svc)]"
+            ? "bg-[var(--c)]"
             : destination === "ems"
                 ? activeIntlQuote.service.id === "ems"
                     ? "ems-stripe"
                     : activeIntlQuote.service.id === "air_letter" || activeIntlQuote.service.id === "air_printed"
                         ? "par-avion-stripe"
-                        : "bg-[var(--svc)]"
+                        : "bg-[var(--c)]"
                 : "airmail-stripe";
 
     const weightPresets =
@@ -875,7 +875,7 @@ export default function PostageCalculator({
                 aria-live="polite"
                 data-testid="live-receipt-banner"
                 data-active-service={activeServiceKey}
-                className="svc rounded-lg border-2 border-[var(--c)] bg-[color-mix(in_srgb,var(--c)_13%,hsl(var(--card)))] overflow-hidden shadow-[3px_3px_0_0_var(--c)] transition-colors duration-150"
+                className="svc rounded-lg border-2 border-[var(--c)] bg-[color-mix(in_oklab,var(--c)_13%,hsl(var(--card)))] dark:bg-[color-mix(in_oklab,var(--c)_18%,hsl(var(--card)))] overflow-hidden shadow-[3px_3px_0_0_var(--c)] transition-colors duration-150"
                 style={serviceStyle(activeColor)}
             >
                 <div className={cn("h-1.5 md:h-2", bannerStripe)} aria-hidden="true" />
@@ -904,7 +904,7 @@ export default function PostageCalculator({
                                 isIndic ? "text-[9px] md:text-[10.5px]" : "text-[9.5px] md:text-[11px]",
                                 activeServiceKey === "ems"
                                     ? "bg-[#FF8533] text-[#1A1714]"
-                                    : "bg-[var(--svc)] text-white"
+                                    : "bg-[var(--svc)] text-white dark:bg-[var(--c)] dark:text-[#14110E]"
                             )}
                         >
                             {banner.selectedBadge}
@@ -1132,51 +1132,25 @@ export default function PostageCalculator({
                         </div>
 
                         <div className="grid grid-cols-[1fr_auto] gap-1 md:gap-2 items-center">
-                            {/* Country Flag + Full-Width Select + Compact Chevron (no wide 'Change' text badge cutting off country name) */}
-                            <div className="relative flex items-center h-8 md:h-10 min-w-0 rounded-md border-[1.5px] border-foreground bg-background px-1.5 md:px-2 gap-1.5 focus-within:ring-[3px] focus-within:ring-primary/25">
-                                <span className="pointer-events-none shrink-0 flex items-center">
-                                    <CountryFlag
-                                        code={activeEmsCountry?.code ?? emsCountryCode}
-                                        title={localizedCountryName}
-                                        className="w-5 h-3.5 md:w-6 md:h-4"
-                                    />
-                                </span>
-                                <select
-                                    id={emsCountryId}
-                                    name="emsCountry"
-                                    value={emsCountryCode}
-                                    onChange={(e) => setEmsCountryCode(e.target.value)}
-                                    className={cn(
-                                        "h-full flex-1 min-w-0 appearance-none bg-transparent font-bold text-foreground focus:outline-none cursor-pointer truncate",
-                                        locale === "ta"
-                                            ? "text-[11px] sm:text-sm md:text-base"
-                                            : isIndic
-                                                ? "text-xs sm:text-sm md:text-base"
-                                                : "text-sm md:text-base"
-                                    )}
-                                >
-                                    {sortedEmsCountries.map((c) => {
-                                        const cName = getLocalizedCountryName(c.code, c.name, locale);
-                                        const suffix =
-                                            c.suspensionStatus === "suspended"
-                                                ? tc("suspendedSuffix")
-                                                : c.suspensionStatus === "restricted"
-                                                    ? tc("noteSuffix")
-                                                    : "";
-                                        return (
-                                            <option key={c.code} value={c.code}>
-                                                {cName}
-                                                {suffix}
-                                            </option>
-                                        );
-                                    })}
-                                </select>
-                                <ChevronDown
-                                    className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0 text-foreground pointer-events-none"
-                                    strokeWidth={2.5}
-                                    aria-hidden="true"
-                                />
-                            </div>
+                            <CountrySelector
+                                id={emsCountryId}
+                                countries={sortedEmsCountries}
+                                value={emsCountryCode}
+                                locale={locale}
+                                isIndic={isIndic}
+                                onChange={setEmsCountryCode}
+                                labels={{
+                                    searchPlaceholder: tc("searchCountryPlaceholder"),
+                                    searchAriaLabel: tc("searchCountryAria"),
+                                    clearSearchAriaLabel: tc("clearCountrySearch"),
+                                    popularHeading: tc("popularCountries"),
+                                    allCountriesLabel: (count) => tc("allCountriesCount", { count }),
+                                    matchingCountriesLabel: (count) => tc("matchingCountriesCount", { count }),
+                                    noResultsLabel: (q) => tc("noCountriesFound", { query: q }),
+                                    suspendedSuffix: tc("suspendedSuffix"),
+                                    noteSuffix: tc("noteSuffix"),
+                                }}
+                            />
 
                             <div
                                 role="group"
@@ -1412,7 +1386,7 @@ export default function PostageCalculator({
                                 checked={registered && canRegister}
                                 disabled={!canRegister}
                                 onChange={(e) => setRegistered(e.target.checked)}
-                                className="h-4 w-4 shrink-0 rounded-sm border-foreground accent-[#1E40AF] cursor-pointer disabled:cursor-not-allowed"
+                                className="h-4 w-4 shrink-0 rounded-sm border-foreground accent-[#1E40AF] dark:accent-[#60A5FA] cursor-pointer disabled:cursor-not-allowed"
                             />
                             <label
                                 htmlFor={regCheckboxId}
@@ -1591,7 +1565,7 @@ export default function PostageCalculator({
                                 checked={intlRegistered && canIntlRegister}
                                 disabled={!canIntlRegister}
                                 onChange={(e) => setIntlRegistered(e.target.checked)}
-                                className="h-4 w-4 shrink-0 rounded-sm border-foreground accent-[#1E40AF] cursor-pointer disabled:cursor-not-allowed"
+                                className="h-4 w-4 shrink-0 rounded-sm border-foreground accent-[#1E40AF] dark:accent-[#60A5FA] cursor-pointer disabled:cursor-not-allowed"
                             />
                             <label
                                 htmlFor={intlRegCheckboxId}

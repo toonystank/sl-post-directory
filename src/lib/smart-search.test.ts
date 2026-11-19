@@ -105,12 +105,12 @@ test("parseSmartSearchIntent detects COD and domestic weight+service queries, an
     assert.equal(parseSmartSearchIntent("Kandy GPO", "en"), null);
 });
 
-test("getSearchCyclingExamples returns rich localized cycling examples including coming-soon tracking", () => {
+test("getSearchCyclingExamples returns rich localized cycling examples including live tracking", () => {
     for (const locale of ["en", "si", "ta"]) {
         const examples = getSearchCyclingExamples(locale);
         assert.ok(examples.length >= 10);
         assert.ok(examples.some((ex) => ex.includes("5kg")));
-        assert.ok(examples.some((ex) => ex.includes("EE123456789LK")));
+        assert.ok(examples.some((ex) => ex.includes("BD070817564LK")));
     }
     assert.ok(SMART_WEIGHT_CHIPS.includes(5000));
 });

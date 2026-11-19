@@ -1,15 +1,21 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/navigation";
+import { buildLocalizedAlternates } from "@/lib/site";
 
-export const metadata: Metadata = {
-    title: "Privacy Policy",
-    description:
-        "Privacy Policy for Lanka Post Directory, including information about contributor submissions, analytics, cookies, and Google AdSense.",
-    alternates: {
-        canonical: "https://lankapost.vercel.app/privacy",
-    },
-};
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+    const { locale } = await params;
+    return {
+        title: "Privacy Policy",
+        description:
+            "Privacy Policy for Lanka Post Directory web and Android app, covering contributor submissions, offline storage, analytics, cookies, and Google Ads.",
+        alternates: buildLocalizedAlternates("/privacy", locale),
+    };
+}
 
 export default async function PrivacyPolicyPage() {
     const t = await getTranslations("Privacy");
@@ -84,6 +90,15 @@ export default async function PrivacyPolicyPage() {
                         {t("s4Title")}
                     </h2>
                     <p className="text-muted-foreground">{t("s4P1")}</p>
+                </section>
+
+                <section className="space-y-3">
+                    <h2 className="font-heading text-xl font-extrabold [font-stretch:82%] text-foreground">
+                        Mobile App &amp; Offline Storage (Google Play / PWA)
+                    </h2>
+                    <p className="text-muted-foreground">
+                        When installed on Android via Google Play (Trusted Web Activity) or as a Progressive Web App, Lanka Post Directory stores a compact copy of the public Sri Lanka Post office directory and postage tariff tables locally on your device (IndexedDB and Cache Storage) so search and rate calculations work offline. We do not collect background location data, contacts, or device identifiers. You may request deletion of any contributor account, review, or uploaded photo at any time via the support link below.
+                    </p>
                 </section>
 
                 <section className="space-y-3">

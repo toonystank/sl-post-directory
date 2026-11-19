@@ -37,6 +37,12 @@ export default function manifest(): MetadataRoute.Manifest {
         url: "/browse",
         icons: [{ src: "/icon-192x192.png", sizes: "192x192", type: "image/png" }],
       },
+      {
+        name: "Rate Tables",
+        short_name: "Tables",
+        url: "/rates",
+        icons: [{ src: "/icon-192x192.png", sizes: "192x192", type: "image/png" }],
+      },
     ],
     icons: [
       {

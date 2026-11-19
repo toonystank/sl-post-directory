@@ -290,7 +290,14 @@
     "noteSuffix": " (Note)",
     "pricesIn": "Prices in {currency}",
     "exchangeRateNote": "1 USD ≈ Rs. {rate}",
-    "lkrEquivalent": "≈ Rs. {amount}"
+    "lkrEquivalent": "≈ Rs. {amount}",
+    "searchCountryPlaceholder": "Search country, code, or city...",
+    "searchCountryAria": "Search destination country",
+    "clearCountrySearch": "Clear search",
+    "popularCountries": "Popular",
+    "allCountriesCount": "All countries ({count})",
+    "matchingCountriesCount": "{count} matching",
+    "noCountriesFound": "No countries match \"{query}\""
   },
   "Blog": {
     "kicker": "Reference & Dispatch",
@@ -435,6 +442,11 @@
     "serviceCodCode": "SLP Courier",
     "meanwhile": "Need postage rates or a post office phone number right now?",
     "ctaRates": "Calculate Postage Rates",
-    "ctaBrowse": "Browse Post Offices"
+    "ctaBrowse": "Browse Post Offices",
+    "liveBadge": "Live Tracking · COD & SLP Courier",
+    "liveSubtitle": "Track Sri Lanka Post COD (BD), SLP Mail Courier (NA, BF), Registered Post (RA, BG), and international articles. Checks COD database first, then SLP Courier.",
+    "inputLabel": "Enter tracking barcode(s)",
+    "inputPlaceholder": "e.g. BD070817564LK, NA055922175LK, BF009065544LK",
+    "trackButton": "Track Parcel"
   }
 }

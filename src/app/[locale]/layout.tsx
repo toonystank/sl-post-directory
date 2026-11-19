@@ -20,6 +20,7 @@ import { routing } from "@/i18n/routing";
 import { notFound } from "next/navigation";
 import { hasLocale } from "next-intl";
 import { getMessages } from "next-intl/server";
+import { getSiteUrl } from "@/lib/site";
 
 // Display: Archivo with the width axis so headlines can be condensed (signage feel)
 const archivo = Archivo({
@@ -61,17 +62,16 @@ const notoTamil = Noto_Sans_Tamil({
     preload: false,
 });
 
+const siteUrl = getSiteUrl();
+
 export const metadata: Metadata = {
-    metadataBase: new URL("https://lankapost.vercel.app"),
-    alternates: {
-        canonical: "/",
-    },
+    metadataBase: new URL(siteUrl),
     title: {
         default: "Lanka Post Directory | Find Sri Lanka Post Offices & Postal Codes",
         template: "%s | Lanka Post Directory",
     },
     description: "Search every post office in Sri Lanka — postal codes, opening hours, phone numbers and locations. Plus a postage calculator and guides.",
-    keywords: ["Sri Lanka Post Office", "Postal Codes Sri Lanka", "Zip Codes Sri Lanka", "Lanka Post Directory", "Post Office Opening Hours"],
+    keywords: ["Sri Lanka Post Office", "Postal Codes Sri Lanka", "Zip Codes Sri Lanka", "Sri Lanka Post Postage Rates", "EMS Sri Lanka Rates", "Lanka Post Directory", "Post Office Opening Hours"],
     applicationName: "Lanka Post Directory",
     appleWebApp: {
         capable: true,
@@ -88,7 +88,7 @@ export const metadata: Metadata = {
     openGraph: {
         title: "Lanka Post Directory | Find Sri Lanka Post Offices & Postal Codes",
         description: "Search every post office in Sri Lanka — postal codes, opening hours, phone numbers and locations.",
-        url: "https://lankapost.vercel.app",
+        url: siteUrl,
         siteName: "Lanka Post Directory",
         locale: "en_US",
         type: "website",
@@ -104,9 +104,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+    colorScheme: "light dark",
     themeColor: [
         { media: "(prefers-color-scheme: light)", color: "#FBF7EF" },
-        { media: "(prefers-color-scheme: dark)", color: "#15120F" },
+        { media: "(prefers-color-scheme: dark)", color: "#14110E" },
     ],
     viewportFit: "cover",
     width: "device-width",

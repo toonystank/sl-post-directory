@@ -5,6 +5,12 @@ import { Building2, PenLine } from "lucide-react";
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 import { getLocalOfficeBySlug } from "@/lib/local-sqlite";
 import { getPostOfficeStatus } from "@/lib/holidays";
+import {
+    buildLocalizedAlternates,
+    buildLocalizedUrl,
+    formatSriLankaPhone,
+    normalizePostalCode,
+} from "@/lib/site";
 import { Link } from "@/navigation";
 import { CopyButton } from "@/components/CopyButton";
 import { BackButton } from "@/components/BackButton";
@@ -60,7 +66,7 @@ async function findOfficeDetails(slug: string) {
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string; slug: string }> }): Promise<Metadata> {
-    const { slug } = await params;
+    const { locale, slug } = await params;
 
     const office = await findOfficeWithFields(slug);
 
@@ -70,19 +76,22 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
         };
     }
 
+    const postalCode = normalizePostalCode(office.postalCode);
     const typeField = office.fields.find((f) => f.name === "Type")?.value || "Post Office";
-    const description = `Find contact numbers, opening hours, and location for ${office.name} (${typeField}). Postal Code: ${office.postalCode}, Sri Lanka. Check services, reviews, and community photos.`;
+    const division = office.fields.find((f) => f.name === "Division")?.value;
+    const codePart = postalCode ? ` - Postal Code ${postalCode}` : "";
+    const title = `${office.name}${codePart}`;
+    const description = `Find telephone numbers, opening hours, and directions for ${office.name} (${typeField}${division ? `, ${division}` : ""}).${postalCode ? ` Postal Code: ${postalCode}, Sri Lanka.` : " Sri Lanka Post office directory."} Check services, reviews, and photos.`;
+    const canonicalUrl = buildLocalizedUrl(`/office/${office.slug}`, locale);
 
     return {
-        title: `${office.name} - Postal Code ${office.postalCode} | Lanka Post Directory`,
+        title,
         description,
-        alternates: {
-            canonical: `https://lankapost.vercel.app/office/${office.slug}`,
-        },
+        alternates: buildLocalizedAlternates(`/office/${office.slug}`, locale),
         openGraph: {
-            title: `${office.name} - Postal Code ${office.postalCode} | Lanka Post Directory`,
+            title: `${title} | Lanka Post Directory`,
             description,
-            url: `https://lankapost.vercel.app/office/${office.slug}`,
+            url: canonicalUrl,
         },
     };
 }
@@ -99,10 +108,19 @@ export default async function OfficeDetails({ params }: { params: Promise<{ loca
     const t = await getTranslations("Office");
     const tStatus = await getTranslations("Status");
 
+    const normalizedCode = normalizePostalCode(office.postalCode);
     const type = office.fields.find((f) => f.name === "Type")?.value;
     const division = office.fields.find((f) => f.name === "Division")?.value;
+    const divisionSlug = division
+        ? division.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+        : null;
     const is24Hour = office.fields.find((f) => f.name === "Is24Hour")?.value === "true";
-    const telephone = office.fields.find((f) => f.name === "Telephone" || f.name === "Phone")?.value;
+    const rawTelephone = office.fields.find((f) => f.name === "Telephone" || f.name === "Phone")?.value;
+    const telephone = formatSriLankaPhone(rawTelephone) || undefined;
+    const workingHoursField = office.fields.find((f) => f.name === "Working Hours")?.value?.trim();
+    const hoursSummary = is24Hour
+        ? t("open24h")
+        : workingHoursField || "Mon–Fri 8:30–16:30 · Sat 9:00–13:00";
 
     const currentStatus = getPostOfficeStatus(locale, is24Hour);
     const statusLabel = currentStatus.status === "holiday" ? tStatus("holiday") : tStatus(currentStatus.label);
@@ -112,6 +130,7 @@ export default async function OfficeDetails({ params }: { params: Promise<{ loca
         : undefined;
 
     const firstImage = office.photos.length > 0 ? office.photos[0].url : undefined;
+    const officeUrl = buildLocalizedUrl(`/office/${office.slug}`, locale);
 
     const jsonLd = {
         "@context": "https://schema.org",
@@ -119,10 +138,11 @@ export default async function OfficeDetails({ params }: { params: Promise<{ loca
         "name": office.name,
         "address": {
             "@type": "PostalAddress",
-            "postalCode": office.postalCode,
+            ...(normalizedCode ? { "postalCode": normalizedCode } : {}),
+            ...(division ? { "addressRegion": division } : {}),
             "addressCountry": "LK"
         },
-        "url": `https://lankapost.vercel.app/office/${office.slug}`,
+        "url": officeUrl,
         ...(telephone ? { "telephone": telephone } : {}),
         ...(firstImage ? { "image": firstImage } : {}),
         ...(office.latitude && office.longitude ? {
@@ -139,7 +159,20 @@ export default async function OfficeDetails({ params }: { params: Promise<{ loca
                 "opens": "00:00",
                 "closes": "23:59"
             }
-        ] : undefined,
+        ] : [
+            {
+                "@type": "OpeningHoursSpecification",
+                "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+                "opens": "08:30",
+                "closes": "16:30"
+            },
+            {
+                "@type": "OpeningHoursSpecification",
+                "dayOfWeek": ["Saturday"],
+                "opens": "09:00",
+                "closes": "13:00"
+            }
+        ],
         ...(avgRating ? {
             "aggregateRating": {
                 "@type": "AggregateRating",
@@ -157,24 +190,36 @@ export default async function OfficeDetails({ params }: { params: Promise<{ loca
                 "@type": "ListItem",
                 "position": 1,
                 "name": "Home",
-                "item": "https://lankapost.vercel.app/"
+                "item": buildLocalizedUrl("/", locale)
             },
             {
                 "@type": "ListItem",
                 "position": 2,
                 "name": "Browse Post Offices",
-                "item": "https://lankapost.vercel.app/browse"
+                "item": buildLocalizedUrl("/browse", locale)
             },
-            {
+            ...(division && divisionSlug ? [{
                 "@type": "ListItem",
                 "position": 3,
+                "name": division,
+                "item": buildLocalizedUrl(`/district/${divisionSlug}`, locale)
+            }] : []),
+            {
+                "@type": "ListItem",
+                "position": division && divisionSlug ? 4 : 3,
                 "name": office.name,
-                "item": `https://lankapost.vercel.app/office/${office.slug}`
+                "item": officeUrl
             }
         ]
     };
 
-    const detailFields = office.fields.filter((f) => f.name !== "Is24Hour");
+    const detailFields = office.fields
+        .filter((f) => f.name !== "Is24Hour")
+        .map((f) =>
+            f.name === "Phone" || f.name === "Telephone"
+                ? { ...f, value: formatSriLankaPhone(f.value) }
+                : f
+        );
     const monoFieldNames = new Set(["Phone", "Telephone", "Short Code"]);
 
     return (
@@ -193,26 +238,49 @@ export default async function OfficeDetails({ params }: { params: Promise<{ loca
             </div>
 
             {/* Stamp-edged Hero Panel */}
-            <div className="stamp-edge bg-foreground p-[2px]">
+            <div className="stamp-edge bg-foreground dark:bg-[hsl(var(--frame))] p-[2px]">
                 <div className="stamp-edge bg-card">
-                    <div className="bg-secondary/25 px-5 py-6 md:px-8 md:py-8">
-                        <div className="flex items-start justify-between gap-4">
-                            <div className="min-w-0">
-                                <h1 className="display text-4xl md:text-6xl break-words">{office.name}</h1>
-                                <p className="mt-2 text-base md:text-lg font-medium text-foreground/80">
-                                    {[type || t("typeDefault"), division].filter(Boolean).join(" · ")}
+                    <div className="bg-secondary/25 dark:bg-secondary/10 px-4 py-5 sm:px-6 sm:py-6 md:px-8 md:py-8">
+                        <div className="flex items-start justify-between gap-3 sm:gap-4">
+                            <div className="min-w-0 flex-1">
+                                <h1 className="display text-[1.85rem] leading-[1.08] sm:text-4xl md:text-6xl [overflow-wrap:break-word] hyphens-none">
+                                    {office.name}
+                                </h1>
+                                <p className="mt-2 text-sm sm:text-base md:text-lg font-medium text-foreground/80">
+                                    <span>{type || t("typeDefault")}</span>
+                                    {division && divisionSlug && (
+                                        <>
+                                            {" · "}
+                                            <Link
+                                                href={`/district/${divisionSlug}`}
+                                                className="underline decoration-foreground/30 underline-offset-4 hover:text-primary hover:decoration-primary"
+                                            >
+                                                {division}
+                                            </Link>
+                                        </>
+                                    )}
                                 </p>
                             </div>
-                            {office.postalCode && (
-                                <Postmark
-                                    code={office.postalCode}
-                                    size="md"
-                                    tone="red"
-                                    waves
-                                    rotate={-10}
-                                    label={(division || "SRI LANKA").toUpperCase()}
-                                    className="-mr-2 shrink-0"
-                                />
+                            {normalizedCode && (
+                                <>
+                                    <Postmark
+                                        code={normalizedCode}
+                                        size="sm"
+                                        tone="red"
+                                        rotate={-8}
+                                        label={(division || "SRI LANKA").toUpperCase()}
+                                        className="sm:hidden shrink-0"
+                                    />
+                                    <Postmark
+                                        code={normalizedCode}
+                                        size="md"
+                                        tone="red"
+                                        waves
+                                        rotate={-10}
+                                        label={(division || "SRI LANKA").toUpperCase()}
+                                        className="hidden sm:inline-flex -mr-2 shrink-0"
+                                    />
+                                </>
                             )}
                         </div>
                     </div>
@@ -220,17 +288,17 @@ export default async function OfficeDetails({ params }: { params: Promise<{ loca
             </div>
 
             {/* Status Strip */}
-            <div className="flex items-center justify-between gap-3 border-b-2 border-foreground py-3 px-1">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-foreground py-3 px-1">
                 <StatusDot status={currentStatus.status} label={statusLabel} variant="strip" />
                 <span className="font-mono text-xs text-muted-foreground">
-                    {is24Hour ? t("open24h") : "Mon–Fri 8:30–16:30 · Sat 9:00–13:00"}
+                    {hoursSummary}
                 </span>
             </div>
 
             {/* Action Row */}
             <OfficeActions
                 name={office.name}
-                postalCode={office.postalCode}
+                postalCode={normalizedCode}
                 phone={telephone}
                 latitude={office.latitude}
                 longitude={office.longitude}
@@ -240,12 +308,12 @@ export default async function OfficeDetails({ params }: { params: Promise<{ loca
             <section className="pt-6">
                 <h2 className="sr-only">{t("details")}</h2>
                 <dl className="divide-y divide-border border-b-2 border-foreground">
-                    {office.postalCode && (
+                    {normalizedCode && (
                         <div className="flex items-center justify-between gap-4 py-3.5">
                             <dt className="label-mono">{t("postalCode")}</dt>
                             <dd className="flex items-center gap-2 font-mono text-base font-semibold">
-                                <span>{office.postalCode}</span>
-                                <CopyButton text={office.postalCode} />
+                                <span>{normalizedCode}</span>
+                                <CopyButton text={normalizedCode} />
                             </dd>
                         </div>
                     )}
@@ -293,7 +361,7 @@ export default async function OfficeDetails({ params }: { params: Promise<{ loca
                                 </span>
                                 {office.controllingOffice.postalCode && (
                                     <span className="font-mono text-sm text-muted-foreground shrink-0">
-                                        {office.controllingOffice.postalCode}
+                                        {normalizePostalCode(office.controllingOffice.postalCode)}
                                     </span>
                                 )}
                             </Link>
@@ -311,7 +379,7 @@ export default async function OfficeDetails({ params }: { params: Promise<{ loca
                                         className="tap flex items-center justify-between gap-3 px-4 py-2.5 text-sm font-medium hover:bg-muted"
                                     >
                                         <span className="truncate">{sub.name}</span>
-                                        <span className="font-mono text-xs text-muted-foreground shrink-0">{sub.postalCode}</span>
+                                        <span className="font-mono text-xs text-muted-foreground shrink-0">{normalizePostalCode(sub.postalCode)}</span>
                                     </Link>
                                 ))}
                             </div>

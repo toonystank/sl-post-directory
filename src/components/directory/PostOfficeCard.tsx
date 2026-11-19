@@ -7,6 +7,8 @@ import { m, AnimatePresence } from "motion/react";
 import { useLocale, useTranslations } from "next-intl";
 import { PostOffice } from "./types";
 import { getPostOfficeStatus } from "@/lib/holidays";
+import { formatSriLankaPhone, normalizePostalCode } from "@/lib/site";
+import { triggerHaptic } from "@/lib/haptics";
 import StatusDot from "@/components/brand/StatusDot";
 import { cn } from "@/lib/utils";
 
@@ -31,11 +33,11 @@ const PostOfficeCard = React.memo(function PostOfficeCard({ office }: PostOffice
 
     const fieldMap = Object.fromEntries(office.fields.map((f) => [f.name, f.value]));
     const type = fieldMap["Type"] || tOffice("typeDefault");
-    const phone = fieldMap["Phone"] || fieldMap["Telephone"];
+    const phone = formatSriLankaPhone(fieldMap["Phone"] || fieldMap["Telephone"]);
     const division = fieldMap["Division"];
     const is24Hour = fieldMap["Is24Hour"] === "true";
-    const rawCode = (office.postalCode || "").trim();
-    const hasCode = Boolean(rawCode && !/^(na|n\/a|-|—|none|null)$/i.test(rawCode));
+    const normalizedCode = normalizePostalCode(office.postalCode);
+    const hasCode = Boolean(normalizedCode && !/^(na|n\/a|-|—|none|null)$/i.test(normalizedCode));
 
     const status = getPostOfficeStatus(locale, is24Hour);
     const statusLabel = status.status === "holiday" ? t("holiday") : t(status.label);
@@ -46,9 +48,10 @@ const PostOfficeCard = React.memo(function PostOfficeCard({ office }: PostOffice
     const handleCopyCode = async (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        if (!office.postalCode) return;
+        if (!normalizedCode) return;
         try {
-            await navigator.clipboard.writeText(office.postalCode);
+            await navigator.clipboard.writeText(normalizedCode);
+            triggerHaptic("success");
             setCopied(true);
             setTimeout(() => setCopied(false), 1800);
         } catch {
@@ -80,18 +83,18 @@ const PostOfficeCard = React.memo(function PostOfficeCard({ office }: PostOffice
                         <button
                             type="button"
                             onClick={handleCopyCode}
-                            aria-label={`${tActions("copy")} ${office.postalCode}`}
-                            title={copied ? tActions("copied") : `${tActions("copy")}: ${office.postalCode}`}
+                            aria-label={`${tActions("copy")} ${normalizedCode}`}
+                            title={copied ? tActions("copied") : `${tActions("copy")}: ${normalizedCode}`}
                             className={cn(
-                                "tap inline-flex h-9 items-center gap-1.5 rounded-md border-[1.5px] border-dashed px-2.5 font-mono text-xs sm:text-sm font-bold tracking-wide transition-colors",
+                                "tap inline-flex h-10 sm:h-9 items-center gap-1.5 rounded-md border-[1.5px] border-dashed px-2.5 font-mono text-xs sm:text-sm font-bold tracking-wide transition-colors",
                                 copied
-                                    ? "border-emerald-700 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300"
+                                    ? "border-emerald-700 dark:border-emerald-400 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300"
                                     : "border-foreground/75 bg-background/70 text-foreground hover:bg-secondary/35"
                             )}
                         >
-                            <span>{office.postalCode}</span>
+                            <span>{normalizedCode}</span>
                             {copied ? (
-                                <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden="true" />
+                                <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
                             ) : (
                                 <Copy className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
                             )}
@@ -153,7 +156,7 @@ const PostOfficeCard = React.memo(function PostOfficeCard({ office }: PostOffice
                                             className="tap flex items-center justify-between gap-3 py-1.5 text-sm hover:text-primary"
                                         >
                                             <span className="truncate font-medium">{sub.name}</span>
-                                            <span className="font-mono text-xs font-bold text-muted-foreground">{sub.postalCode || "—"}</span>
+                                            <span className="font-mono text-xs font-bold text-muted-foreground">{normalizePostalCode(sub.postalCode) || "—"}</span>
                                         </Link>
                                     </li>
                                 ))}

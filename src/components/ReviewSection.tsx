@@ -21,20 +21,32 @@ interface ReviewSectionProps {
 
 function StarRating({ rating, interactive, onChange }: { rating: number; interactive?: boolean; onChange?: (r: number) => void }) {
     return (
-        <div className="flex gap-0.5">
+        <div
+            className="flex gap-0.5"
+            role={interactive ? "radiogroup" : "img"}
+            aria-label={interactive ? "Select star rating" : `Rated ${rating} out of 5 stars`}
+        >
             {[1, 2, 3, 4, 5].map((star) => (
                 <button
                     key={star}
                     type="button"
+                    role={interactive ? "radio" : undefined}
+                    aria-checked={interactive ? star === rating : undefined}
+                    aria-label={`Rate ${star} out of 5 stars`}
                     disabled={!interactive}
                     onClick={() => onChange?.(star)}
-                    className={`${interactive ? "cursor-pointer hover:scale-110 transition-transform" : "cursor-default"}`}
+                    className={`${
+                        interactive
+                            ? "tap inline-flex h-11 w-11 items-center justify-center rounded-md cursor-pointer hover:bg-muted/60 active:scale-95 transition-transform"
+                            : "inline-flex items-center justify-center cursor-default"
+                    }`}
                 >
                     <Star
-                        className={`w-5 h-5 ${star <= rating
+                        className={`${interactive ? "w-6 h-6" : "w-5 h-5"} ${star <= rating
                             ? "fill-secondary text-secondary"
                             : "text-muted-foreground/30"
                             }`}
+                        aria-hidden="true"
                     />
                 </button>
             ))}

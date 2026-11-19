@@ -1,12 +1,14 @@
-import { MetadataRoute } from 'next';
+import { MetadataRoute } from "next";
+import { getSiteUrl } from "@/lib/site";
 
 export default function robots(): MetadataRoute.Robots {
-  return {
-    rules: {
-      userAgent: '*',
-      allow: '/',
-      disallow: ['/api/', '/admin/', '/dashboard/', '/login', '/register', '/suggest/'],
-    },
-    sitemap: 'https://lankapost.vercel.app/sitemap.xml',
-  };
+    const siteUrl = getSiteUrl();
+    return {
+        rules: {
+            userAgent: "*",
+            allow: "/",
+            disallow: ["/api/", "/admin/", "/dashboard/", "/login", "/register", "/suggest/"],
+        },
+        sitemap: `${siteUrl}/sitemap.xml`,
+    };
 }

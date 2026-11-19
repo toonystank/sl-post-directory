@@ -49,13 +49,14 @@ export default function Navbar() {
     const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN" || user?.role === "MODERATOR";
 
     const isHome = !isOfflineFallback && pathname === "/";
-    const isRatesPage = !isOfflineFallback && pathname.startsWith("/calculator");
+    const isRatesPage = !isOfflineFallback && (pathname.startsWith("/calculator") || pathname.startsWith("/rates"));
     const isTabRoot = !isOfflineFallback && ["/", "/browse", "/calculator", "/track", "/blog"].includes(pathname);
 
     const mobileTitle =
         isOfflineFallback ? tInstall("offlinePageTitle")
         : pathname.startsWith("/browse") ? tApp("tabBrowse")
-        : pathname.startsWith("/calculator") ? tApp("titleRates")
+        : pathname.startsWith("/calculator") || pathname.startsWith("/rates") ? tApp("titleRates")
+        : pathname.startsWith("/district/") ? tApp("tabBrowse")
         : pathname.startsWith("/track") ? tApp("titleTrack")
         : pathname === "/blog" ? tApp("titleGuides")
         : pathname.startsWith("/blog/") ? tApp("titleGuide")
@@ -68,12 +69,12 @@ export default function Navbar() {
         : "";
 
     const navItems = [
-        { href: "/", label: t("home"), active: isHome },
-        { href: "/calculator", label: t("calculator"), active: !isOfflineFallback && pathname.startsWith("/calculator") },
-        { href: "/browse", label: t("browse"), active: !isOfflineFallback && (pathname.startsWith("/browse") || pathname.startsWith("/office")) },
-        { href: "/track", label: t("track"), active: !isOfflineFallback && pathname.startsWith("/track") },
-        { href: "/blog", label: t("blog"), active: !isOfflineFallback && pathname.startsWith("/blog") },
-        ...(isAdmin ? [{ href: "/dashboard", label: t("dashboard"), active: !isOfflineFallback && pathname.startsWith("/dashboard") }] : []),
+        { href: "/", label: t("home"), active: isHome, soon: false },
+        { href: "/calculator", label: t("calculator"), active: !isOfflineFallback && (pathname.startsWith("/calculator") || pathname.startsWith("/rates")), soon: false },
+        { href: "/browse", label: t("browse"), active: !isOfflineFallback && (pathname.startsWith("/browse") || pathname.startsWith("/office") || pathname.startsWith("/district")), soon: false },
+        { href: "/track", label: t("track"), active: !isOfflineFallback && pathname.startsWith("/track"), soon: false },
+        { href: "/blog", label: t("blog"), active: !isOfflineFallback && pathname.startsWith("/blog"), soon: false },
+        ...(isAdmin ? [{ href: "/dashboard", label: t("dashboard"), active: !isOfflineFallback && pathname.startsWith("/dashboard"), soon: false }] : []),
     ];
 
     const goBack = () => {
@@ -118,16 +119,17 @@ export default function Navbar() {
                     <div className="ml-auto flex items-center gap-1.5">
                         {isRatesPage && <CurrencySwitcher />}
                         <LanguageSwitcher />
+                        <ThemeToggle />
                     </div>
                 </div>
 
                 {/* ===== Desktop masthead ===== */}
-                <div className="hidden md:flex container mx-auto h-16 items-center justify-between px-4">
-                    <Link href="/" aria-label={tApp("home")} className="tap">
-                        <StampLogo size={38} />
+                <div className="hidden md:flex container mx-auto h-16 items-center justify-between gap-3 px-4 overflow-x-clip">
+                    <Link href="/" aria-label={tApp("home")} className="tap shrink-0">
+                        <StampLogo size={36} />
                     </Link>
 
-                    <nav className="flex items-center gap-1 text-[0.95rem] font-semibold">
+                    <nav className="flex flex-1 items-center justify-center gap-0.5 xl:gap-1 text-[0.78rem] lg:text-[0.86rem] xl:text-[0.95rem] font-semibold min-w-0 overflow-x-auto scrollbar-hide">
                         {navItems.map((item) => (
                             <Link
                                 key={item.href}
@@ -146,23 +148,28 @@ export default function Navbar() {
                                 }}
                                 aria-current={item.active ? "page" : undefined}
                                 className={cn(
-                                    "relative px-3 py-2 transition-colors whitespace-nowrap shrink-0",
+                                    "relative inline-flex items-center gap-1 px-1.5 lg:px-2.5 xl:px-3 py-2 transition-colors whitespace-nowrap shrink-0",
                                     item.active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                                 )}
                             >
-                                {item.label}
+                                <span>{item.label}</span>
+                                {item.soon && (
+                                    <span className="hidden xl:inline-flex rounded bg-secondary/70 px-1 py-px font-mono text-[9px] font-bold uppercase tracking-tight text-secondary-foreground">
+                                        Soon
+                                    </span>
+                                )}
                                 {item.active && (
                                     <m.span
                                         layoutId="desktop-nav-underline"
                                         transition={{ type: "spring", stiffness: 460, damping: 34 }}
-                                        className="absolute inset-x-3 -bottom-[13px] h-[3px] bg-primary"
+                                        className="absolute inset-x-1.5 lg:inset-x-2.5 xl:inset-x-3 -bottom-[13px] h-[3px] bg-primary"
                                     />
                                 )}
                             </Link>
                         ))}
                     </nav>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5 lg:gap-2 shrink-0">
                         {!isInstalled && (canNativePrompt || isIOS) && (
                             <Button
                                 type="button"
