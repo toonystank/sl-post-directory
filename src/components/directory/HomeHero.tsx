@@ -57,7 +57,7 @@ export function ModeToggle({ searchMode, onModeChange, className }: { searchMode
     );
 }
 
-export default function HomeHero({ search, searchMode: controlledMode, total = 4158, activeQuery, searchRef }: HomeHeroProps) {
+export default function HomeHero({ search, searchMode: controlledMode, total = 4024, activeQuery, searchRef }: HomeHeroProps) {
     const t = useTranslations("Home");
     const locale = useLocale();
     const isIndic = locale === "si" || locale === "ta";
@@ -174,7 +174,13 @@ export default function HomeHero({ search, searchMode: controlledMode, total = 4
                         </div>
 
                         <p className="hidden md:block mt-3 font-mono text-xs text-muted-foreground">
-                            {total > 0 && !effectiveQuery ? `${total.toLocaleString()} offices · 9 provinces · EN / සිං / த` : "EN / සිං / த"}
+                            {total > 0 && !effectiveQuery
+                                ? locale === "si"
+                                    ? `තැපැල් කාර්යාල ${total.toLocaleString()} · පළාත් 9 · EN / සිං / த`
+                                    : locale === "ta"
+                                        ? `${total.toLocaleString()} அஞ்சல் நிலையங்கள் · 9 மாகாணங்கள் · EN / සිං / த`
+                                        : `${total.toLocaleString()} offices · 9 provinces · EN / සිං / த`
+                                : "EN / සිං / த"}
                         </p>
                     </div>
 

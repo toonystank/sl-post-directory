@@ -13,8 +13,9 @@ import DirectorySidebar from "./directory/DirectorySidebar";
 import MobileFilters from "./directory/MobileFilters";
 import DirectoryGrid from "./directory/DirectoryGrid";
 import { useServiceLabel } from "./directory/filters";
-import { ALPHABET } from "./directory/types";
+import { ALPHABET, POPULAR_SEARCHES } from "./directory/types";
 import { cn } from "@/lib/utils";
+import { triggerHaptic } from "@/lib/haptics";
 
 export default function SearchDirectory() {
     const t = useTranslations("Search");
@@ -23,14 +24,30 @@ export default function SearchDirectory() {
     const serviceLabel = useServiceLabel();
 
     const {
-        query, setQuery,
-        searchMode, setSearchMode,
-        activeLetter, setActiveLetter,
-        activeService, setActiveService,
-        offices, total, nextCursor,
-        loading, initialLoading,
+        query,
+        setQuery,
+        searchMode,
+        setSearchMode,
+        activeLetter,
+        setActiveLetter,
+        activeService,
+        setActiveService,
+        activeDivision,
+        setActiveDivision,
+        activeOfficeType,
+        setActiveOfficeType,
+        only24Hour,
+        setOnly24Hour,
+        availableDivisions,
+        availableTypes,
+        offices,
+        total,
+        nextCursor,
+        loading,
+        initialLoading,
         isOfflineFallback,
-        updateUrl, fetchOffices,
+        updateUrl,
+        fetchOffices,
     } = useDirectoryState();
 
     const [filtersOpen, setFiltersOpen] = useState(false);
@@ -41,8 +58,21 @@ export default function SearchDirectory() {
     const heroInputRef = useRef<HTMLInputElement>(null);
     const resultsSectionRef = useRef<HTMLElement>(null);
 
-    const hasActiveFilters = Boolean(query || activeLetter || activeService);
-    const activeFilterCount = (activeLetter ? 1 : 0) + (activeService ? 1 : 0);
+    const currentExtra = {
+        division: activeDivision,
+        officeType: activeOfficeType,
+        is24Hour: only24Hour,
+    };
+
+    const hasActiveFilters = Boolean(
+        query || activeLetter || activeService || activeDivision || activeOfficeType || only24Hour
+    );
+    const activeFilterCount =
+        (activeLetter ? 1 : 0) +
+        (activeService ? 1 : 0) +
+        (activeDivision ? 1 : 0) +
+        (activeOfficeType ? 1 : 0) +
+        (only24Hour ? 1 : 0);
 
     const scrollToResults = () => {
         requestAnimationFrame(() => {
@@ -51,55 +81,90 @@ export default function SearchDirectory() {
     };
 
     const submitSearch = () => {
-        updateUrl(query, searchMode, activeLetter, activeService);
-        fetchOffices(query, activeLetter, searchMode, activeService, 0, false);
+        updateUrl(query, searchMode, activeLetter, activeService, currentExtra);
+        fetchOffices(query, activeLetter, searchMode, activeService, 0, false, currentExtra);
         scrollToResults();
     };
 
     const handleClearQuery = () => {
         setQuery("");
-        updateUrl("", searchMode, activeLetter, activeService);
-        fetchOffices("", activeLetter, searchMode, activeService, 0, false);
+        updateUrl("", searchMode, activeLetter, activeService, currentExtra);
+        fetchOffices("", activeLetter, searchMode, activeService, 0, false, currentExtra);
     };
 
     const handleSuggestionClick = (suggestion: string) => {
         setQuery(suggestion);
-        updateUrl(suggestion, searchMode, activeLetter, activeService);
-        fetchOffices(suggestion, activeLetter, searchMode, activeService, 0, false);
+        updateUrl(suggestion, searchMode, activeLetter, activeService, currentExtra);
+        fetchOffices(suggestion, activeLetter, searchMode, activeService, 0, false, currentExtra);
         scrollToResults();
     };
 
     const handleModeSwitch = (mode: typeof searchMode) => {
-        if (mode === searchMode && !query && !activeLetter && !activeService) return;
+        if (mode === searchMode && !hasActiveFilters) return;
+        triggerHaptic("light");
         setSearchMode(mode);
         setQuery("");
         setActiveLetter(null);
         setActiveService(null);
+        setActiveDivision(null);
+        setActiveOfficeType(null);
+        setOnly24Hour(false);
         setFiltersOpen(false);
-        updateUrl("", mode, null, null);
-        fetchOffices("", null, mode, null, 0, false);
+        updateUrl("", mode, null, null, {});
+        fetchOffices("", null, mode, null, 0, false, {});
     };
 
     const handleLetterFilter = (letter: string) => {
+        triggerHaptic("light");
         const newLetter = activeLetter === letter ? null : letter;
         setActiveLetter(newLetter);
-        updateUrl(query, searchMode, newLetter, activeService);
-        fetchOffices(query, newLetter, searchMode, activeService, 0, false);
+        updateUrl(query, searchMode, newLetter, activeService, currentExtra);
+        fetchOffices(query, newLetter, searchMode, activeService, 0, false, currentExtra);
     };
 
     const handleServiceFilter = (service: string) => {
+        triggerHaptic("light");
         const newService = activeService === service ? null : service;
         setActiveService(newService);
-        updateUrl(query, searchMode, activeLetter, newService);
-        fetchOffices(query, activeLetter, searchMode, newService, 0, false);
+        updateUrl(query, searchMode, activeLetter, newService, currentExtra);
+        fetchOffices(query, activeLetter, searchMode, newService, 0, false, currentExtra);
+    };
+
+    const handleDivisionFilter = (division: string | null) => {
+        triggerHaptic("light");
+        setActiveDivision(division);
+        const nextExtra = { ...currentExtra, division };
+        updateUrl(query, searchMode, activeLetter, activeService, nextExtra);
+        fetchOffices(query, activeLetter, searchMode, activeService, 0, false, nextExtra);
+    };
+
+    const handleOfficeTypeFilter = (officeType: string | null) => {
+        triggerHaptic("light");
+        setActiveOfficeType(officeType);
+        const nextExtra = { ...currentExtra, officeType };
+        updateUrl(query, searchMode, activeLetter, activeService, nextExtra);
+        fetchOffices(query, activeLetter, searchMode, activeService, 0, false, nextExtra);
+    };
+
+    const handleToggle24Hour = () => {
+        triggerHaptic("light");
+        const next = !only24Hour;
+        setOnly24Hour(next);
+        const nextExtra = { ...currentExtra, is24Hour: next };
+        updateUrl(query, searchMode, activeLetter, activeService, nextExtra);
+        fetchOffices(query, activeLetter, searchMode, activeService, 0, false, nextExtra);
     };
 
     const handlePopularSearch = (term: string) => {
+        triggerHaptic("light");
         setQuery(term);
         setActiveLetter(null);
         setActiveService(null);
-        updateUrl(term, searchMode, null, null);
-        fetchOffices(term, null, searchMode, null, 0, false);
+        setActiveDivision(null);
+        setActiveOfficeType(null);
+        setOnly24Hour(false);
+        updateUrl(term, searchMode, null, null, {});
+        fetchOffices(term, null, searchMode, null, 0, false, {});
         scrollToResults();
     };
 
@@ -107,15 +172,21 @@ export default function SearchDirectory() {
         setQuery("");
         setActiveLetter(null);
         setActiveService(null);
-        updateUrl("", searchMode, null, null);
-        fetchOffices("", null, searchMode, null, 0, false);
+        setActiveDivision(null);
+        setActiveOfficeType(null);
+        setOnly24Hour(false);
+        updateUrl("", searchMode, null, null, {});
+        fetchOffices("", null, searchMode, null, 0, false, {});
     };
 
     const clearSheetFilters = () => {
         setActiveLetter(null);
         setActiveService(null);
-        updateUrl(query, searchMode, null, null);
-        fetchOffices(query, null, searchMode, null, 0, false);
+        setActiveDivision(null);
+        setActiveOfficeType(null);
+        setOnly24Hour(false);
+        updateUrl(query, searchMode, null, null, {});
+        fetchOffices(query, null, searchMode, null, 0, false, {});
     };
 
     useEffect(() => {
@@ -130,7 +201,7 @@ export default function SearchDirectory() {
     }, []);
 
     return (
-        <section className="relative w-full">
+        <section className="relative w-full overflow-x-clip">
             {/* Browse Directory Header */}
             <div className="border-b-2 border-foreground bg-card/40 md:paper-grain">
                 <div className="container mx-auto px-4 py-5 md:py-8">
@@ -143,7 +214,12 @@ export default function SearchDirectory() {
                                 {tBrowse("lede")}
                             </p>
                         </div>
-                        <ModeToggle searchMode={searchMode} onModeChange={handleModeSwitch} className="self-start md:self-auto shrink-0" />
+                        {/* Shown only when left sidebar is collapsed (< lg) to avoid duplicate Name | Area toggle on desktop */}
+                        <ModeToggle
+                            searchMode={searchMode}
+                            onModeChange={handleModeSwitch}
+                            className="lg:hidden self-start md:self-auto shrink-0"
+                        />
                     </div>
 
                     <div ref={searchContainerRef} className="mt-4 max-w-3xl">
@@ -161,9 +237,13 @@ export default function SearchDirectory() {
                         />
                     </div>
 
-                    {/* Mobile quick A-Z strip */}
-                    <div className="mt-4 lg:hidden">
-                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar" role="group" aria-label={tBrowse("byLetter")}>
+                    {/* Mobile & Tablet (< lg) quick A-Z strip + Popular town pills */}
+                    <div className="mt-4 lg:hidden space-y-2.5">
+                        <div
+                            className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide"
+                            role="group"
+                            aria-label={tBrowse("byLetter")}
+                        >
                             <button
                                 type="button"
                                 onClick={() => {
@@ -198,6 +278,19 @@ export default function SearchDirectory() {
                                     </button>
                                 );
                             })}
+                        </div>
+
+                        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-hide">
+                            {POPULAR_SEARCHES.map((term) => (
+                                <button
+                                    key={term}
+                                    type="button"
+                                    onClick={() => handlePopularSearch(term)}
+                                    className="tap shrink-0 rounded-full border border-foreground/50 bg-background px-2.5 py-1 text-xs font-semibold hover:bg-secondary/40"
+                                >
+                                    {term}
+                                </button>
+                            ))}
                         </div>
                     </div>
                 </div>
@@ -234,6 +327,14 @@ export default function SearchDirectory() {
                         activeService={activeService}
                         handleServiceFilter={handleServiceFilter}
                         clearService={() => handleServiceFilter(activeService || "")}
+                        activeDivision={activeDivision}
+                        availableDivisions={availableDivisions}
+                        handleDivisionFilter={handleDivisionFilter}
+                        activeOfficeType={activeOfficeType}
+                        availableTypes={availableTypes}
+                        handleOfficeTypeFilter={handleOfficeTypeFilter}
+                        only24Hour={only24Hour}
+                        handleToggle24Hour={handleToggle24Hour}
                         handlePopularSearch={handlePopularSearch}
                     />
 
@@ -247,6 +348,8 @@ export default function SearchDirectory() {
                                         ? t("startingWith", { letter: activeLetter })
                                         : query
                                         ? t("resultsFor", { query })
+                                        : activeDivision
+                                        ? `${activeDivision} Offices`
                                         : t("allOffices")}
                                 </h2>
                                 <p className="mt-0.5 font-mono text-xs text-muted-foreground">
@@ -263,8 +366,11 @@ export default function SearchDirectory() {
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    className="lg:hidden"
-                                    onClick={() => setFiltersOpen(true)}
+                                    className="lg:hidden h-10"
+                                    onClick={() => {
+                                        triggerHaptic("light");
+                                        setFiltersOpen(true);
+                                    }}
                                 >
                                     <SlidersHorizontal className="h-4 w-4" />
                                     <span>{t("moreFilters")}</span>
@@ -276,7 +382,7 @@ export default function SearchDirectory() {
                                 </Button>
 
                                 <AddOfficeModal>
-                                    <Button variant="default" size="sm">
+                                    <Button variant="default" size="sm" className="h-10">
                                         <Plus className="h-4 w-4" />
                                         <span>{t("addOffice")}</span>
                                     </Button>
@@ -288,6 +394,7 @@ export default function SearchDirectory() {
                             <div className="mb-4 flex flex-wrap items-center gap-2">
                                 {query && (
                                     <button
+                                        type="button"
                                         onClick={handleClearQuery}
                                         className="tap inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-foreground bg-secondary/40 px-3 py-1 text-xs font-semibold hover:bg-secondary/70"
                                     >
@@ -295,8 +402,39 @@ export default function SearchDirectory() {
                                         <X className="h-3.5 w-3.5" aria-hidden="true" />
                                     </button>
                                 )}
+                                {activeDivision && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDivisionFilter(null)}
+                                        className="tap inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-foreground bg-secondary/40 px-3 py-1 text-xs font-semibold hover:bg-secondary/70"
+                                    >
+                                        <span>{activeDivision}</span>
+                                        <X className="h-3.5 w-3.5" aria-hidden="true" />
+                                    </button>
+                                )}
+                                {activeOfficeType && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleOfficeTypeFilter(null)}
+                                        className="tap inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-foreground bg-secondary/40 px-3 py-1 text-xs font-semibold hover:bg-secondary/70"
+                                    >
+                                        <span>{activeOfficeType}</span>
+                                        <X className="h-3.5 w-3.5" aria-hidden="true" />
+                                    </button>
+                                )}
+                                {only24Hour && (
+                                    <button
+                                        type="button"
+                                        onClick={handleToggle24Hour}
+                                        className="tap inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-foreground bg-primary text-primary-foreground px-3 py-1 text-xs font-semibold"
+                                    >
+                                        <span>24-Hour</span>
+                                        <X className="h-3.5 w-3.5" aria-hidden="true" />
+                                    </button>
+                                )}
                                 {activeLetter && (
                                     <button
+                                        type="button"
                                         onClick={() => handleLetterFilter(activeLetter)}
                                         className="tap inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-foreground bg-secondary/40 px-3 py-1 font-mono text-xs font-semibold hover:bg-secondary/70"
                                     >
@@ -306,6 +444,7 @@ export default function SearchDirectory() {
                                 )}
                                 {activeService && (
                                     <button
+                                        type="button"
                                         onClick={() => handleServiceFilter(activeService)}
                                         className="tap inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-foreground bg-secondary/40 px-3 py-1 text-xs font-semibold hover:bg-secondary/70"
                                     >
@@ -314,6 +453,7 @@ export default function SearchDirectory() {
                                     </button>
                                 )}
                                 <button
+                                    type="button"
                                     onClick={clearAll}
                                     className="tap px-2 py-1 text-xs font-semibold text-primary hover:underline underline-offset-4"
                                 >
@@ -334,6 +474,7 @@ export default function SearchDirectory() {
                             activeLetter={activeLetter}
                             searchMode={searchMode}
                             activeService={activeService}
+                            extraFilters={currentExtra}
                             fetchOffices={fetchOffices}
                         />
                     </section>
@@ -347,6 +488,15 @@ export default function SearchDirectory() {
                 handleLetterFilter={handleLetterFilter}
                 activeService={activeService}
                 handleServiceFilter={handleServiceFilter}
+                activeDivision={activeDivision}
+                availableDivisions={availableDivisions}
+                handleDivisionFilter={handleDivisionFilter}
+                activeOfficeType={activeOfficeType}
+                availableTypes={availableTypes}
+                handleOfficeTypeFilter={handleOfficeTypeFilter}
+                only24Hour={only24Hour}
+                handleToggle24Hour={handleToggle24Hour}
+                handlePopularSearch={handlePopularSearch}
                 onClear={clearSheetFilters}
                 total={total}
             />

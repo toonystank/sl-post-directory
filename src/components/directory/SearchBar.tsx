@@ -14,12 +14,14 @@ import {
     Mail,
     ArrowRight,
     Scale,
+    PackageSearch,
 } from "lucide-react";
 import { m, AnimatePresence } from "motion/react";
 import { Link, useRouter } from "@/navigation";
 import { cn } from "@/lib/utils";
 import CountryFlag from "@/components/brand/CountryFlag";
 import NuwaraEliyaPostOffice from "@/components/brand/NuwaraEliyaPostOffice";
+import HomeTrackingDrawerCard from "@/components/tracking/HomeTrackingDrawerCard";
 import { useCurrency } from "@/context/CurrencyContext";
 import { formatCurrencyAmount } from "@/lib/currency";
 import {
@@ -34,6 +36,8 @@ import {
     ensureLocalOfficeIndex,
     getLoadedOfficeIndexSync,
 } from "@/lib/office-index-client";
+import type { RichAutocompleteSuggestion } from "@/lib/office-index";
+import { triggerHaptic } from "@/lib/haptics";
 import { SearchMode } from "./types";
 
 interface SearchBarProps {
@@ -76,7 +80,7 @@ export default function SearchBar({
     const router = useRouter();
     const { currency, lkrPerUsd } = useCurrency();
 
-    const [suggestions, setSuggestions] = useState<string[]>([]);
+    const [suggestions, setSuggestions] = useState<RichAutocompleteSuggestion[]>([]);
     const [showDropdown, setShowDropdown] = useState(false);
     const [suggestionsLoading, setSuggestionsLoading] = useState(false);
     const [isActive, setIsActive] = useState(false);
@@ -84,7 +88,7 @@ export default function SearchBar({
     const [exampleIndex, setExampleIndex] = useState(0);
     const [weightOverrideGrams, setWeightOverrideGrams] = useState<number | null>(null);
 
-    const suggestionCache = useRef<Record<string, string[]>>({});
+    const suggestionCache = useRef<Record<string, RichAutocompleteSuggestion[]>>({});
     const suggestDebounce = useRef<NodeJS.Timeout | null>(null);
     const suggestAbort = useRef<AbortController | null>(null);
     const localContainerRef = useRef<HTMLDivElement>(null);
@@ -128,12 +132,12 @@ export default function SearchBar({
                 return;
             }
 
-            // Fast Path 1: Synchronous 4,158-office local index (< 3ms, zero network)
+            // Fast Path 1: Synchronous local index (< 3ms, zero network)
             const syncEngine = getLoadedOfficeIndexSync();
             if (syncEngine) {
                 suggestAbort.current?.abort();
                 setSuggestionsLoading(false);
-                setSuggestions(syncEngine.autocomplete(trimmed, mode, 5));
+                setSuggestions(syncEngine.autocompleteRich(trimmed, mode, 5));
                 return;
             }
 
@@ -152,7 +156,7 @@ export default function SearchBar({
                 // Hydrate local index once (typically from IndexedDB in < 20ms)
                 const engine = await ensureLocalOfficeIndex();
                 if (!controller.signal.aborted && engine) {
-                    const localList = engine.autocomplete(trimmed, mode, 5);
+                    const localList = engine.autocompleteRich(trimmed, mode, 5);
                     suggestionCache.current[cacheKey] = localList;
                     setSuggestions(localList);
                     return;
@@ -164,26 +168,44 @@ export default function SearchBar({
                 );
                 if (res.ok && !controller.signal.aborted) {
                     const data = await res.json();
-                    const list: string[] = data.suggestions || [];
+                    const list: RichAutocompleteSuggestion[] = (data.suggestions || []).map((label: string) => ({
+                        label,
+                        queryValue: label,
+                        kind: mode === "division" ? "division" : "office",
+                    }));
                     suggestionCache.current[cacheKey] = list;
                     setSuggestions(list);
                 } else if (!controller.signal.aborted) {
-                    const offlineMatches = searchOfflineOfficesCache({
+                    const offlineMatches: RichAutocompleteSuggestion[] = searchOfflineOfficesCache({
                         q: val,
                         mode: mode === "division" ? "division" : "name",
                     })
-                        .map((o) => o.name)
-                        .slice(0, 5);
+                        .slice(0, 5)
+                        .map((o) => ({
+                            label: o.name,
+                            queryValue: o.name,
+                            slug: o.slug,
+                            postalCode: o.postalCode || undefined,
+                            division: o.fields.find((f) => f.name === "Division")?.value,
+                            kind: "office",
+                        }));
                     setSuggestions(offlineMatches);
                 }
             } catch (err) {
                 if ((err as { name?: string })?.name !== "AbortError") {
-                    const offlineMatches = searchOfflineOfficesCache({
+                    const offlineMatches: RichAutocompleteSuggestion[] = searchOfflineOfficesCache({
                         q: val,
                         mode: mode === "division" ? "division" : "name",
                     })
-                        .map((o) => o.name)
-                        .slice(0, 5);
+                        .slice(0, 5)
+                        .map((o) => ({
+                            label: o.name,
+                            queryValue: o.name,
+                            slug: o.slug,
+                            postalCode: o.postalCode || undefined,
+                            division: o.fields.find((f) => f.name === "Division")?.value,
+                            kind: "office",
+                        }));
                     setSuggestions(offlineMatches);
                 }
             } finally {
@@ -209,11 +231,11 @@ export default function SearchBar({
         setShowDropdown(true);
         if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
 
-        // If the 4,158-office local index is already hydrated, run immediately with 0ms debounce!
+        // If the local index is already hydrated, run immediately with 0ms debounce!
         const syncEngine = getLoadedOfficeIndexSync();
         if (syncEngine) {
             setSuggestionsLoading(false);
-            setSuggestions(syncEngine.autocomplete(val, effectiveAutocompleteMode, 5));
+            setSuggestions(syncEngine.autocompleteRich(val, effectiveAutocompleteMode, 5));
             return;
         }
 
@@ -226,6 +248,15 @@ export default function SearchBar({
     const navigateToSmartCalculator = (intent: SmartSearchIntent) => {
         setShowDropdown(false);
         setIsActive(false);
+        triggerHaptic("light");
+        if (intent.kind === "tracking") {
+            router.push(intent.trackHref);
+            return;
+        }
+        if (intent.kind === "international" && intent.seoRatesHref) {
+            router.push(intent.seoRatesHref);
+            return;
+        }
         const params = new URLSearchParams(intent.calculatorHref.query);
         router.push(`/calculator?${params.toString()}`);
     };
@@ -234,20 +265,20 @@ export default function SearchBar({
         if (!enableSmartHomeSearch || !smartIntent) {
             return suggestions;
         }
-        // When a user types an explicit weight or COD query (e.g. "thaiwan 5kg", "cod 5000 1kg"),
-        // suppress unrelated trigram post-office matches so the rate card is crisp and focused.
-        if (smartIntent.hasExplicitWeight || smartIntent.kind === "cod") {
+        // When a user types a tracking barcode, explicit weight, or COD query,
+        // suppress unrelated trigram post-office matches so the smart card is crisp and focused.
+        if (smartIntent.kind === "tracking" || smartIntent.hasExplicitWeight || smartIntent.kind === "cod") {
             return [];
         }
         const qLower = query.trim().toLowerCase();
-        return suggestions.filter((s) => s.toLowerCase().includes(qLower)).slice(0, 2);
+        return suggestions.filter((s) => s.label.toLowerCase().includes(qLower)).slice(0, 2);
     }, [enableSmartHomeSearch, smartIntent, suggestions, query]);
 
     const handleSubmit = () => {
         if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
         setShowDropdown(false);
         setIsActive(false);
-        // If on Home Page and user typed a clear rate query (like "thaiwan 5kg") with no matching post offices, jump straight to the pre-filled calculator
+        // If on Home Page and user typed a clear rate query (like "thaiwan 5kg") with no matching post offices, jump straight to the SEO rate page / calculator
         if (enableSmartHomeSearch && smartIntent && visibleSuggestions.length === 0) {
             navigateToSmartCalculator(smartIntent);
             return;
@@ -255,11 +286,16 @@ export default function SearchBar({
         onSubmit();
     };
 
-    const handleSuggestClick = (s: string) => {
+    const handleSuggestClick = (s: RichAutocompleteSuggestion) => {
         setShowDropdown(false);
         setIsActive(false);
         if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
-        onSuggestionClick(s);
+        triggerHaptic("light");
+        if (enableSmartHomeSearch && s.kind === "office" && s.slug) {
+            router.push(`/office/${s.slug}`);
+            return;
+        }
+        onSuggestionClick(s.queryValue);
     };
 
     const handleCloseDropdownOnly = () => {
@@ -365,8 +401,18 @@ export default function SearchBar({
                     isSticky ? "h-11" : enableSmartHomeSearch ? "h-12 sm:h-14 md:h-15" : "h-14"
                 )}
             >
-                {/* Embedded Scroll-Reactive Nuwara Eliya Post Office Illustration Inside the Home Search Bar */}
-                {enableSmartHomeSearch && <NuwaraEliyaPostOffice />}
+                {/* Embedded Scroll-Reactive Nuwara Eliya Post Office Illustration — dims when typing for crisp text legibility */}
+                {enableSmartHomeSearch && (
+                    <div
+                        className={cn(
+                            "pointer-events-none transition-opacity duration-200",
+                            query.trim().length > 0 ? "opacity-25" : "opacity-65 dark:opacity-80"
+                        )}
+                        aria-hidden="true"
+                    >
+                        <NuwaraEliyaPostOffice />
+                    </div>
+                )}
 
                 <label
                     htmlFor={`search-${id}`}
@@ -534,11 +580,13 @@ export default function SearchBar({
                                 <div className="flex items-center justify-between gap-2 border-b-[1.5px] border-foreground bg-muted/60 px-2.5 py-1.5 sm:px-3.5 sm:py-2">
                                     <span className="font-mono text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-foreground truncate">
                                         {smartIntent
-                                            ? smartIntent.kind === "international"
-                                                ? t("smartPreviewIntl")
-                                                : smartIntent.kind === "cod"
-                                                    ? t("smartPreviewCod")
-                                                    : t("smartPreviewLocal")
+                                            ? smartIntent.kind === "tracking"
+                                                ? "Parcel & Mail Tracking"
+                                                : smartIntent.kind === "international"
+                                                    ? t("smartPreviewIntl")
+                                                    : smartIntent.kind === "cod"
+                                                        ? t("smartPreviewCod")
+                                                        : t("smartPreviewLocal")
                                             : t("resultsFor", { query })}
                                     </span>
                                     <button
@@ -552,9 +600,16 @@ export default function SearchBar({
                                     </button>
                                 </div>
 
-                                {/* 1. Smart Rate Preview Section (International / COD / Domestic) */}
+                                {/* 1. Smart Preview Section (Tracking / International / COD / Domestic) */}
                                 {smartIntent && (
                                     <div className="p-2 sm:p-3.5 border-b border-border space-y-2">
+                                        {smartIntent.kind === "tracking" && (
+                                            <HomeTrackingDrawerCard
+                                                intent={smartIntent}
+                                                onCloseDrawer={handleCloseDropdownOnly}
+                                            />
+                                        )}
+
                                         {smartIntent.kind === "international" && (
                                             <div
                                                 data-testid="smart-rate-preview-intl"
@@ -697,12 +752,12 @@ export default function SearchBar({
                                         {smartIntent.kind === "cod" && (
                                             <div
                                                 data-testid="smart-rate-preview-cod"
-                                                className="rounded-lg border-2 border-foreground bg-[#15803D]/10 p-3 space-y-2.5"
+                                                className="rounded-lg border-2 border-foreground bg-[#15803D]/10 dark:bg-emerald-500/15 p-3 space-y-2.5"
                                             >
                                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                                     <div>
                                                         <span className="inline-flex items-center gap-1.5 font-heading text-base font-extrabold text-foreground">
-                                                            <Banknote className="h-4 w-4 text-[#15803D]" />
+                                                            <Banknote className="h-4 w-4 text-[#15803D] dark:text-emerald-400" />
                                                             <span>{tc("codTitle")}</span>
                                                         </span>
                                                         <p className="font-mono text-xs text-muted-foreground">
@@ -719,7 +774,7 @@ export default function SearchBar({
                                                         <span className="block font-mono text-[10px] uppercase text-muted-foreground">
                                                             {tc("total")}
                                                         </span>
-                                                        <span className="font-mono text-xl font-extrabold text-[#15803D] tabular-nums">
+                                                        <span className="font-mono text-xl font-extrabold text-[#15803D] dark:text-emerald-400 tabular-nums">
                                                             {formatCurrencyAmount(
                                                                 smartIntent.result.totalCost,
                                                                 currency,
@@ -760,7 +815,7 @@ export default function SearchBar({
                                         {smartIntent.kind === "domestic" && (
                                             <div
                                                 data-testid="smart-rate-preview-domestic"
-                                                className="rounded-lg border-2 border-foreground bg-primary/5 p-3 space-y-2.5"
+                                                className="rounded-lg border-2 border-foreground bg-primary/5 dark:bg-primary/15 p-3 space-y-2.5"
                                             >
                                                 <div className="flex items-center justify-between gap-2">
                                                     <span className="inline-flex items-center gap-1.5 font-heading text-base font-extrabold text-foreground">
@@ -818,7 +873,7 @@ export default function SearchBar({
                                     <ul role="listbox" className="divide-y divide-border">
                                         {visibleSuggestions.map((s, i) => (
                                             <li
-                                                key={s + i}
+                                                key={`${s.label}-${s.postalCode ?? i}`}
                                                 id={`${listId}-${i}`}
                                                 role="option"
                                                 aria-selected={highlight === i}
@@ -835,7 +890,19 @@ export default function SearchBar({
                                                     )}
                                                 >
                                                     <Building2 className="h-4 w-4 shrink-0 text-primary" />
-                                                    <span className="flex-1 font-semibold truncate">{s}</span>
+                                                    <span className="min-w-0 flex-1">
+                                                        <span className="block font-semibold truncate">{s.queryValue}</span>
+                                                        {s.division && (
+                                                            <span className="block text-xs text-muted-foreground truncate">
+                                                                {s.division}
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                    {s.postalCode && (
+                                                        <span className="shrink-0 rounded border border-foreground/30 bg-muted/60 px-1.5 py-0.5 font-mono text-xs font-bold text-foreground">
+                                                            {s.postalCode}
+                                                        </span>
+                                                    )}
                                                     <CornerDownLeft
                                                         className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60"
                                                         aria-hidden="true"
@@ -846,20 +913,22 @@ export default function SearchBar({
                                     </ul>
                                 )}
 
-                                {/* Footer Directory Search Action */}
-                                <div className="bg-muted/40 px-3.5 py-2 border-t border-border flex items-center justify-between">
-                                    <button
-                                        type="button"
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        onClick={() => onSubmit()}
-                                        className="tap inline-flex items-center gap-1.5 text-xs font-bold text-foreground hover:text-primary transition-colors"
-                                    >
-                                        <Building2 className="h-3.5 w-3.5 shrink-0 text-primary" />
-                                        <span>
-                                            {t("smartSearchDirectoryFor", { query: query.trim() })}
-                                        </span>
-                                    </button>
-                                </div>
+                                {/* Footer Directory Search Action (hidden for tracking barcodes) */}
+                                {smartIntent?.kind !== "tracking" && (
+                                    <div className="bg-muted/40 px-3.5 py-2 border-t border-border flex items-center justify-between">
+                                        <button
+                                            type="button"
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onClick={() => onSubmit()}
+                                            className="tap inline-flex items-center gap-1.5 text-xs font-bold text-foreground hover:text-primary transition-colors"
+                                        >
+                                            <Building2 className="h-3.5 w-3.5 shrink-0 text-primary" />
+                                            <span>
+                                                {t("smartSearchDirectoryFor", { query: query.trim() })}
+                                            </span>
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </m.div>
                     )}
@@ -879,7 +948,7 @@ export default function SearchBar({
                         >
                             {suggestions.map((s, i) => (
                                 <li
-                                    key={s + i}
+                                    key={`${s.label}-${s.postalCode ?? i}`}
                                     id={`${listId}-${i}`}
                                     role="option"
                                     aria-selected={highlight === i}
@@ -898,7 +967,19 @@ export default function SearchBar({
                                         ) : (
                                             <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />
                                         )}
-                                        <span className="flex-1 truncate">{s}</span>
+                                        <span className="min-w-0 flex-1">
+                                            <span className="block truncate font-medium">{s.queryValue}</span>
+                                            {s.division && searchMode === "name" && (
+                                                <span className="block text-xs text-muted-foreground truncate">
+                                                    {s.division}
+                                                </span>
+                                            )}
+                                        </span>
+                                        {s.postalCode && (
+                                            <span className="shrink-0 rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-xs font-bold">
+                                                {s.postalCode}
+                                            </span>
+                                        )}
                                         <CornerDownLeft
                                             className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60"
                                             aria-hidden="true"

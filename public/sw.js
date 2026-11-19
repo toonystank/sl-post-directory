@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v9";
+const CACHE_VERSION = "v10";
 const STATIC_CACHE = `sl-post-static-${CACHE_VERSION}`;
 const PAGES_CACHE = `sl-post-pages-${CACHE_VERSION}`;
 const RSC_CACHE = `sl-post-rsc-${CACHE_VERSION}`;
@@ -20,7 +20,7 @@ const INSTALL_STATIC_URLS = [
   "/manifest.webmanifest",
 ];
 
-const APP_SHELL_PATH_RE = /^\/(?:(?:si|ta)\/)?(?:|calculator|browse|track|blog|offline)$/;
+const APP_SHELL_PATH_RE = /^\/(?:(?:si|ta)\/)?(?:|calculator|browse|track|blog|offline|rates(?:\/.*)?|district(?:\/.*)?)$/;
 
 const STATIC_EXT_RE = /\.(?:png|jpg|jpeg|webp|avif|svg|ico|woff2?|css|js|webmanifest)$/i;
 // Next.js / Turbopack development chunks have mutable paths and `no-store` headers;
@@ -62,7 +62,7 @@ function buildOfflineHtmlFallback() {
 <body>
   <main class="card">
     <h1>You're offline</h1>
-    <p>This page hasn't been saved for offline use yet. Your postage calculator and local 4,158-office search still work offline.</p>
+    <p>This page hasn't been saved for offline use yet. Your postage calculator and offline Sri Lanka Post office search still work.</p>
     <div class="actions">
       <a class="primary" href="/calculator">Open Calculator</a>
       <a class="secondary" href="/">Go Home</a>

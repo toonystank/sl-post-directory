@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import PillarBox from "@/components/brand/PillarBox";
 import { PostOffice, SearchMode } from "./types";
+import type { DirectoryExtraFilters } from "./useDirectoryState";
 import PostOfficeCard from "./PostOfficeCard";
 
 interface DirectoryGridProps {
@@ -21,12 +22,32 @@ interface DirectoryGridProps {
     activeLetter: string | null;
     searchMode: SearchMode;
     activeService: string | null;
-    fetchOffices: (q: string, letter: string | null, mode: SearchMode, service: string | null, cursor: number, append: boolean) => void;
+    extraFilters?: DirectoryExtraFilters;
+    fetchOffices: (
+        q: string,
+        letter: string | null,
+        mode: SearchMode,
+        service: string | null,
+        cursor: number,
+        append: boolean,
+        extra?: DirectoryExtraFilters
+    ) => void;
 }
 
 export default function DirectoryGrid({
-    offices, initialLoading, loading, hasActiveFilters, clearAll,
-    nextCursor, total, query, activeLetter, searchMode, activeService, fetchOffices
+    offices,
+    initialLoading,
+    loading,
+    hasActiveFilters,
+    clearAll,
+    nextCursor,
+    total,
+    query,
+    activeLetter,
+    searchMode,
+    activeService,
+    extraFilters,
+    fetchOffices,
 }: DirectoryGridProps) {
     const t = useTranslations("Search");
 
@@ -79,7 +100,7 @@ export default function DirectoryGrid({
             <div className="mt-8 flex justify-center py-4">
                 {nextCursor !== null ? (
                     <Button
-                        onClick={() => fetchOffices(query, activeLetter, searchMode, activeService, nextCursor, true)}
+                        onClick={() => fetchOffices(query, activeLetter, searchMode, activeService, nextCursor, true, extraFilters)}
                         disabled={loading}
                         variant="outline"
                         size="lg"

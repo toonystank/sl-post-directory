@@ -55,20 +55,20 @@ export default function PillarBox({ className }: { className?: string }) {
             <polygon
                 points="20,298 44,282 186,281 220,298 164,321 58,321"
                 fill="hsl(var(--muted))"
-                opacity="0.72"
-                stroke="hsl(var(--foreground))"
-                strokeOpacity="0.18"
-                strokeWidth="1.2"
+                opacity="0.82"
+                stroke="hsl(var(--frame))"
+                strokeOpacity="0.45"
+                strokeWidth="1.3"
             />
             <polygon
                 points="38,298 63,309 157,309 197,297 192,303 156,314 62,314 34,301"
                 fill="#0B0908"
-                opacity="0.34"
+                opacity="0.42"
             />
 
             {/* 3D Hexagonal Black Base Plinth */}
             <g strokeLinejoin="round">
-                <polygon points="41,252 63,262 63,307 41,296" fill="#141210" />
+                <polygon points="41,252 63,262 63,307 41,296" fill="#181513" />
                 <polygon points="63,262 157,262 157,307 63,307" fill={`url(#${id}-plinth-front)`} />
                 <polygon points="157,262 194,252 194,296 157,307" fill={`url(#${id}-plinth-right)`} />
 
@@ -76,9 +76,9 @@ export default function PillarBox({ className }: { className?: string }) {
                 <polyline
                     points="41,252 41,296 63,307 157,307 194,296 194,252"
                     fill="none"
-                    stroke="hsl(var(--foreground))"
-                    strokeOpacity="0.45"
-                    strokeWidth="1.3"
+                    stroke="hsl(var(--frame))"
+                    strokeOpacity="0.85"
+                    strokeWidth="1.4"
                 />
                 {/* 3D vertical corner highlights */}
                 <line x1="63" y1="262" x2="63" y2="307" stroke="#0B0908" strokeWidth="1.1" />

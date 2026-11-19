@@ -290,7 +290,14 @@
     "noteSuffix": " (සටහන)",
     "pricesIn": "මිල ගණන් {currency}",
     "exchangeRateNote": "1 USD ≈ රු. {rate}",
-    "lkrEquivalent": "≈ රු. {amount}"
+    "lkrEquivalent": "≈ රු. {amount}",
+    "searchCountryPlaceholder": "රට, කේතය හෝ නගරය සොයන්න...",
+    "searchCountryAria": "ගමනාන්ත රට සොයන්න",
+    "clearCountrySearch": "සෙවුම මකන්න",
+    "popularCountries": "ජනප්‍රිය",
+    "allCountriesCount": "සියලුම රටවල් ({count})",
+    "matchingCountriesCount": "ගැලපෙන {count}",
+    "noCountriesFound": "\"{query}\" සඳහා රටවල් හමු නොවීය"
   },
   "Blog": {
     "kicker": "තොරතුරු සහ මාර්ගෝපදේශ",
@@ -435,6 +442,11 @@
     "serviceCodCode": "SLP කුරියර්",
     "meanwhile": "දැන් තැපැල් ගාස්තු හෝ තැපැල් කාර්යාල දුරකථන අංකයක් අවශ්‍යද?",
     "ctaRates": "තැපැල් ගාස්තු ගණනය කරන්න",
-    "ctaBrowse": "තැපැල් කාර්යාල පිරික්සන්න"
+    "ctaBrowse": "තැපැල් කාර්යාල පිරික්සන්න",
+    "liveBadge": "සජීවී ලුහුබැඳීම · COD සහ SLP කුරියර්",
+    "liveSubtitle": "ශ්‍රී ලංකා තැපැල් COD (BD), SLP කුරියර් (NA, BF), ලියාපදිංචි තැපැල් (RA, BG) සහ විදේශීය පාර්සල් ලුහුබඳින්න. පළමුව COD පද්ධතියත් පසුව SLP කුරියර් පද්ධතියත් පරීක්ෂා කෙරේ.",
+    "inputLabel": "ලුහුබැඳුම් අංක ඇතුළත් කරන්න",
+    "inputPlaceholder": "උදා: BD070817564LK, NA055922175LK, BF009065544LK",
+    "trackButton": "පාර්සලය ලුහුබඳින්න"
   }
 }

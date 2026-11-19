@@ -92,45 +92,74 @@
     --status-closed: 358 78% 40%;
     --status-holiday: 255 30% 42%;
 
+    --frame: 30 13% 9%;                /* #1A1714 crisp ink outline */
+    --frame-hover: 30 13% 9%;
+    --shadow-ink: 30 13% 9%;           /* #1A1714 crisp ink block shadow */
+    --stripe-gap: 43 100% 99%;         /* #FFFDF8 warm paper gap in airmail stripes */
+    --scrollbar-track: #EFE7D8;
+    --scrollbar-thumb: #8C7E6E;
+
     --radius: 0.375rem;
     --tabbar-h: 60px;
     --appbar-h: 56px;
+
+    color-scheme: light dark;
+    accent-color: hsl(var(--primary));
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+
+    &:is(.light),
+    &:has(> head > meta[name="color-scheme"][content="light"]) {
+      color-scheme: light;
+    }
+    &:is(.dark),
+    &:has(> head > meta[name="color-scheme"][content="dark"]) {
+      color-scheme: dark;
+    }
   }
 
   .dark {
-    /* "Night Mail" — warm ink background, paper text */
-    --background: 30 15% 7%;           /* #15120F */
-    --foreground: 38 40% 92%;          /* #F3EDE2 */
+    /* "Night Mail" — warm espresso-ink background, elevated dark cards, warm bronze frames, paper text */
+    --background: 28 16% 7%;           /* #14110E */
+    --foreground: 38 40% 93%;          /* #F5EFE6 */
 
-    --card: 30 13% 10%;                /* #1E1A16 */
-    --card-foreground: 38 40% 92%;
+    --card: 28 14% 11.5%;              /* #211C18 — distinct elevated card surface */
+    --card-foreground: 38 40% 93%;
 
-    --popover: 30 13% 10%;
-    --popover-foreground: 38 40% 92%;
+    --popover: 28 14% 13%;             /* #26201B — elevated floating menu surface */
+    --popover-foreground: 38 40% 93%;
 
-    --primary: 358 72% 56%;            /* #E0393E — brighter red for dark */
-    --primary-foreground: 30 15% 7%;
+    --primary: 358 78% 54%;            /* #E52E35 — vibrant high-contrast postal red for dark */
+    --primary-foreground: 40 60% 98%;  /* warm white text passes WCAG AA on red */
 
-    --secondary: 45 100% 48%;
-    --secondary-foreground: 30 15% 7%;
+    --secondary: 45 96% 52%;           /* #FABA10 — warm pillar-box gold */
+    --secondary-foreground: 28 16% 7%;
 
-    --muted: 30 10% 15%;
-    --muted-foreground: 33 12% 64%;    /* #A69C90 */
+    --muted: 28 12% 16%;               /* #2E2823 */
+    --muted-foreground: 33 14% 68%;    /* #B8AFA4 — crisp AA/AAA readability on dark */
 
-    --accent: 30 10% 16%;
-    --accent-foreground: 38 40% 92%;
+    --accent: 30 14% 19%;              /* #372F28 */
+    --accent-foreground: 38 40% 93%;
 
-    --destructive: 358 72% 56%;
-    --destructive-foreground: 30 15% 7%;
+    --destructive: 358 76% 58%;
+    --destructive-foreground: 40 60% 98%;
 
-    --border: 30 12% 20%;              /* #3A332C */
-    --input: 30 10% 30%;
-    --ring: 358 72% 56%;
+    --border: 30 13% 23%;              /* #433B33 */
+    --input: 30 13% 32%;               /* #5D5247 — meets 3:1 non-text contrast */
+    --ring: 358 76% 58%;
 
-    --status-open: 140 50% 55%;
-    --status-closing: 38 95% 58%;
-    --status-closed: 358 72% 62%;
-    --status-holiday: 255 50% 72%;
+    --status-open: 142 58% 58%;
+    --status-closing: 38 95% 60%;
+    --status-closed: 358 78% 64%;
+    --status-holiday: 255 58% 76%;
+
+    --frame: 33 17% 38%;               /* #726150 — warm philatelic bronze/stone frame (no white glare) */
+    --frame-hover: 36 28% 62%;         /* #BA9F82 — brighter warm interactive border on hover/focus */
+    --shadow-ink: 30 16% 19%;          /* #382F27 — tactile 3D stepped block shadow on dark background */
+    --stripe-gap: 28 14% 17%;          /* #312A24 — warm dark gap in Par Avion / EMS stripes */
+    --scrollbar-track: #1C1713;
+    --scrollbar-thumb: #6E5F50;
+
+    color-scheme: dark;
   }
 
   * {
@@ -140,11 +169,24 @@
   html {
     -webkit-tap-highlight-color: transparent;
     text-size-adjust: 100%;
+    overscroll-behavior-y: contain;
   }
 
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "ss01", "cv11";
+    overscroll-behavior-y: contain;
+    overflow-x: clip;
+  }
+
+  button, a, [role="button"] {
+    touch-action: manipulation;
+  }
+
+  @media (display-mode: standalone) {
+    .hide-in-standalone {
+      display: none !important;
+    }
   }
 
   h1, h2, h3, h4 {
@@ -232,9 +274,9 @@
   background: repeating-linear-gradient(
     -45deg,
     #D7263D 0 10px,
-    #fff 10px 16px,
+    hsl(var(--stripe-gap)) 10px 16px,
     #1D4E9E 16px 26px,
-    #fff 26px 32px
+    hsl(var(--stripe-gap)) 26px 32px
   );
 }
 
@@ -243,9 +285,9 @@
   background: repeating-linear-gradient(
     -45deg,
     #FF6600 0 10px,
-    #fff 10px 16px,
+    hsl(var(--stripe-gap)) 10px 16px,
     #0035AD 16px 26px,
-    #fff 26px 32px
+    hsl(var(--stripe-gap)) 26px 32px
   );
 }
 
@@ -263,6 +305,9 @@
 @utility paper-grain {
   @media (min-width: 768px) {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.1 0 0 0 0 0.08 0 0 0 0 0.05 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    &:is(.dark *) {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.92 0 0 0 0 0.85 0 0 0 0 0.72 0 0 0 .035 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
   }
 }
 
@@ -345,4 +390,223 @@
 .cv-auto {
   content-visibility: auto;
   contain-intrinsic-size: auto 76px;
+}
+
+/* ---------- Dark Mode Frame & Block-Shadow Calibration ----------
+   In light mode ("Day Post"), structural 2px borders (`border-foreground`) and
+   hard offset shadows (`hsl(var(--foreground))`) use deep black ink (#1A1714).
+   In dark mode ("Night Mail"), `--foreground` is 93% warm white (#F5EFE6) for text;
+   using 93% white for 2px borders and 4px block shadows on every card creates harsh glare.
+   Here we map structural `border-foreground` outlines in `.dark` to warm philatelic bronze
+   (`--frame`) and block shadows to deep stepped umber (`--shadow-ink`), while keeping
+   active inverted pills (`.border-foreground.bg-foreground`) crisp. */
+.dark {
+  .border-foreground {
+    border-color: hsl(var(--frame));
+  }
+  .border-foreground\/85 {
+    border-color: hsl(var(--frame) / 0.85);
+  }
+  .border-foreground\/80 {
+    border-color: hsl(var(--frame) / 0.8);
+  }
+  .border-foreground\/75 {
+    border-color: hsl(var(--frame) / 0.75);
+  }
+  .border-foreground\/70 {
+    border-color: hsl(var(--frame) / 0.7);
+  }
+  .border-foreground\/60 {
+    border-color: hsl(var(--frame) / 0.6);
+  }
+  .border-foreground\/55 {
+    border-color: hsl(var(--frame) / 0.55);
+  }
+  .border-foreground\/50 {
+    border-color: hsl(var(--frame) / 0.5);
+  }
+  .border-foreground\/45 {
+    border-color: hsl(var(--frame) / 0.45);
+  }
+  .border-foreground\/40 {
+    border-color: hsl(var(--frame) / 0.4);
+  }
+  .border-foreground\/35 {
+    border-color: hsl(var(--frame) / 0.35);
+  }
+  .border-foreground\/30 {
+    border-color: hsl(var(--frame) / 0.3);
+  }
+  .border-foreground\/25 {
+    border-color: hsl(var(--frame) / 0.25);
+  }
+  .border-foreground\/20 {
+    border-color: hsl(var(--frame) / 0.2);
+  }
+  .border-foreground\/15 {
+    border-color: hsl(var(--frame) / 0.15);
+  }
+  .border-foreground\/10 {
+    border-color: hsl(var(--frame) / 0.1);
+  }
+
+  .hover\:border-foreground:hover,
+  .focus\:border-foreground:focus,
+  .focus-visible\:border-foreground:focus-visible {
+    border-color: hsl(var(--frame-hover));
+  }
+
+  .border-foreground.bg-foreground {
+    border-color: hsl(var(--foreground));
+  }
+
+  [class*="hsl(var(--foreground)"] {
+    --tw-shadow-color: hsl(var(--shadow-ink));
+  }
+}
+
+/* Legacy fallback for WebKit/Blink browsers without standard scrollbar-color */
+@supports not (scrollbar-color: auto) {
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+}
+
+/* ---------- Blog & Postal Guides Rich Prose ---------- */
+.prose-custom {
+  color: hsl(var(--foreground) / 0.92);
+}
+
+.prose-custom h2 {
+  font-family: var(--font-heading);
+  font-stretch: 82%;
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: hsl(var(--foreground));
+  margin-top: 2.25rem;
+  margin-bottom: 0.85rem;
+}
+
+.prose-custom h3 {
+  font-family: var(--font-heading);
+  font-stretch: 82%;
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: hsl(var(--foreground));
+  margin-top: 1.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.prose-custom p {
+  margin-bottom: 1rem;
+  line-height: 1.7;
+  color: hsl(var(--foreground) / 0.88);
+}
+
+.prose-custom strong {
+  color: hsl(var(--foreground));
+  font-weight: 700;
+}
+
+.prose-custom a {
+  color: hsl(var(--primary));
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.prose-custom ul,
+.prose-custom ol {
+  margin: 1rem 0;
+  padding-left: 1.5rem;
+  color: hsl(var(--foreground) / 0.88);
+}
+
+.prose-custom ul {
+  list-style-type: disc;
+}
+
+.prose-custom ol {
+  list-style-type: decimal;
+}
+
+.prose-custom li {
+  margin-bottom: 0.35rem;
+  line-height: 1.65;
+}
+
+.prose-custom blockquote {
+  margin: 1.25rem 0;
+  padding: 0.75rem 1rem;
+  border-left: 4px solid hsl(var(--secondary));
+  background: hsl(var(--card));
+  color: hsl(var(--foreground) / 0.9);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.prose-custom code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+}
+
+.prose-custom pre {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  border: 1.5px solid hsl(var(--frame));
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  margin: 1.25rem 0;
+}
+
+.prose-custom pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.prose-custom table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  font-size: 0.875rem;
+  background: hsl(var(--card));
+  border: 1.5px solid hsl(var(--frame));
+}
+
+.prose-custom th,
+.prose-custom td {
+  padding: 0.65rem 0.85rem;
+  border: 1px solid hsl(var(--border));
+  text-align: left;
+}
+
+.prose-custom th {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+/* Override any hardcoded inline black/white styles pasted into rich-text blog articles when in dark mode */
+.dark .prose-custom [style*="color"] {
+  color: inherit !important;
+}
+.dark .prose-custom [style*="background"] {
+  background-color: transparent !important;
 }

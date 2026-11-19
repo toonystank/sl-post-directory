@@ -2,6 +2,7 @@
 
 import { useState, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
+import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, ArrowLeft, Save, Check } from "lucide-react";
@@ -21,6 +22,7 @@ interface BlogEditorProps {
 
 export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) {
     const editor = useRef(null);
+    const { resolvedTheme } = useTheme();
     const [title, setTitle] = useState(post?.title || "");
     const [slug, setSlug] = useState(post?.slug || "");
     const [excerpt, setExcerpt] = useState(post?.excerpt || "");
@@ -33,13 +35,13 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
     const config = useMemo(() => ({
         readonly: false,
         height: 600,
-        theme: 'dark',
+        theme: resolvedTheme === "dark" ? "dark" : "default",
         placeholder: 'Start writing your article...',
         toolbarSticky: true,
         showCharsCounter: false,
         showWordsCounter: false,
         showXPathInStatusbar: false
-    }), []);
+    }), [resolvedTheme]);
 
     const handleSave = async () => {
         if (!title || !slug || !contentHtml) {

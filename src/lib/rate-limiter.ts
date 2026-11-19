@@ -120,6 +120,8 @@ export const rateLimiters = {
     reviews: createLimiter({ prefix: "rl:reviews", limit: 8, windowMs: 15 * 60_000, windowLabel: "15 m" }),
     /** Community photos: 10 uploads per hour per IP */
     photos: createLimiter({ prefix: "rl:photos", limit: 10, windowMs: 60 * 60_000, windowLabel: "1 h" }),
+    /** Parcel tracking proxy: 30 requests per minute per IP */
+    tracking: createLimiter({ prefix: "rl:tracking", limit: 30, windowMs: 60_000, windowLabel: "1 m" }),
 };
 
 export type AppRateLimiter = (typeof rateLimiters)[keyof typeof rateLimiters];

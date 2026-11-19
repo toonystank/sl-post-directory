@@ -1,12 +1,21 @@
 import type { Metadata } from "next";
 import PostageCalculator from "@/components/PostageCalculator";
 import CalculatorHeader from "@/components/CalculatorHeader";
+import { buildLocalizedAlternates } from "@/lib/site";
 
-export const metadata: Metadata = {
-    title: "Postage Calculator",
-    description:
-        "Calculate official Sri Lanka Post shipping costs for domestic letters, parcels, SLP Courier (formerly Speed Post), COD, and international EMS, Air Mail, U-Packet, TDS, and Sea Mail.",
-};
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+    const { locale } = await params;
+    return {
+        title: "Postage Calculator",
+        description:
+            "Calculate official Sri Lanka Post shipping costs for domestic letters, parcels, SLP Courier (formerly Speed Post), COD, and international EMS, Air Mail, U-Packet, TDS, and Sea Mail.",
+        alternates: buildLocalizedAlternates("/calculator", locale),
+    };
+}
 
 type SearchParamValue = string | string[] | undefined;
 

@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { usePWA } from "@/context/PWAContext";
 import { stripLocalePrefix } from "@/lib/locale";
 import { ensureLocalOfficeIndex } from "@/lib/office-index-client";
+import { triggerHaptic } from "@/lib/haptics";
 import MoreSheet from "./MoreSheet";
 
 const HIDDEN_ON = ["/login", "/register", "/dashboard"];
@@ -38,8 +39,8 @@ export default function BottomTabBar() {
 
     const tabs = [
         { href: "/", label: t("tabHome"), icon: Home, active: !isOfflineFallback && pathname === "/" },
-        { href: "/calculator", label: t("tabRates"), icon: Calculator, active: !isOfflineFallback && pathname.startsWith("/calculator") },
-        { href: "/browse", label: t("tabBrowse"), icon: FolderOpen, active: !isOfflineFallback && (pathname.startsWith("/browse") || pathname.startsWith("/office")) },
+        { href: "/calculator", label: t("tabRates"), icon: Calculator, active: !isOfflineFallback && (pathname.startsWith("/calculator") || pathname.startsWith("/rates")) },
+        { href: "/browse", label: t("tabBrowse"), icon: FolderOpen, active: !isOfflineFallback && (pathname.startsWith("/browse") || pathname.startsWith("/office") || pathname.startsWith("/district")) },
         { href: "/track", label: t("tabTrack"), icon: Package, active: !isOfflineFallback && pathname.startsWith("/track") },
     ];
 
@@ -58,13 +59,14 @@ export default function BottomTabBar() {
         <>
             <nav
                 aria-label={t("mainNav")}
-                className="md:hidden fixed inset-x-0 bottom-0 z-[80] border-t-2 border-foreground bg-background pb-safe"
+                className="md:hidden fixed inset-x-0 bottom-0 z-[80] border-t-2 border-foreground bg-background pb-safe select-none"
             >
                 <ul className="grid h-[var(--tabbar-h)] grid-cols-5">
                     {tabs.map(({ href, label, icon: Icon, active }) => (
                         <li key={href}>
                             <Link
                                 href={href}
+                                onClick={() => triggerHaptic("light")}
                                 onTouchStart={() => prefetchTab(href)}
                                 onPointerEnter={() => prefetchTab(href)}
                                 aria-current={active ? "page" : undefined}

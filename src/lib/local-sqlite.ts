@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { createRequire } from "module";
+import { normalizePostalCode, postalCodeSearchVariants } from "./site";
 
 export interface LocalOfficeField {
     id: string;
@@ -202,7 +203,7 @@ export function loadLocalOffices(): LocalOfficeRecord[] {
                 id: rowId,
                 name: row.name,
                 slug,
-                postalCode: row.postalCode || "",
+                postalCode: normalizePostalCode(row.postalCode),
                 services: [],
                 rmsc: null,
                 latitude: null,
@@ -251,6 +252,9 @@ export function queryLocalOffices(params: {
     letter?: string;
     mode?: string;
     service?: string;
+    division?: string;
+    officeType?: string;
+    is24Hour?: boolean;
     cursor?: number;
     limit?: number;
 }): {
@@ -277,10 +281,31 @@ export function queryLocalOffices(params: {
         );
     }
 
+    const division = params.division?.trim().toLowerCase() || "";
+    if (division) {
+        filtered = filtered.filter((item) => item.divisionLower === division);
+    }
+
+    const officeType = params.officeType?.trim().toLowerCase() || "";
+    if (officeType) {
+        filtered = filtered.filter((item) =>
+            item.record.fields.some(
+                (f) => f.name === "Type" && f.value.toLowerCase() === officeType
+            )
+        );
+    }
+
+    if (params.is24Hour) {
+        filtered = filtered.filter((item) =>
+            item.record.fields.some((f) => f.name === "Is24Hour" && f.value === "true")
+        );
+    }
+
     const q = params.q?.trim() || "";
     if (q) {
         const qLower = q.toLowerCase();
         const mode = params.mode || "name";
+        const codeVariants = postalCodeSearchVariants(q).map((v) => v.toLowerCase());
 
         if (mode === "division") {
             filtered = filtered.filter((item) => item.divisionLower.includes(qLower));
@@ -290,13 +315,25 @@ export function queryLocalOffices(params: {
             const contains: IndexedLocalOffice[] = [];
 
             for (const item of filtered) {
-                if (item.nameLower === qLower || item.codeLower === qLower) {
+                const isCodeExact =
+                    item.codeLower === qLower ||
+                    (codeVariants.length > 0 && codeVariants.includes(item.codeLower));
+                const isCodePrefix =
+                    item.codeLower.startsWith(qLower) ||
+                    (codeVariants.length > 0 &&
+                        codeVariants.some((v) => item.codeLower.startsWith(v)));
+                const isCodeContains =
+                    item.codeLower.includes(qLower) ||
+                    (codeVariants.length > 0 &&
+                        codeVariants.some((v) => item.codeLower.includes(v)));
+
+                if (item.nameLower === qLower || isCodeExact) {
                     exact.push(item);
-                } else if (item.nameLower.startsWith(qLower) || item.codeLower.startsWith(qLower)) {
+                } else if (item.nameLower.startsWith(qLower) || isCodePrefix) {
                     prefix.push(item);
                 } else if (
                     item.nameLower.includes(qLower) ||
-                    item.codeLower.includes(qLower) ||
+                    isCodeContains ||
                     item.fieldsLower.some((val) => val.includes(qLower))
                 ) {
                     contains.push(item);
@@ -340,18 +377,31 @@ export function autocompleteLocalOffices(q: string, mode = "name"): string[] {
     }
 
     const isNumeric = /^\d+$/.test(trimmed);
+    const codeVariants = postalCodeSearchVariants(trimmed);
     const exact: LocalOfficeRecord[] = [];
     const prefix: LocalOfficeRecord[] = [];
     const contains: LocalOfficeRecord[] = [];
 
     for (const item of index) {
-        if (item.nameLower === qLower || item.record.postalCode === trimmed) {
+        const codeExact =
+            item.record.postalCode === trimmed ||
+            (codeVariants.length > 0 && codeVariants.includes(item.record.postalCode));
+        const codePrefix =
+            item.record.postalCode.startsWith(trimmed) ||
+            (codeVariants.length > 0 &&
+                codeVariants.some((v) => item.record.postalCode.startsWith(v)));
+        const codeContains =
+            item.record.postalCode.includes(trimmed) ||
+            (codeVariants.length > 0 &&
+                codeVariants.some((v) => item.record.postalCode.includes(v)));
+
+        if (item.nameLower === qLower || codeExact) {
             exact.push(item.record);
-        } else if (item.nameLower.startsWith(qLower) || item.record.postalCode.startsWith(trimmed)) {
+        } else if (item.nameLower.startsWith(qLower) || codePrefix) {
             prefix.push(item.record);
         } else if (
             item.nameLower.includes(qLower) ||
-            item.record.postalCode.includes(trimmed) ||
+            codeContains ||
             (mode === "all" && item.divisionLower.includes(qLower))
         ) {
             contains.push(item.record);

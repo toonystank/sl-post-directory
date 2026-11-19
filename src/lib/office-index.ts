@@ -1,4 +1,5 @@
 import type { PostOffice, SearchMode, SearchResponse } from "@/components/directory/types";
+import { formatSriLankaPhone, normalizePostalCode, postalCodeSearchVariants } from "./site";
 
 /**
  * Compact tuple row for a single post office:
@@ -78,7 +79,20 @@ export function encodeOfficeIndex(records: OfficeIndexSourceRecord[]): CompactOf
         return idx;
     };
 
-    const sorted = [...records].sort((a, b) => a.name.localeCompare(b.name));
+    // Deduplicate obvious lowercase/empty-postcode duplicates (e.g. "kabagamuwa" without postcode vs "Kabagamuwa" with 71202)
+    const namesWithPostalCode = new Set<string>();
+    for (const rec of records) {
+        if (normalizePostalCode(rec.postalCode)) {
+            namesWithPostalCode.add(rec.name.trim().toLowerCase());
+        }
+    }
+    const cleanedRecords = records.filter((rec) => {
+        const hasCode = Boolean(normalizePostalCode(rec.postalCode));
+        if (hasCode) return true;
+        return !namesWithPostalCode.has(rec.name.trim().toLowerCase());
+    });
+
+    const sorted = [...cleanedRecords].sort((a, b) => a.name.localeCompare(b.name));
     const rows: CompactOfficeRow[] = new Array(sorted.length);
     const hashChunks: string[] = [String(sorted.length)];
 
@@ -94,7 +108,7 @@ export function encodeOfficeIndex(records: OfficeIndexSourceRecord[]): CompactOf
                 if (f.name === "Division") division = f.value;
                 else if (f.name === "Type") type = f.value;
                 else if (f.name === "Phone" || f.name === "Telephone") {
-                    if (!phone && f.value) phone = f.value.trim();
+                    if (!phone && f.value) phone = formatSriLankaPhone(f.value);
                 } else if (f.name === "Is24Hour" && f.value === "true") {
                     is24Hour = true;
                 }
@@ -112,7 +126,7 @@ export function encodeOfficeIndex(records: OfficeIndexSourceRecord[]): CompactOf
         }
 
         const flags = is24Hour ? FLAG_IS_24_HOUR : 0;
-        const postalCode = (rec.postalCode || "").trim();
+        const postalCode = normalizePostalCode(rec.postalCode);
 
         rows[i] = [
             rec.id,
@@ -132,7 +146,7 @@ export function encodeOfficeIndex(records: OfficeIndexSourceRecord[]): CompactOf
         }
     }
 
-    const version = `v1-${sorted.length}-${fnv1aHash(hashChunks.join("|"))}`;
+    const version = `v2-${sorted.length}-${fnv1aHash(hashChunks.join("|"))}`;
     return {
         v: version,
         count: sorted.length,
@@ -195,8 +209,11 @@ interface PreparedRow {
     nameLower: string;
     nameCompact: string;
     codeLower: string;
+    codeStripped: string;
     firstChar: string;
     divisionLower: string;
+    typeLower: string;
+    is24Hour: boolean;
     servicesLower: string[];
 }
 
@@ -271,36 +288,63 @@ export interface LocalQueryParams {
     mode?: SearchMode;
     letter?: string | null;
     service?: string | null;
+    division?: string | null;
+    officeType?: string | null;
+    is24Hour?: boolean;
     cursor?: number;
     limit?: number;
 }
 
+export interface RichAutocompleteSuggestion {
+    label: string;
+    queryValue: string;
+    slug?: string;
+    postalCode?: string;
+    division?: string;
+    kind: "office" | "division";
+}
+
 /**
- * In-memory search engine hydrated from the compact 4,158-office index.
- * Executes autocomplete, A–Z browse, postcode, division, and service filters in < 10ms.
+ * In-memory search engine hydrated from the compact office index.
+ * Executes autocomplete, A–Z browse, postcode, division, type, 24h, and service filters in < 10ms.
  */
 export class LocalOfficeSearchEngine {
     readonly index: CompactOfficeIndex;
     private readonly prepared: PreparedRow[];
     private readonly slugMap: Map<string, CompactOfficeRow>;
+    readonly divisions: string[];
+    readonly types: string[];
 
     constructor(index: CompactOfficeIndex) {
         this.index = index;
         this.slugMap = new Map();
+        this.divisions = [...index.d].filter(Boolean).sort((a, b) => a.localeCompare(b));
+        const typeSet = new Set<string>(["Post Office", ...index.t.filter(Boolean)]);
+        this.types = Array.from(typeSet).sort((a, b) => a.localeCompare(b));
+
         const divisionsLower = index.d.map((d) => d.toLowerCase());
+        const typesLower = index.t.map((t) => t.toLowerCase());
         const servicesLower = index.s.map((s) => s.toLowerCase());
 
         this.prepared = index.r.map((row) => {
-            const [, slug, name, postalCode, divIdx, , , , svcIndices] = row;
+            const [, slug, name, rawPostalCode, divIdx, typeIdx, , flags, svcIndices] = row;
+            const normalizedCode = normalizePostalCode(rawPostalCode);
+            if (normalizedCode !== rawPostalCode) {
+                row[3] = normalizedCode;
+            }
             this.slugMap.set(slug, row);
             const nameLower = name.toLowerCase();
+            const codeLower = normalizedCode.toLowerCase();
             return {
                 row,
                 nameLower,
                 nameCompact: nameLower.replace(/[^a-z0-9]/g, ""),
-                codeLower: postalCode.toLowerCase(),
+                codeLower,
+                codeStripped: codeLower.replace(/^0+/, ""),
                 firstChar: name.charAt(0).toUpperCase(),
                 divisionLower: divIdx >= 0 ? (divisionsLower[divIdx] || "") : "",
+                typeLower: typeIdx >= 0 ? (typesLower[typeIdx] || "post office") : "post office",
+                is24Hour: (flags & FLAG_IS_24_HOUR) !== 0,
                 servicesLower: svcIndices.map((idx) => servicesLower[idx] || "").filter(Boolean),
             };
         });
@@ -322,6 +366,9 @@ export class LocalOfficeSearchEngine {
     query(params: LocalQueryParams): SearchResponse {
         const letter = (params.letter || "").trim().toUpperCase();
         const serviceLower = (params.service || "").trim().toLowerCase();
+        const divisionFilterLower = (params.division || "").trim().toLowerCase();
+        const typeFilterLower = (params.officeType || "").trim().toLowerCase();
+        const only24Hour = Boolean(params.is24Hour);
         const rawQ = (params.q || "").trim();
         const mode: SearchMode = params.mode === "division" ? "division" : "name";
         const cursor = Math.max(0, params.cursor ?? 0);
@@ -340,6 +387,18 @@ export class LocalOfficeSearchEngine {
             );
         }
 
+        if (divisionFilterLower) {
+            pool = pool.filter((item) => item.divisionLower === divisionFilterLower);
+        }
+
+        if (typeFilterLower) {
+            pool = pool.filter((item) => item.typeLower === typeFilterLower);
+        }
+
+        if (only24Hour) {
+            pool = pool.filter((item) => item.is24Hour);
+        }
+
         let ranked: PreparedRow[];
         if (!rawQ) {
             ranked = pool;
@@ -356,19 +415,38 @@ export class LocalOfficeSearchEngine {
             const primaryTerm = cleanOfficeSearchTerm(rawQ);
             const qLower = primaryTerm.toLowerCase();
             const qCompact = qLower.replace(/[^a-z0-9]/g, "");
+            const codeVariants = postalCodeSearchVariants(primaryTerm).map((v) => v.toLowerCase());
             const exact: PreparedRow[] = [];
             const prefix: PreparedRow[] = [];
             const contains: PreparedRow[] = [];
             const fuzzy: PreparedRow[] = [];
 
             for (const item of pool) {
-                if (item.nameLower === qLower || item.codeLower === qLower) {
+                const isCodeExact =
+                    item.codeLower === qLower ||
+                    (codeVariants.length > 0 &&
+                        (codeVariants.includes(item.codeLower) ||
+                            (item.codeStripped !== "" && codeVariants.includes(item.codeStripped))));
+                const isCodePrefix =
+                    item.codeLower.startsWith(qLower) ||
+                    (codeVariants.length > 0 &&
+                        codeVariants.some(
+                            (v) =>
+                                item.codeLower.startsWith(v) ||
+                                (item.codeStripped !== "" && item.codeStripped.startsWith(v))
+                        ));
+                const isCodeContains =
+                    item.codeLower.includes(qLower) ||
+                    (codeVariants.length > 0 &&
+                        codeVariants.some((v) => item.codeLower.includes(v)));
+
+                if (item.nameLower === qLower || isCodeExact) {
                     exact.push(item);
-                } else if (item.nameLower.startsWith(qLower) || item.codeLower.startsWith(qLower)) {
+                } else if (item.nameLower.startsWith(qLower) || isCodePrefix) {
                     prefix.push(item);
                 } else if (
                     item.nameLower.includes(qLower) ||
-                    item.codeLower.includes(qLower) ||
+                    isCodeContains ||
                     item.divisionLower.includes(qLower)
                 ) {
                     contains.push(item);
@@ -387,26 +465,30 @@ export class LocalOfficeSearchEngine {
         return { offices, total, nextCursor };
     }
 
-    autocomplete(rawQ: string, mode: "name" | "division" | "all" = "name", maxResults = 5): string[] {
+    autocompleteRich(
+        rawQ: string,
+        mode: "name" | "division" | "all" = "name",
+        maxResults = 5
+    ): RichAutocompleteSuggestion[] {
         const trimmed = rawQ.trim();
         if (!trimmed) return [];
         const qLower = trimmed.toLowerCase();
 
         if (mode === "division") {
             const seen = new Set<string>();
-            const prefix: string[] = [];
-            const contains: string[] = [];
+            const prefix: RichAutocompleteSuggestion[] = [];
+            const contains: RichAutocompleteSuggestion[] = [];
             for (const div of this.index.d) {
                 const lower = div.toLowerCase();
                 if (lower.startsWith(qLower)) {
                     if (!seen.has(div)) {
                         seen.add(div);
-                        prefix.push(div);
+                        prefix.push({ label: div, queryValue: div, division: div, kind: "division" });
                     }
                 } else if (lower.includes(qLower)) {
                     if (!seen.has(div)) {
                         seen.add(div);
-                        contains.push(div);
+                        contains.push({ label: div, queryValue: div, division: div, kind: "division" });
                     }
                 }
             }
@@ -414,6 +496,7 @@ export class LocalOfficeSearchEngine {
         }
 
         const isNumeric = /^\d+$/.test(trimmed);
+        const codeVariants = postalCodeSearchVariants(trimmed).map((v) => v.toLowerCase());
         const qCompact = qLower.replace(/[^a-z0-9]/g, "");
         const exact: CompactOfficeRow[] = [];
         const prefix: CompactOfficeRow[] = [];
@@ -421,35 +504,68 @@ export class LocalOfficeSearchEngine {
         const fuzzy: CompactOfficeRow[] = [];
 
         for (const item of this.prepared) {
-            if (item.nameLower === qLower || item.codeLower === qLower) {
+            const isCodeExact =
+                item.codeLower === qLower ||
+                (codeVariants.length > 0 &&
+                    (codeVariants.includes(item.codeLower) ||
+                        (item.codeStripped !== "" && codeVariants.includes(item.codeStripped))));
+            const isCodePrefix =
+                item.codeLower.startsWith(qLower) ||
+                (codeVariants.length > 0 &&
+                    codeVariants.some(
+                        (v) =>
+                            item.codeLower.startsWith(v) ||
+                            (item.codeStripped !== "" && item.codeStripped.startsWith(v))
+                    ));
+            const isCodeContains =
+                item.codeLower.includes(qLower) ||
+                (codeVariants.length > 0 && codeVariants.some((v) => item.codeLower.includes(v)));
+
+            if (item.nameLower === qLower || isCodeExact) {
                 exact.push(item.row);
-            } else if (item.nameLower.startsWith(qLower) || item.codeLower.startsWith(qLower)) {
+            } else if (item.nameLower.startsWith(qLower) || isCodePrefix) {
                 prefix.push(item.row);
             } else if (
                 item.nameLower.includes(qLower) ||
-                item.codeLower.includes(qLower) ||
+                isCodeContains ||
                 (mode === "all" && item.divisionLower.includes(qLower))
             ) {
                 contains.push(item.row);
-            } else if (!isNumeric && exact.length + prefix.length + contains.length < maxResults && fuzzyMatchesName(item, qLower, qCompact)) {
+            } else if (
+                !isNumeric &&
+                exact.length + prefix.length + contains.length < maxResults &&
+                fuzzyMatchesName(item, qLower, qCompact)
+            ) {
                 fuzzy.push(item.row);
             }
         }
 
-        const suggestions: string[] = [];
+        const suggestions: RichAutocompleteSuggestion[] = [];
         const seen = new Set<string>();
         for (const bucket of [exact, prefix, contains, fuzzy]) {
             for (const row of bucket) {
-                const name = row[2];
-                const postalCode = row[3];
+                const [, slug, name, postalCode, divIdx] = row;
+                const division = divIdx >= 0 ? this.index.d[divIdx] : undefined;
                 const label = isNumeric && postalCode ? `${name} (${postalCode})` : name;
-                if (!seen.has(label)) {
-                    seen.add(label);
-                    suggestions.push(label);
+                const dedupKey = `${name.toLowerCase()}|${postalCode}`;
+                if (!seen.has(dedupKey)) {
+                    seen.add(dedupKey);
+                    suggestions.push({
+                        label,
+                        queryValue: name,
+                        slug,
+                        postalCode: postalCode || undefined,
+                        division,
+                        kind: "office",
+                    });
                     if (suggestions.length >= maxResults) return suggestions;
                 }
             }
         }
         return suggestions;
+    }
+
+    autocomplete(rawQ: string, mode: "name" | "division" | "all" = "name", maxResults = 5): string[] {
+        return this.autocompleteRich(rawQ, mode, maxResults).map((s) => s.label);
     }
 }
