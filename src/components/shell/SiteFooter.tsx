@@ -1,11 +1,13 @@
-import { getTranslations } from "next-intl/server";
+"use client";
+
+import { useTranslations } from "next-intl";
 import { Link } from "@/navigation";
 import StampLogo from "@/components/brand/StampLogo";
 
 /** Desktop footer (hidden on mobile — the More sheet carries this info there). */
-export default async function SiteFooter() {
-    const t = await getTranslations("Footer");
-    const tNav = await getTranslations("Nav");
+export default function SiteFooter() {
+    const t = useTranslations("Footer");
+    const tNav = useTranslations("Nav");
     return (
         <footer className="hidden md:block mt-auto border-t-2 border-foreground bg-card">
             <div className="airmail-stripe h-1.5" aria-hidden="true" />

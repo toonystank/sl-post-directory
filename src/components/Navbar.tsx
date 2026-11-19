@@ -13,6 +13,7 @@ import LanguageSwitcher from "./LanguageSwitcher";
 import CurrencySwitcher from "./CurrencySwitcher";
 import StampLogo from "./brand/StampLogo";
 import { usePWA } from "@/context/PWAContext";
+import { stripLocalePrefix } from "@/lib/locale";
 
 /**
  * Global header.
@@ -20,7 +21,8 @@ import { usePWA } from "@/context/PWAContext";
  * - mobile: compact native-style app bar (logo on home, back + title elsewhere).
  */
 export default function Navbar() {
-    const pathname = usePathname() || "/";
+    const rawPathname = usePathname() || "/";
+    const pathname = stripLocalePrefix(rawPathname);
     const router = useRouter();
     const { data: session } = useSession();
     const t = useTranslations("Nav");

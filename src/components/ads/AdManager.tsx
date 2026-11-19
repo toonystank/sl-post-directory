@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import Script from "next/script";
 import { usePathname } from "@/navigation";
+import { stripLocalePrefix } from "@/lib/locale";
 
 const NON_CONTENT_PREFIXES = ["/login", "/register", "/dashboard", "/suggest"];
 let cachedAdsEnabled: boolean | null = null;
@@ -27,7 +28,7 @@ function isNativePlatform(): boolean {
 }
 
 export default function AdManager({ children }: { children: React.ReactNode }) {
-    const pathname = usePathname() || "/";
+    const pathname = stripLocalePrefix(usePathname() || "/");
     const [adsEnabled, setAdsEnabled] = useState(true);
     const [loading, setLoading] = useState(true);
     const [isNative, setIsNative] = useState(false);

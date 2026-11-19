@@ -7,6 +7,7 @@ import { Home, FolderOpen, Calculator, Package, Menu } from "lucide-react";
 import { m } from "motion/react";
 import { cn } from "@/lib/utils";
 import { usePWA } from "@/context/PWAContext";
+import { stripLocalePrefix } from "@/lib/locale";
 import MoreSheet from "./MoreSheet";
 
 const HIDDEN_ON = ["/login", "/register", "/dashboard"];
@@ -17,7 +18,7 @@ const HIDDEN_ON = ["/login", "/register", "/dashboard"];
  */
 export default function BottomTabBar() {
     const t = useTranslations("App");
-    const pathname = usePathname() || "/";
+    const pathname = stripLocalePrefix(usePathname() || "/");
     const { isOfflineFallbackPage } = usePWA();
     const [moreOpen, setMoreOpen] = React.useState(false);
     const [hasMounted, setHasMounted] = React.useState(false);
