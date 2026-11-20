@@ -385,7 +385,9 @@ export default function HomeTrackingDrawerCard({
                                         : "bg-primary text-primary-foreground"
                                 )}
                             >
-                                <span>Full Details</span>
+                                <span>
+                                    {isSingle ? "Full Details" : `Track All (${intent.barcodes.length})`}
+                                </span>
                                 <ArrowRight className="h-3.5 w-3.5 shrink-0" />
                             </Link>
                         )}
