@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
+import { setRequestLocale } from "next-intl/server";
 import PostageCalculator from "@/components/PostageCalculator";
 import CalculatorHeader from "@/components/CalculatorHeader";
-import { buildLocalizedAlternates } from "@/lib/site";
+import {
+    buildLocalizedAlternates,
+    buildLocalizedUrl,
+    getDefaultOpenGraphImages,
+    getOgLocale,
+} from "@/lib/site";
 
 export async function generateMetadata({
     params,
@@ -9,11 +15,20 @@ export async function generateMetadata({
     params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
     const { locale } = await params;
+    const title = "Postage Calculator";
+    const description =
+        "Calculate official Sri Lanka Post shipping costs for domestic letters, parcels, SLP Courier (formerly Speed Post), COD, and international EMS, Air Mail, U-Packet, TDS, and Sea Mail.";
     return {
-        title: "Postage Calculator",
-        description:
-            "Calculate official Sri Lanka Post shipping costs for domestic letters, parcels, SLP Courier (formerly Speed Post), COD, and international EMS, Air Mail, U-Packet, TDS, and Sea Mail.",
+        title,
+        description,
         alternates: buildLocalizedAlternates("/calculator", locale),
+        openGraph: {
+            title: `${title} | Lanka Post Directory`,
+            description,
+            url: buildLocalizedUrl("/calculator", locale),
+            locale: getOgLocale(locale),
+            images: getDefaultOpenGraphImages(`${title} | Lanka Post Directory`),
+        },
     };
 }
 
@@ -25,8 +40,10 @@ function firstParam(val: SearchParamValue): string | undefined {
 }
 
 export default async function CalculatorPage({
+    params: routeParams,
     searchParams,
 }: {
+    params: Promise<{ locale: string }>;
     searchParams: Promise<{
         mode?: SearchParamValue;
         country?: SearchParamValue;
@@ -37,7 +54,8 @@ export default async function CalculatorPage({
         registered?: SearchParamValue;
     }>;
 }) {
-    const params = await searchParams;
+    const [{ locale }, params] = await Promise.all([routeParams, searchParams]);
+    setRequestLocale(locale);
     const m = firstParam(params.mode);
     const initialMode = m === "cod" ? "cod" : m === "local" ? "domestic" : "ems";
     const initialCountry = firstParam(params.country)?.toUpperCase();

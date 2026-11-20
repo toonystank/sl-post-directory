@@ -56,13 +56,50 @@ export function buildLocalizedAlternates(
  */
 export function normalizePostalCode(raw: string | null | undefined): string {
     const trimmed = (raw ?? "").trim();
-    if (!trimmed || trimmed === "-" || trimmed === "—") return "";
+    if (
+        !trimmed ||
+        trimmed === "-" ||
+        trimmed === "—" ||
+        /^(n\/?a|none|null|unknown)$/i.test(trimmed)
+    ) {
+        return "";
+    }
     if (/^\d{1,5}$/.test(trimmed)) {
         const numeric = parseInt(trimmed, 10);
         if (numeric === 0) return "";
         return trimmed.padStart(5, "0");
     }
     return trimmed;
+}
+
+/**
+ * Converts a Sri Lanka postal division name into its canonical `/district/[slug]` segment.
+ */
+export function slugifyDivision(name: string): string {
+    return name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+}
+
+export function getOgLocale(locale: string = "en"): string {
+    if (locale === "si") return "si_LK";
+    if (locale === "ta") return "ta_LK";
+    return "en_US";
+}
+
+export function getDefaultOpenGraphImages(
+    alt: string = "Lanka Post Directory — Sri Lanka Post Offices, Postal Codes & 2026 Rates"
+) {
+    const siteUrl = getSiteUrl();
+    return [
+        {
+            url: `${siteUrl}/opengraph-image`,
+            width: 1200,
+            height: 630,
+            alt,
+        },
+    ];
 }
 
 /**

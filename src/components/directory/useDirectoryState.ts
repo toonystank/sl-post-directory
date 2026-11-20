@@ -16,7 +16,14 @@ export interface DirectoryExtraFilters {
     is24Hour?: boolean;
 }
 
-export function useDirectoryState() {
+export interface InitialDirectoryData {
+    offices: PostOffice[];
+    total: number;
+    nextCursor: number | null;
+    divisions: string[];
+}
+
+export function useDirectoryState(initialData?: InitialDirectoryData) {
     const router = useRouter();
     const searchParams = useSearchParams();
 
@@ -27,6 +34,10 @@ export function useDirectoryState() {
     const urlDivision = searchParams.get("division") || null;
     const urlOfficeType = searchParams.get("type") || null;
     const urlIs24Hour = searchParams.get("is24Hour") === "1" || searchParams.get("is24Hour") === "true";
+
+    const hasUrlFilters = Boolean(
+        urlQuery || urlLetter || urlService || urlDivision || urlOfficeType || urlIs24Hour
+    );
 
     const syncEngineAtInit = getLoadedOfficeIndexSync();
     const syncInitialResult = syncEngineAtInit
@@ -41,7 +52,9 @@ export function useDirectoryState() {
               cursor: 0,
               limit: PAGE_LIMIT,
           })
-        : null;
+        : !hasUrlFilters && initialData && initialData.offices.length > 0
+          ? initialData
+          : null;
 
     const [query, setQuery] = useState(urlQuery);
     const [searchMode, setSearchMode] = useState<SearchMode>(urlMode);
@@ -52,7 +65,7 @@ export function useDirectoryState() {
     const [only24Hour, setOnly24Hour] = useState<boolean>(urlIs24Hour);
 
     const [availableDivisions, setAvailableDivisions] = useState<string[]>(
-        () => syncEngineAtInit?.divisions ?? []
+        () => syncEngineAtInit?.divisions ?? initialData?.divisions ?? []
     );
     const [availableTypes, setAvailableTypes] = useState<string[]>(
         () => syncEngineAtInit?.types ?? ["Post Office", "Sub Post Office"]

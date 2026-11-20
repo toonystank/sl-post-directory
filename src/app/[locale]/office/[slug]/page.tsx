@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getTranslations } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Building2, PenLine } from "lucide-react";
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 import { getLocalOfficeBySlug } from "@/lib/local-sqlite";
@@ -9,6 +9,8 @@ import {
     buildLocalizedAlternates,
     buildLocalizedUrl,
     formatSriLankaPhone,
+    getDefaultOpenGraphImages,
+    getOgLocale,
     normalizePostalCode,
 } from "@/lib/site";
 import { Link } from "@/navigation";
@@ -92,12 +94,15 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
             title: `${title} | Lanka Post Directory`,
             description,
             url: canonicalUrl,
+            locale: getOgLocale(locale),
+            images: getDefaultOpenGraphImages(`${title} | Lanka Post Directory`),
         },
     };
 }
 
 export default async function OfficeDetails({ params }: { params: Promise<{ locale: string; slug: string }> }) {
     const { locale, slug } = await params;
+    setRequestLocale(locale);
 
     const office = await findOfficeDetails(slug);
 

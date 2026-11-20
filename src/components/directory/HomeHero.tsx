@@ -103,8 +103,7 @@ export default function HomeHero({ search, searchMode: controlledMode, total = 4
                                             : "display text-[1.28rem] sm:text-[1.5rem] leading-[1.08] md:text-4xl lg:text-5xl"
                                     )}
                                 >
-                                    <span className="md:hidden">{t("headlineMobile")}</span>
-                                    <span className="hidden md:inline">{t("headlineDesktop")}</span>
+                                    {t("headlineDesktop")}
                                 </h1>
                                 <p
                                     className={cn(

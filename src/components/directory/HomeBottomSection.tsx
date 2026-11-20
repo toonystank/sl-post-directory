@@ -19,10 +19,17 @@ const POPULAR_RATE_LINKS = [
     { href: "/rates/cod", label: "COD Charges" },
 ];
 
+export interface DivisionLink {
+    name: string;
+    slug: string;
+}
+
 export default function HomeBottomSection({
     children,
+    divisions = [],
 }: {
     children: React.ReactNode;
+    divisions?: DivisionLink[];
 }) {
     const t = useTranslations("Home");
 
@@ -54,6 +61,34 @@ export default function HomeBottomSection({
                         ))}
                     </div>
                 </div>
+
+                {/* Browse Post Offices by Postal Division (internal link hub to all 30 division pages & 4,000+ offices) */}
+                {divisions.length > 0 && (
+                    <div className="rounded-xl border-2 border-foreground bg-card p-4 sm:p-5">
+                        <div className="flex items-center justify-between gap-2 mb-3">
+                            <h2 className="font-heading text-lg sm:text-xl font-extrabold [font-stretch:82%]">
+                                Browse Post Offices by Division
+                            </h2>
+                            <Link
+                                href="/browse"
+                                className="text-xs sm:text-sm font-semibold text-primary hover:underline shrink-0"
+                            >
+                                All offices &rarr;
+                            </Link>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {divisions.map((div) => (
+                                <Link
+                                    key={div.slug}
+                                    href={`/district/${div.slug}`}
+                                    className="tap rounded-full border-[1.5px] border-foreground/50 bg-background px-3 py-1.5 text-xs font-semibold hover:border-foreground hover:bg-secondary/35 transition-colors"
+                                >
+                                    {div.name}
+                                </Link>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                     <div className="lg:col-span-2">

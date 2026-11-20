@@ -45,6 +45,10 @@ export default function proxy(request: NextRequest) {
 }
 
 export const config = {
-    // Match only internationalized pathnames, skip api/static/images/.well-known
-    matcher: ["/", "/(si|ta|en)/:path*", "/((?!api|_next|_vercel|\\.well-known|.*\\..*).*)"],
+    // Match only internationalized pathnames, skip api/static/images/OG/.well-known
+    matcher: [
+        "/",
+        "/(si|ta|en)/:path*",
+        "/((?!api|_next|_vercel|opengraph-image|twitter-image|\\.well-known|.*\\..*).*)",
+    ],
 };

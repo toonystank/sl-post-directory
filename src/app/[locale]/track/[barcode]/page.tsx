@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { setRequestLocale } from "next-intl/server";
 import TrackerClient from "@/components/tracking/TrackerClient";
 import { buildLocalizedAlternates } from "@/lib/site";
 
@@ -13,6 +14,10 @@ export async function generateMetadata({
         title: `Track ${clean} · Sri Lanka Post`,
         description: `Live Sri Lanka Post tracking status for ${clean} (COD & SLP Mail Courier).`,
         alternates: buildLocalizedAlternates(`/track/${encodeURIComponent(clean)}`, locale),
+        robots: {
+            index: false,
+            follow: false,
+        },
     };
 }
 
@@ -21,7 +26,8 @@ export default async function TrackBarcodePage({
 }: {
     params: Promise<{ locale: string; barcode: string }>;
 }) {
-    const { barcode } = await params;
+    const { locale, barcode } = await params;
+    setRequestLocale(locale);
     const clean = decodeURIComponent(barcode).trim();
     return <TrackerClient initialQuery={clean} />;
 }
