@@ -98,6 +98,11 @@ export const metadata: Metadata = {
         title: "Lanka Post Directory",
         description: "Search every post office in Sri Lanka — postal codes, opening hours, phone numbers and locations.",
     },
+    verification: {
+        google:
+            process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim() ||
+            "NRSZmmfWoQ_951WXlbBILyHQXkVHfjr5jFeMXSWW2vA",
+    },
     other: {
         "google-adsense-account": "ca-pub-2503310431210239",
     },
