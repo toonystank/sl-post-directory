@@ -39,6 +39,7 @@ import {
     parseBarcodes,
 } from "@/lib/tracking/classifier";
 import { formatTrackingTimestamp } from "@/lib/tracking/format";
+import { normalizeCodTrackingResult } from "@/lib/tracking/status";
 import type {
     CodBatchApiResponse,
     SlpCaptchaApiResponse,
@@ -107,13 +108,33 @@ export default function TrackerClient({ initialQuery = "" }: TrackerClientProps)
     // Live preview of barcodes parsed from current input
     const liveParsedBarcodes = React.useMemo(() => parseBarcodes(input), [input]);
 
-    // Load recent tracking history from localStorage
+    // Load recent tracking history from localStorage (and re-normalize COD statuses so
+    // previously cached "PENDING DELIVERY" entries immediately reflect accurate step states)
     React.useEffect(() => {
         try {
             const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
             if (raw) {
                 const parsed = JSON.parse(raw) as HistoryEntry[];
-                if (Array.isArray(parsed)) setHistory(parsed.slice(0, MAX_HISTORY_ITEMS));
+                if (Array.isArray(parsed)) {
+                    const normalized = parsed.slice(0, MAX_HISTORY_ITEMS).map((entry) => {
+                        if (entry?.result?.service === "cod") {
+                            const fixed = normalizeCodTrackingResult(entry.result);
+                            return {
+                                ...entry,
+                                statusLabel: fixed.statusLabel,
+                                statusCategory: fixed.statusCategory,
+                                result: fixed,
+                            };
+                        }
+                        return entry;
+                    });
+                    setHistory(normalized);
+                    try {
+                        localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(normalized));
+                    } catch {
+                        // Ignore storage quota errors
+                    }
+                }
             }
         } catch {
             // Ignore localStorage parse errors
@@ -869,6 +890,7 @@ export default function TrackerClient({ initialQuery = "" }: TrackerClientProps)
                                 const isCod = item.service === "cod";
                                 const isSettled = item.statusCategory === "settled";
                                 const isDelivered = item.statusCategory === "delivered";
+                                const isReturned = item.statusCategory === "returned";
                                 const fmt = formatTrackingTimestamp(item.checkedAt);
                                 const routeFrom = item.result.acceptingOfficeQuery || item.result.acceptingOffice;
                                 const routeTo = item.result.deliveryOfficeQuery || item.result.deliveryOffice;
@@ -921,13 +943,17 @@ export default function TrackerClient({ initialQuery = "" }: TrackerClientProps)
                                                         "inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-heading text-[11px] font-extrabold uppercase",
                                                         isSettled || isDelivered
                                                             ? "bg-[#15803D] text-white"
-                                                            : "bg-secondary text-secondary-foreground"
+                                                            : isReturned
+                                                                ? "bg-primary text-primary-foreground"
+                                                                : "bg-secondary text-secondary-foreground"
                                                     )}
                                                 >
                                                     {isSettled ? (
                                                         <Banknote className="h-3 w-3 shrink-0" />
                                                     ) : isDelivered ? (
                                                         <CheckCircle2 className="h-3 w-3 shrink-0" />
+                                                    ) : isReturned ? (
+                                                        <AlertCircle className="h-3 w-3 shrink-0" />
                                                     ) : (
                                                         <Truck className="h-3 w-3 shrink-0" />
                                                     )}

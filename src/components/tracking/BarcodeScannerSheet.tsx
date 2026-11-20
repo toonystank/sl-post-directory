@@ -105,6 +105,7 @@ export default function BarcodeScannerSheet({
     const videoRef = React.useRef<HTMLVideoElement | null>(null);
     const streamRef = React.useRef<MediaStream | null>(null);
     const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+    const cameraCaptureInputRef = React.useRef<HTMLInputElement | null>(null);
     const ocrBusyRef = React.useRef(false);
     const pendingConfirmRef = React.useRef<PendingConfirmation | null>(null);
     pendingConfirmRef.current = pendingConfirm;
@@ -134,21 +135,80 @@ export default function BarcodeScannerSheet({
         setCameraError(null);
         setStatusHint("Starting camera...");
 
-        if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-            setCameraError("Camera access is not supported in this browser. Use the Photo tab instead.");
+        if (typeof window !== "undefined" && !window.isSecureContext) {
+            setCameraError(
+                "Live camera requires HTTPS. Tap Take Photo below to scan using your phone camera."
+            );
             return;
         }
 
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({
+        if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+            setCameraError(
+                "Live camera is unavailable in this browser. Tap Take Photo below to scan with your phone camera."
+            );
+            return;
+        }
+
+        // Progressive fallback chain so Android/iOS cameras never fail on strict resolution constraints
+        const constraintAttempts: MediaStreamConstraints[] = [
+            {
                 audio: false,
                 video: {
                     facingMode: { ideal: facingMode },
                     width: { ideal: 1280 },
                     height: { ideal: 720 },
                 },
-            });
+            },
+            {
+                audio: false,
+                video: { facingMode: { ideal: facingMode } },
+            },
+            {
+                audio: false,
+                video: true,
+            },
+        ];
 
+        let stream: MediaStream | null = null;
+        let lastErr: unknown = null;
+
+        for (const constraints of constraintAttempts) {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                break;
+            } catch (err) {
+                lastErr = err;
+                const name = err instanceof DOMException ? err.name : "";
+                // Stop retrying immediately on hard permission / security denial
+                if (name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError") {
+                    break;
+                }
+            }
+        }
+
+        if (!stream) {
+            const name = lastErr instanceof DOMException ? lastErr.name : "";
+            if (name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError") {
+                setCameraError(
+                    "Camera permission was blocked by the browser or site policy. Allow camera access and retry, or tap Take Photo below."
+                );
+            } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+                setCameraError(
+                    "No camera was detected on this device. Switch to From Photo / Receipt to upload an image."
+                );
+            } else if (name === "NotReadableError" || name === "TrackStartError") {
+                setCameraError(
+                    "Camera is currently in use by another app. Close the other app and tap Retry, or tap Take Photo."
+                );
+            } else {
+                setCameraError(
+                    "Could not start live camera. Tap Retry Camera or use Take Photo below."
+                );
+            }
+            return;
+        }
+
+        try {
             streamRef.current = stream;
             const videoTrack = stream.getVideoTracks()[0];
             if (videoTrack) {
@@ -165,8 +225,9 @@ export default function BarcodeScannerSheet({
                 setStatusHint("Scanning 1D/2D barcode & printed/written code...");
             }
         } catch {
+            stopCameraStream();
             setCameraError(
-                "Could not access camera. Check browser camera permissions or switch to the Photo tab."
+                "Could not display camera preview. Tap Retry Camera or use Take Photo below."
             );
         }
     }, [facingMode, stopCameraStream]);
@@ -632,6 +693,37 @@ export default function BarcodeScannerSheet({
 
                 {/* Scrollable Body */}
                 <div className="overflow-y-auto p-3.5 space-y-3 flex-1">
+                    {/* Always-mounted file & native mobile camera capture inputs so clicks preserve user gesture */}
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                                setTab("photo");
+                                void handlePhotoSelected(file);
+                            }
+                            e.target.value = "";
+                        }}
+                        className="hidden"
+                    />
+                    <input
+                        ref={cameraCaptureInputRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                                setTab("photo");
+                                void handlePhotoSelected(file);
+                            }
+                            e.target.value = "";
+                        }}
+                        className="hidden"
+                    />
+
                     {/* ===== TAB 1: LIVE CAMERA VIEWFINDER ===== */}
                     {tab === "camera" && (
                         <div className="space-y-3">
@@ -709,7 +801,7 @@ export default function BarcodeScannerSheet({
                                     <div className="absolute inset-0 bg-black/90 p-4 flex flex-col items-center justify-center text-center gap-2.5 z-20">
                                         <AlertCircle className="h-7 w-7 text-secondary" />
                                         <p className="text-xs font-bold text-white max-w-xs">{cameraError}</p>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex flex-wrap items-center justify-center gap-2">
                                             <button
                                                 type="button"
                                                 onClick={() => void startCameraStream()}
@@ -719,10 +811,11 @@ export default function BarcodeScannerSheet({
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => setTab("photo")}
-                                                className="tap rounded-md border border-foreground bg-secondary px-3 py-1.5 text-xs font-extrabold text-secondary-foreground"
+                                                onClick={() => cameraCaptureInputRef.current?.click()}
+                                                className="tap inline-flex items-center gap-1.5 rounded-md border border-foreground bg-secondary px-3 py-1.5 text-xs font-extrabold text-secondary-foreground"
                                             >
-                                                Upload Photo Instead
+                                                <Camera className="h-3.5 w-3.5" />
+                                                <span>Take Photo</span>
                                             </button>
                                         </div>
                                     </div>
@@ -756,16 +849,24 @@ export default function BarcodeScannerSheet({
                     {/* ===== TAB 2: PHOTO / GALLERY RECEIPT UPLOAD ===== */}
                     {tab === "photo" && (
                         <div className="space-y-3">
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) void handlePhotoSelected(file);
-                                }}
-                                className="hidden"
-                            />
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => cameraCaptureInputRef.current?.click()}
+                                    className="tap inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border-2 border-foreground bg-secondary px-3 font-heading text-xs font-extrabold text-secondary-foreground shadow-[0_2px_0_0_hsl(var(--foreground))]"
+                                >
+                                    <Camera className="h-4 w-4 shrink-0" />
+                                    <span>Take Photo</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="tap inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border-2 border-foreground bg-card px-3 font-heading text-xs font-extrabold text-foreground shadow-[0_2px_0_0_hsl(var(--foreground))]"
+                                >
+                                    <Upload className="h-4 w-4 shrink-0" />
+                                    <span>Choose Gallery</span>
+                                </button>
+                            </div>
 
                             <button
                                 type="button"

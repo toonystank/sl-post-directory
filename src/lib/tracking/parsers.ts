@@ -6,6 +6,13 @@ import type {
     TrackingStatusCategory,
     TrackingStep,
 } from "./types";
+import {
+    buildCodSteps,
+    classifyCodStatus,
+    estimateCodDelivery,
+} from "./status";
+
+export { buildCodSteps, classifyCodStatus, estimateCodDelivery };
 
 const COD_KEY_LABELS: Record<string, string> = {
     acceptingpo: "Accepting Post Office",
@@ -113,84 +120,6 @@ export function parseCodSummaryHtml(html: string): ParsedCodSummaryPage {
     return { csrfToken, rows, rateLimited };
 }
 
-export function classifyCodStatus(statusText: string, hasReceivedDate: boolean): TrackingStatusCategory {
-    const s = statusText.toLowerCase();
-    if (s.includes("settled")) return "settled";
-    if (s.includes("deliver") || s.includes("success")) return "delivered";
-    if (s.includes("return") || s.includes("fail") || s.includes("cancel")) return "returned";
-    if (s.includes("arrived") || s.includes("received") || hasReceivedDate) return "arrived";
-    if (s.includes("transit") || s.includes("dispatch")) return "in_transit";
-    if (s.includes("pending")) return "pending";
-    return "accepted";
-}
-
-export function buildCodSteps(
-    category: TrackingStatusCategory,
-    acceptingOffice?: string,
-    deliveryOffice?: string,
-    settledOffice?: string
-): TrackingStep[] {
-    const isReturned = category === "returned";
-    const isSettled = category === "settled";
-
-    const labels = [
-        "Accepted",
-        "In Transit",
-        "Arrived",
-        isReturned ? "Returned" : isSettled ? "Settled" : "Delivered",
-    ];
-
-    const details = [
-        acceptingOffice ? `Accepted at ${acceptingOffice}` : undefined,
-        acceptingOffice ? `Dispatched from ${acceptingOffice}` : undefined,
-        deliveryOffice ? `Arrived at ${deliveryOffice}` : undefined,
-        isReturned
-            ? deliveryOffice
-                ? `Returned from ${deliveryOffice}`
-                : "Returned to sender"
-            : isSettled
-                ? settledOffice
-                    ? `COD settled at ${settledOffice}`
-                    : "COD payment settled"
-                : deliveryOffice
-                    ? `Delivered by ${deliveryOffice}`
-                    : undefined,
-    ];
-
-    let activeIndex = 0;
-    if (category === "in_transit" || category === "pending") activeIndex = 1;
-    if (category === "arrived") activeIndex = 2;
-    if (category === "delivered" || category === "settled" || category === "returned") {
-        activeIndex = 3;
-    }
-
-    return labels.map((label, idx) => {
-        let state: TrackingStep["state"] = "upcoming";
-        if (idx < activeIndex) {
-            state = "completed";
-        } else if (idx === activeIndex) {
-            state = isReturned && idx === 3 ? "error" : idx === 3 ? "completed" : "active";
-        }
-        return { label, detail: details[idx], state };
-    });
-}
-
-function estimateCodDelivery(
-    category: TrackingStatusCategory,
-    acceptingOffice?: string,
-    deliveryOffice?: string
-): string | undefined {
-    if (category === "delivered" || category === "settled" || category === "returned") {
-        return undefined;
-    }
-    if (category === "arrived") {
-        return "Delivery expected today or next working day";
-    }
-    if (acceptingOffice && deliveryOffice && acceptingOffice.toLowerCase() === deliveryOffice.toLowerCase()) {
-        return "Estimated delivery in 1–2 business days";
-    }
-    return "Estimated delivery in 2–4 business days";
-}
 
 /**
  * Parse the detail table from either:

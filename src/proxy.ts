@@ -8,7 +8,7 @@ const intlMiddleware = createMiddleware(routing);
 function applySecurityHeaders(response: NextResponse): NextResponse {
     response.headers.set("X-Content-Type-Options", "nosniff");
     response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-    response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(self), interest-cohort=()");
+    response.headers.set("Permissions-Policy", "camera=(self), microphone=(), geolocation=(self), interest-cohort=()");
     return response;
 }
 

@@ -1,5 +1,5 @@
 {
   "name": "Lanka Post Directory",
   "description": "Search every post office in Sri Lanka — postal codes, opening hours, phone numbers and locations. Plus a postage calculator and guides.",
-  "requestFramePermissions": []
+  "requestFramePermissions": ["camera"]
 }
