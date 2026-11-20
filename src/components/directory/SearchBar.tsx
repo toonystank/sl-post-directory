@@ -14,13 +14,12 @@ import {
     Mail,
     ArrowRight,
     Scale,
-    PackageSearch,
 } from "lucide-react";
 import { m, AnimatePresence } from "motion/react";
 import { Link, useRouter } from "@/navigation";
 import { cn } from "@/lib/utils";
 import CountryFlag from "@/components/brand/CountryFlag";
-import NuwaraEliyaPostOffice from "@/components/brand/NuwaraEliyaPostOffice";
+import HomeSmartSearchComposer from "./HomeSmartSearchComposer";
 import HomeTrackingDrawerCard from "@/components/tracking/HomeTrackingDrawerCard";
 import { useCurrency } from "@/context/CurrencyContext";
 import { formatCurrencyAmount } from "@/lib/currency";
@@ -217,32 +216,38 @@ export default function SearchBar({
         []
     );
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = e.target.value;
-        onQueryChange(val, id);
-        setHighlight(-1);
-        if (!val.trim()) {
+    const processValueChange = useCallback(
+        (val: string, sourceId: string) => {
+            onQueryChange(val, sourceId);
+            setHighlight(-1);
+            if (!val.trim()) {
+                if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
+                setSuggestions([]);
+                setShowDropdown(false);
+                return;
+            }
+            setIsActive(true);
+            setShowDropdown(true);
             if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
-            setSuggestions([]);
-            setShowDropdown(false);
-            return;
-        }
-        setIsActive(true);
-        setShowDropdown(true);
-        if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
 
-        // If the local index is already hydrated, run immediately with 0ms debounce!
-        const syncEngine = getLoadedOfficeIndexSync();
-        if (syncEngine) {
-            setSuggestionsLoading(false);
-            setSuggestions(syncEngine.autocompleteRich(val, effectiveAutocompleteMode, 5));
-            return;
-        }
+            // If the local index is already hydrated, run immediately with 0ms debounce!
+            const syncEngine = getLoadedOfficeIndexSync();
+            if (syncEngine) {
+                setSuggestionsLoading(false);
+                setSuggestions(syncEngine.autocompleteRich(val, effectiveAutocompleteMode, 5));
+                return;
+            }
 
-        suggestDebounce.current = setTimeout(
-            () => void fetchSuggestions(val, effectiveAutocompleteMode),
-            80
-        );
+            suggestDebounce.current = setTimeout(
+                () => void fetchSuggestions(val, effectiveAutocompleteMode),
+                80
+            );
+        },
+        [effectiveAutocompleteMode, fetchSuggestions, onQueryChange]
+    );
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        processValueChange(e.target.value, id);
     };
 
     const navigateToSmartCalculator = (intent: SmartSearchIntent) => {
@@ -384,177 +389,166 @@ export default function SearchBar({
         }
     }, [searchMode, enableSmartHomeSearch]);
 
-    const showCyclingOverlay = enableSmartHomeSearch && query.length === 0;
+    const handleEnterTypeMode = useCallback(() => {
+        setIsActive(true);
+        void ensureLocalOfficeIndex();
+        if (query.trim()) setShowDropdown(true);
+    }, [query]);
+
+    const handleComposerSubmit = () => {
+        if (open && highlight >= 0 && visibleSuggestions[highlight]) {
+            handleSuggestClick(visibleSuggestions[highlight]);
+        } else {
+            handleSubmit();
+        }
+    };
 
     return (
         <div className="relative w-full" id={`search-container-${id}`} ref={actualContainerRef}>
-            <form
-                ref={searchFormRef}
-                role="search"
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    handleSubmit();
-                }}
-                className={cn(
-                    "relative flex items-stretch overflow-hidden rounded-md border-2 border-foreground bg-card transition-shadow",
-                    "focus-within:shadow-[3px_3px_0_0_hsl(var(--foreground))]",
-                    isSticky ? "h-11" : enableSmartHomeSearch ? "h-12 sm:h-14 md:h-15" : "h-14"
-                )}
-            >
-                {/* Embedded Scroll-Reactive Nuwara Eliya Post Office Illustration — dims when typing for crisp text legibility */}
-                {enableSmartHomeSearch && (
-                    <div
-                        className={cn(
-                            "pointer-events-none transition-opacity duration-200",
-                            query.trim().length > 0 ? "opacity-25" : "opacity-65 dark:opacity-80"
-                        )}
-                        aria-hidden="true"
-                    >
-                        <NuwaraEliyaPostOffice />
-                    </div>
-                )}
-
-                <label
-                    htmlFor={`search-${id}`}
-                    className="relative z-10 flex flex-1 items-center gap-2 pl-2.5 md:pl-3.5 min-w-0 cursor-text"
-                >
-                    <span className="sr-only">{t("submit")}</span>
-                    <span
-                        className={cn(
-                            "flex items-center justify-center shrink-0",
-                            enableSmartHomeSearch
-                                ? "h-6 w-6 sm:h-7 sm:w-7 rounded-full border border-foreground/40 bg-card/95 text-foreground shadow-2xs"
-                                : "text-muted-foreground"
-                        )}
-                        aria-hidden="true"
-                    >
-                        {enableSmartHomeSearch ? (
-                            <Search className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={2.5} />
-                        ) : searchMode === "name" ? (
-                            <Building2 className="h-[1.1rem] w-[1.1rem]" />
-                        ) : (
-                            <MapPin className="h-[1.1rem] w-[1.1rem]" />
-                        )}
-                    </span>
-
-                    <div className="relative flex-1 h-full flex items-center min-w-0">
-                        {/* Smoothly Cycling Mobile-First Example Texts when Home Search Input is Empty */}
-                        {showCyclingOverlay && (
-                            <div
-                                aria-hidden="true"
-                                data-testid="cycling-search-placeholder"
-                                className="pointer-events-none absolute inset-0 flex items-center overflow-hidden pr-1.5"
-                            >
-                                <AnimatePresence mode="wait" initial={false}>
-                                    <m.span
-                                        key={exampleIndex}
-                                        initial={{ y: 10, opacity: 0 }}
-                                        animate={{ y: 0, opacity: 1 }}
-                                        exit={{ y: -10, opacity: 0 }}
-                                        transition={{
-                                            duration: 0.3,
-                                            ease: [0.16, 1, 0.3, 1],
-                                        }}
-                                        className={cn(
-                                            "block w-full truncate font-semibold tracking-normal text-foreground drop-shadow-[0_1px_0_hsl(var(--card))]",
-                                            locale === "si" || locale === "ta"
-                                                ? "text-[10.5px] sm:text-[12.5px] md:text-[14px]"
-                                                : "text-[11.5px] sm:text-[13px] md:text-[14.5px]"
-                                        )}
-                                    >
-                                        {cyclingExamples[exampleIndex]}
-                                    </m.span>
-                                </AnimatePresence>
-                            </div>
-                        )}
-
-                        <input
-                            id={`search-${id}`}
-                            ref={inputRef}
-                            type="search"
-                            inputMode="search"
-                            enterKeyHint="search"
-                            autoComplete="off"
-                            value={query}
-                            onChange={handleChange}
-                            onKeyDown={handleKeyDown}
-                            onFocus={() => {
-                                setIsActive(true);
-                                void ensureLocalOfficeIndex();
-                                if (query.trim()) setShowDropdown(true);
-                            }}
-                            placeholder={
-                                enableSmartHomeSearch
-                                    ? ""
-                                    : searchMode === "name"
-                                        ? t("placeholderName")
-                                        : t("placeholderArea")
-                            }
-                            aria-label={
-                                enableSmartHomeSearch
-                                    ? cyclingExamples[exampleIndex]
-                                    : searchMode === "name"
-                                        ? t("placeholderName")
-                                        : t("placeholderArea")
-                            }
-                            role="combobox"
-                            aria-expanded={open}
-                            aria-controls={listId}
-                            aria-autocomplete="list"
-                            aria-activedescendant={
-                                open && highlight >= 0 ? `${listId}-${highlight}` : undefined
-                            }
-                            className={cn(
-                                "relative z-10 h-full w-full min-w-0 bg-transparent outline-none [&::-webkit-search-cancel-button]:hidden",
-                                isSticky
-                                    ? "text-base"
-                                    : enableSmartHomeSearch
-                                        ? "text-[13.5px] sm:text-[15px] md:text-[16px] font-bold text-foreground drop-shadow-[0_1px_0_hsl(var(--card))]"
-                                        : "text-[1.05rem] md:text-[1.12rem] placeholder:text-muted-foreground/80"
-                            )}
-                        />
-                    </div>
-                </label>
-
-                <div className="relative z-10 flex items-center gap-1 pr-1.5">
-                    {(loading || suggestionsLoading) && (
-                        <span className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-card/90">
-                            <Loader2
-                                className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin text-foreground"
-                                aria-hidden="true"
-                            />
-                        </span>
-                    )}
-                    {query && (
-                        <button
-                            type="button"
-                            onClick={handleClearAndClose}
-                            data-testid="search-clear-button"
-                            className={cn(
-                                "tap flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full transition-colors",
-                                enableSmartHomeSearch
-                                    ? "border border-foreground bg-card text-foreground hover:bg-secondary"
-                                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                            )}
-                            aria-label={t("clear")}
-                        >
-                            <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={2.5} />
-                        </button>
-                    )}
-                </div>
-
-                <button
-                    type="submit"
+            {enableSmartHomeSearch ? (
+                <HomeSmartSearchComposer
+                    id={id}
+                    query={query}
+                    onQueryChange={processValueChange}
+                    loading={loading}
+                    suggestionsLoading={suggestionsLoading}
+                    officeSuggestions={suggestions}
+                    cyclingExamples={cyclingExamples}
+                    exampleIndex={exampleIndex}
+                    locale={locale}
+                    isActive={isActive}
+                    open={open}
+                    listId={listId}
+                    highlight={highlight}
+                    submitLabel={t("submit")}
+                    clearLabel={t("clear")}
+                    searchFormRef={searchFormRef}
+                    onEnterTypeMode={handleEnterTypeMode}
+                    onCollapseTypeMode={handleCloseDropdownOnly}
+                    onClearAll={() => {
+                        if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
+                        setSuggestions([]);
+                        setShowDropdown(false);
+                        onClear();
+                    }}
+                    onSubmit={handleComposerSubmit}
+                    onArrowNavigate={(dir) => {
+                        if (dir === "down") {
+                            setHighlight((h) => Math.min(h + 1, visibleSuggestions.length - 1));
+                        } else {
+                            setHighlight((h) => Math.max(h - 1, -1));
+                        }
+                    }}
+                    onEscape={handleCloseDropdownOnly}
+                />
+            ) : (
+                <form
+                    ref={searchFormRef}
+                    role="search"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        handleSubmit();
+                    }}
                     className={cn(
-                        "tap relative z-10 flex shrink-0 items-center justify-center gap-2 border-l-2 border-foreground bg-primary font-semibold text-primary-foreground hover:bg-primary/90",
-                        isSticky ? "w-11" : "w-12 sm:w-14 md:w-auto md:px-6"
+                        "relative flex items-stretch overflow-hidden rounded-md border-2 border-foreground bg-card transition-shadow",
+                        "focus-within:shadow-[3px_3px_0_0_hsl(var(--foreground))]",
+                        isSticky ? "h-11" : "h-14"
                     )}
-                    aria-label={t("submit")}
                 >
-                    <Search className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.4} />
-                    {!isSticky && <span className="hidden md:inline">{t("submit")}</span>}
-                </button>
-            </form>
+                    <label
+                        htmlFor={`search-${id}`}
+                        className="relative z-10 flex flex-1 items-center gap-2 pl-2.5 md:pl-3.5 min-w-0 cursor-text"
+                    >
+                        <span className="sr-only">{t("submit")}</span>
+                        <span
+                            className="flex items-center justify-center shrink-0 text-muted-foreground"
+                            aria-hidden="true"
+                        >
+                            {searchMode === "name" ? (
+                                <Building2 className="h-[1.1rem] w-[1.1rem]" />
+                            ) : (
+                                <MapPin className="h-[1.1rem] w-[1.1rem]" />
+                            )}
+                        </span>
+
+                        <div className="relative flex-1 h-full flex items-center min-w-0">
+                            <input
+                                id={`search-${id}`}
+                                ref={inputRef}
+                                type="search"
+                                inputMode="search"
+                                enterKeyHint="search"
+                                autoComplete="off"
+                                value={query}
+                                onChange={handleChange}
+                                onKeyDown={handleKeyDown}
+                                onFocus={() => {
+                                    setIsActive(true);
+                                    void ensureLocalOfficeIndex();
+                                    if (query.trim()) setShowDropdown(true);
+                                }}
+                                placeholder={
+                                    searchMode === "name"
+                                        ? t("placeholderName")
+                                        : t("placeholderArea")
+                                }
+                                aria-label={
+                                    searchMode === "name"
+                                        ? t("placeholderName")
+                                        : t("placeholderArea")
+                                }
+                                role="combobox"
+                                aria-expanded={open}
+                                aria-controls={listId}
+                                aria-autocomplete="list"
+                                aria-activedescendant={
+                                    open && highlight >= 0 ? `${listId}-${highlight}` : undefined
+                                }
+                                className={cn(
+                                    "relative z-10 h-full w-full min-w-0 bg-transparent outline-none [&::-webkit-search-cancel-button]:hidden",
+                                    isSticky
+                                        ? "text-base"
+                                        : "text-[1.05rem] md:text-[1.12rem] placeholder:text-muted-foreground/80"
+                                )}
+                            />
+                        </div>
+                    </label>
+
+                    <div className="relative z-10 flex items-center gap-1 pr-1.5">
+                        {(loading || suggestionsLoading) && (
+                            <span className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-card/90">
+                                <Loader2
+                                    className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin text-foreground"
+                                    aria-hidden="true"
+                                />
+                            </span>
+                        )}
+                        {query && (
+                            <button
+                                type="button"
+                                onClick={handleClearAndClose}
+                                data-testid="search-clear-button"
+                                className="tap flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full transition-colors text-muted-foreground hover:bg-muted hover:text-foreground"
+                                aria-label={t("clear")}
+                            >
+                                <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={2.5} />
+                            </button>
+                        )}
+                    </div>
+
+                    <button
+                        type="submit"
+                        className={cn(
+                            "tap relative z-10 flex shrink-0 items-center justify-center gap-2 border-l-2 border-foreground bg-primary font-semibold text-primary-foreground hover:bg-primary/90",
+                            isSticky ? "w-11" : "w-12 sm:w-14 md:w-auto md:px-6"
+                        )}
+                        aria-label={t("submit")}
+                    >
+                        <Search className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.4} />
+                        {!isSticky && <span className="hidden md:inline">{t("submit")}</span>}
+                    </button>
+                </form>
+            )}
 
             {/* Home Page: In-Flow Push-Down Smart Search Drawer (shifts UI elements below downward when open, jumps back up when closed) */}
             {enableSmartHomeSearch ? (

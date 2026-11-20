@@ -590,6 +590,19 @@ export default function BarcodeScannerSheet({
         }
     };
 
+    React.useEffect(() => {
+        if (!open) return;
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                e.preventDefault();
+                stopCameraStream();
+                onClose();
+            }
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, [open, onClose, stopCameraStream]);
+
     if (!open || typeof document === "undefined") return null;
 
     const cleanEditable = editableCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");

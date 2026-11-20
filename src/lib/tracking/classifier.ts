@@ -138,10 +138,13 @@ export function detectTrackingQuery(raw: string): string[] {
     const seen = new Set<string>();
     for (const part of parts) {
         const clean = part.toUpperCase().replace(/[^A-Z0-9]/g, "");
-        // Require either full UPU S10 (e.g. BD070817564LK, NA055922175LK)
+        // Require either full UPU S10 (e.g. BD070817564LK, NA055922175LK),
+        // complete domestic tracking code with country suffix (e.g. BD00000LK),
         // OR 2 letters + 6+ digits (partial/domestic tracking codes)
         const isTrackingToken =
-            UPU_BARCODE_REGEX.test(clean) || /^[A-Z]{2}\d{6,14}[A-Z]{0,2}$/.test(clean);
+            UPU_BARCODE_REGEX.test(clean) ||
+            /^[A-Z]{2}\d{5,14}[A-Z]{2}$/.test(clean) ||
+            /^[A-Z]{2}\d{6,14}[A-Z]{0,2}$/.test(clean);
         if (!isTrackingToken) {
             return [];
         }
