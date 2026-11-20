@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState, useEffect, useMemo, useCallback } from "react";
+import React, { useRef, useState, useEffect, useLayoutEffect, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
 import {
     Camera,
@@ -10,7 +10,9 @@ import {
     Search,
     X,
 } from "lucide-react";
-import { m, AnimatePresence } from "motion/react";
+import { m, AnimatePresence, useReducedMotion } from "motion/react";
+
+const EXPAND_EASE = [0.22, 1, 0.36, 1] as const;
 import { cn } from "@/lib/utils";
 import NuwaraEliyaPostOffice from "@/components/brand/NuwaraEliyaPostOffice";
 import type { RichAutocompleteSuggestion } from "@/lib/office-index";
@@ -86,7 +88,24 @@ export default function HomeSmartSearchComposer({
     const [pasteFeedback, setPasteFeedback] = useState<string | null>(null);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const contentRef = useRef<HTMLDivElement>(null);
+    const [contentHeight, setContentHeight] = useState<number | "auto">("auto");
+    const prefersReducedMotion = useReducedMotion();
     const lastSyncedQueryRef = useRef<string>(query);
+
+    // Measure the natural content height so the outer shell can animate between sizes
+    useLayoutEffect(() => {
+        const el = contentRef.current;
+        if (!el || typeof ResizeObserver === "undefined") return;
+        setContentHeight(el.offsetHeight);
+        const ro = new ResizeObserver((entries) => {
+            const entry = entries[0];
+            const h = entry?.borderBoxSize?.[0]?.blockSize ?? el.offsetHeight;
+            setContentHeight(Math.round(h));
+        });
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
     const feedbackTimerRef = useRef<number | null>(null);
 
     // Keep local composer state aligned if parent clears or sets query externally
@@ -411,25 +430,37 @@ export default function HomeSmartSearchComposer({
                     onSubmit();
                 }}
                 className={cn(
-                    "relative overflow-hidden rounded-lg border-2 border-foreground bg-card transition-[box-shadow,border-color] duration-200",
+                    "relative overflow-hidden rounded-lg border-2 border-foreground bg-card transition-[box-shadow,border-color] duration-300",
                     isExpanded
                         ? "shadow-[3px_3px_0_0_hsl(var(--foreground))]"
                         : "focus-within:shadow-[3px_3px_0_0_hsl(var(--foreground))]"
                 )}
             >
-                {/* Embedded Nuwara Eliya Post Office Illustration — crisp at rest, dimmed in Type Mode for WCAG AAA contrast */}
+                {/* Centered Nuwara Eliya Post Office backdrop — veiled so text always stays legible */}
                 <div
                     className={cn(
-                        "pointer-events-none transition-opacity duration-200",
-                        isExpanded ? "opacity-12 dark:opacity-15" : "opacity-65 dark:opacity-80"
+                        "pointer-events-none absolute inset-0 transition-opacity duration-500 ease-out",
+                        isExpanded ? "opacity-75 dark:opacity-70" : "opacity-95 dark:opacity-85"
                     )}
                     aria-hidden="true"
                 >
-                    <NuwaraEliyaPostOffice />
+                    <NuwaraEliyaPostOffice expanded={isExpanded} />
                 </div>
 
+                {/* Animated height shell: smoothly grows/shrinks between resting and Type Mode */}
+                <m.div
+                    initial={false}
+                    animate={{ height: contentHeight }}
+                    transition={
+                        prefersReducedMotion
+                            ? { duration: 0 }
+                            : { duration: 0.34, ease: EXPAND_EASE }
+                    }
+                    className="relative z-10 overflow-hidden"
+                >
                 {/* Top / Main Input Surface */}
                 <div
+                    ref={contentRef}
                     className={cn(
                         "relative z-10 flex items-stretch",
                         isExpanded ? "flex-col" : "flex-row min-h-[50px] sm:min-h-[58px]"
@@ -620,7 +651,10 @@ export default function HomeSmartSearchComposer({
 
                         {/* Top-Right Clear / Collapse Trigger when Expanded */}
                         {isExpanded && (
-                            <button
+                            <m.button
+                                initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.24, delay: 0.08, ease: EXPAND_EASE }}
                                 type="button"
                                 onMouseDown={(e) => e.preventDefault()}
                                 onClick={(e) => {
@@ -632,25 +666,33 @@ export default function HomeSmartSearchComposer({
                                 className="tap mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-foreground/40 bg-card text-foreground hover:border-foreground hover:bg-secondary/25 transition-colors"
                             >
                                 <X className="h-3.5 w-3.5" strokeWidth={2.5} />
-                            </button>
+                            </m.button>
                         )}
                     </div>
 
                     {/* Resting State Right Submit Button (hides when Expanded because CTA moves to the action footer) */}
                     {!isExpanded && (
-                        <button
+                        <m.button
+                            initial={prefersReducedMotion ? false : { opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.25, ease: EXPAND_EASE }}
                             type="submit"
                             className="tap relative z-10 flex w-12 sm:w-14 md:w-auto md:px-6 shrink-0 items-center justify-center gap-2 border-l-2 border-foreground bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
                             aria-label={submitLabel}
                         >
                             <Search className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.4} />
                             <span className="hidden md:inline">{submitLabel}</span>
-                        </button>
+                        </m.button>
                     )}
 
                     {/* Expanded Type Mode: Predictive Next-Word Chips + Mobile Quick Action Footer */}
                     {isExpanded && (
-                        <div className="relative z-10">
+                        <m.div
+                            initial={prefersReducedMotion ? false : { opacity: 0, y: -8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3, delay: 0.06, ease: EXPAND_EASE }}
+                            className="relative z-10"
+                        >
                             {/* Predictive Next-Word & Bulk Completion Chip Strip */}
                             {prediction.chips.length > 0 && (
                                 <div
@@ -772,9 +814,10 @@ export default function HomeSmartSearchComposer({
                                     </button>
                                 </div>
                             </div>
-                        </div>
+                        </m.div>
                     )}
                 </div>
+                </m.div>
             </form>
 
             {/* Lazy-Loaded Unified Camera Barcode & Receipt OCR Scanner */}
