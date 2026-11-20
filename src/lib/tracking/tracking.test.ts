@@ -6,10 +6,12 @@ import {
     parseBarcodes,
 } from "./classifier";
 import {
+    classifyCodStatus,
     parseCodDetailsHtml,
     parseCodSummaryHtml,
     parseSlpHtml,
 } from "./parsers";
+import { normalizeCodTrackingResult } from "./status";
 import {
     signUpstreamSessionCookie,
     verifyUpstreamSessionCookie,
@@ -108,6 +110,55 @@ test("parseCodDetailsHtml parses live settled COD detail table", () => {
     assert.equal(res.settledDate, "2026-11-13 14:20:34");
     assert.equal(res.steps[3].label, "Settled");
     assert.equal(res.steps[3].state, "completed");
+});
+
+test("parseCodDetailsHtml and classifyCodStatus never mark PENDING DELIVERY or undelivered items as delivered", () => {
+    const pendingDeliveryHtml = `
+    <table class='result-table'>
+      <tr><th>Field</th><th>Value</th></tr>
+      <tr><td>Barcode</td><td>BD003579778LK</td></tr>
+      <tr><td>Status</td><td>PENDING DELIVERY</td></tr>
+      <tr><td>AcceptingPO</td><td>PO Kotagala</td></tr>
+      <tr><td>DateAccepted</td><td>2026-11-19 10:12:00</td></tr>
+      <tr><td>DeliveryPO</td><td>PO Kandy</td></tr>
+      <tr><td>ReceivedDate</td><td>2026-11-20 04:14:00</td></tr>
+    </table>`;
+
+    const res = parseCodDetailsHtml(pendingDeliveryHtml, "BD003579778LK");
+    assert.ok(res);
+    assert.equal(res.statusLabel, "PENDING DELIVERY");
+    assert.equal(res.statusCategory, "arrived");
+    assert.equal(res.steps[0].state, "completed"); // Accepted
+    assert.equal(res.steps[1].state, "completed"); // In Transit
+    assert.equal(res.steps[2].state, "active");    // Arrived (awaiting delivery)
+    assert.equal(res.steps[3].label, "Delivered");
+    assert.equal(res.steps[3].state, "upcoming");  // NOT delivered yet!
+    assert.ok(res.deliveryEstimate);
+
+    // Exhaustive status string checks
+    assert.equal(classifyCodStatus("PENDING DELIVERY", true), "arrived");
+    assert.equal(classifyCodStatus("PENDING DELIVERY", false), "pending");
+    assert.equal(classifyCodStatus("Awaiting Delivery", true), "arrived");
+    assert.equal(classifyCodStatus("Ready for Delivery", true), "arrived");
+    assert.equal(classifyCodStatus("Out for Delivery", true), "out_for_delivery");
+    assert.equal(classifyCodStatus("Undelivered", true), "returned");
+    assert.equal(classifyCodStatus("Not Delivered", true), "returned");
+    assert.equal(classifyCodStatus("Delivery Failed", true), "returned");
+    assert.equal(classifyCodStatus("Returned to Sender", true), "returned");
+    assert.equal(classifyCodStatus("Delivered", true), "delivered");
+    assert.equal(classifyCodStatus("Item Delivered", true), "delivered");
+    assert.equal(classifyCodStatus("Settled", true), "settled");
+
+    // Stale localStorage history self-healing
+    const staleCached = {
+        ...res,
+        statusCategory: "delivered" as const,
+        steps: res.steps.map((s) => ({ ...s, state: "completed" as const })),
+    };
+    const healed = normalizeCodTrackingResult(staleCached);
+    assert.equal(healed.statusCategory, "arrived");
+    assert.equal(healed.steps[2].state, "active");
+    assert.equal(healed.steps[3].state, "upcoming");
 });
 
 test("parseSlpHtml parses 5-column SLP Courier tracking table", () => {
