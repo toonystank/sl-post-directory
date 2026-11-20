@@ -1,32 +1,56 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getTranslations } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { getPostBySlug } from "@/lib/blog";
 import { getVariablesMap, replacePlaceholders } from "@/lib/variables";
+import {
+    buildLocalizedAlternates,
+    buildLocalizedUrl,
+    getDefaultOpenGraphImages,
+    getOgLocale,
+    getSiteUrl,
+} from "@/lib/site";
 import { ArrowLeft, Calendar, Clock, User } from "lucide-react";
 import { Link } from "@/navigation";
 import { Button } from "@/components/ui/button";
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
-    const { slug } = await params;
+export const revalidate = 3600;
+
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ locale: string; slug: string }>;
+}): Promise<Metadata> {
+    const { locale, slug } = await params;
     const post = await getPostBySlug(slug);
     if (!post) return { title: "Article Not Found" };
+
+    const canonicalUrl = buildLocalizedUrl(`/blog/${slug}`, locale);
 
     return {
         title: post.title,
         description: post.excerpt,
+        alternates: buildLocalizedAlternates(`/blog/${slug}`, locale),
         openGraph: {
             title: post.title,
             description: post.excerpt,
+            url: canonicalUrl,
+            locale: getOgLocale(locale),
             type: "article",
             publishedTime: post.date.toISOString(),
             authors: [post.author],
+            images: getDefaultOpenGraphImages(post.title),
         },
     };
 }
 
-export default async function BlogArticlePage({ params }: { params: Promise<{ slug: string }> }) {
-    const { slug } = await params;
+export default async function BlogArticlePage({
+    params,
+}: {
+    params: Promise<{ locale: string; slug: string }>;
+}) {
+    const { locale, slug } = await params;
+    setRequestLocale(locale);
     const post = await getPostBySlug(slug);
 
     if (!post) {
@@ -43,12 +67,14 @@ export default async function BlogArticlePage({ params }: { params: Promise<{ sl
         day: "numeric",
     });
 
+    const siteUrl = getSiteUrl();
     const jsonLd = {
         "@context": "https://schema.org",
         "@type": "Article",
         "headline": post.title,
         "description": post.excerpt,
         "datePublished": post.date.toISOString(),
+        "url": buildLocalizedUrl(`/blog/${slug}`, locale),
         "author": {
             "@type": "Organization",
             "name": post.author,
@@ -56,7 +82,7 @@ export default async function BlogArticlePage({ params }: { params: Promise<{ sl
         "publisher": {
             "@type": "Organization",
             "name": "Lanka Post Directory",
-            "url": "https://lankapost.vercel.app",
+            "url": siteUrl,
         },
     };
 

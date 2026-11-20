@@ -1,17 +1,47 @@
 import type { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { getAllPosts } from "@/lib/blog";
+import {
+    buildLocalizedAlternates,
+    buildLocalizedUrl,
+    getDefaultOpenGraphImages,
+    getOgLocale,
+} from "@/lib/site";
 import BlogCard from "@/components/BlogCard";
 import { BookOpen } from "lucide-react";
 
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
-    title: "Postal Guides & Tips",
-    description: "Postal guides, tips, and helpful articles about Sri Lanka Post services, postal codes, shipping, and more.",
-};
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+    const { locale } = await params;
+    const title = "Postal Guides & Tips";
+    const description =
+        "Postal guides, tips, and helpful articles about Sri Lanka Post services, postal codes, shipping, and more.";
+    return {
+        title,
+        description,
+        alternates: buildLocalizedAlternates("/blog", locale),
+        openGraph: {
+            title: `${title} | Lanka Post Directory`,
+            description,
+            url: buildLocalizedUrl("/blog", locale),
+            locale: getOgLocale(locale),
+            images: getDefaultOpenGraphImages(`${title} | Lanka Post Directory`),
+        },
+    };
+}
 
-export default async function BlogPage() {
+export default async function BlogPage({
+    params,
+}: {
+    params: Promise<{ locale: string }>;
+}) {
+    const { locale } = await params;
+    setRequestLocale(locale);
     const posts = await getAllPosts();
     const t = await getTranslations("Blog");
 

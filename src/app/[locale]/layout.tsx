@@ -19,7 +19,7 @@ import { PWAProvider } from "@/context/PWAContext";
 import { routing } from "@/i18n/routing";
 import { notFound } from "next/navigation";
 import { hasLocale } from "next-intl";
-import { getMessages } from "next-intl/server";
+import { getMessages, setRequestLocale } from "next-intl/server";
 import { getSiteUrl } from "@/lib/site";
 
 // Display: Archivo with the width axis so headlines can be condensed (signage feel)
@@ -64,49 +64,119 @@ const notoTamil = Noto_Sans_Tamil({
 
 const siteUrl = getSiteUrl();
 
-export const metadata: Metadata = {
-    metadataBase: new URL(siteUrl),
-    title: {
-        default: "Lanka Post Directory | Find Sri Lanka Post Offices & Postal Codes",
+const LOCALE_METADATA: Record<
+    string,
+    {
+        defaultTitle: string;
+        template: string;
+        description: string;
+        ogDescription: string;
+        ogLocale: string;
+    }
+> = {
+    en: {
+        defaultTitle: "Lanka Post Directory | Find Sri Lanka Post Offices & Postal Codes",
         template: "%s | Lanka Post Directory",
+        description:
+            "Search every post office in Sri Lanka — postal codes, opening hours, phone numbers and locations. Plus a 2026 postage calculator, parcel tracking and guides.",
+        ogDescription:
+            "Search 4,000+ Sri Lanka post offices — postal codes, opening hours, phone numbers, 2026 postage rates and parcel tracking.",
+        ogLocale: "en_US",
     },
-    description: "Search every post office in Sri Lanka — postal codes, opening hours, phone numbers and locations. Plus a postage calculator and guides.",
-    keywords: ["Sri Lanka Post Office", "Postal Codes Sri Lanka", "Zip Codes Sri Lanka", "Sri Lanka Post Postage Rates", "EMS Sri Lanka Rates", "Lanka Post Directory", "Post Office Opening Hours"],
-    applicationName: "Lanka Post Directory",
-    appleWebApp: {
-        capable: true,
-        statusBarStyle: "default",
-        title: "Lanka Post",
+    si: {
+        defaultTitle: "ලංකා තැපැල් නාමාවලිය | ශ්‍රී ලංකා තැපැල් කාර්යාල, තැපැල් කේත සහ ගාස්තු",
+        template: "%s | ලංකා තැපැල් නාමාවලිය",
+        description:
+            "ශ්‍රී ලංකාවේ සියලුම තැපැල් කාර්යාල, තැපැල් කේත, දුරකථන අංක, විවෘත වේලාවන්, 2026 තැපැල් ගාස්තු සහ පාර්සල් ලුහුබැඳීම එකම තැනකින් සොයන්න.",
+        ogDescription:
+            "ශ්‍රී ලංකාවේ තැපැල් කාර්යාල 4,000+ ක තැපැල් කේත, දුරකථන අංක, 2026 තැපැල් ගාස්තු සහ පාර්සල් ලුහුබැඳීම.",
+        ogLocale: "si_LK",
     },
-    icons: {
-        icon: "/icon-192x192.png",
-        apple: "/apple-touch-icon.png",
-    },
-    formatDetection: {
-        telephone: false,
-    },
-    openGraph: {
-        title: "Lanka Post Directory | Find Sri Lanka Post Offices & Postal Codes",
-        description: "Search every post office in Sri Lanka — postal codes, opening hours, phone numbers and locations.",
-        url: siteUrl,
-        siteName: "Lanka Post Directory",
-        locale: "en_US",
-        type: "website",
-    },
-    twitter: {
-        card: "summary_large_image",
-        title: "Lanka Post Directory",
-        description: "Search every post office in Sri Lanka — postal codes, opening hours, phone numbers and locations.",
-    },
-    verification: {
-        google:
-            process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim() ||
-            "NRSZmmfWoQ_951WXlbBILyHQXkVHfjr5jFeMXSWW2vA",
-    },
-    other: {
-        "google-adsense-account": "ca-pub-2503310431210239",
+    ta: {
+        defaultTitle: "இலங்கை அஞ்சல் அடைவு | இலங்கை அஞ்சல் நிலையங்கள், அஞ்சல் குறியீடுகள் & கட்டணங்கள்",
+        template: "%s | இலங்கை அஞ்சல் அடைவு",
+        description:
+            "இலங்கையின் அனைத்து அஞ்சல் நிலையங்கள், அஞ்சல் குறியீடுகள், தொலைபேசி எண்கள், திறக்கும் நேரங்கள், 2026 தபால் கட்டணங்கள் மற்றும் பொதி கண்காணிப்பு.",
+        ogDescription:
+            "இலங்கையின் 4,000+ அஞ்சல் நிலையங்கள், அஞ்சல் குறியீடுகள், 2026 தபால் கட்டணங்கள் மற்றும் பொதி கண்காணிப்பு.",
+        ogLocale: "ta_LK",
     },
 };
+
+export function generateStaticParams() {
+    return routing.locales.map((locale) => ({ locale }));
+}
+
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+    const { locale } = await params;
+    const meta = LOCALE_METADATA[locale] ?? LOCALE_METADATA.en;
+
+    return {
+        metadataBase: new URL(siteUrl),
+        title: {
+            default: meta.defaultTitle,
+            template: meta.template,
+        },
+        description: meta.description,
+        keywords: [
+            "Sri Lanka Post Office",
+            "Postal Codes Sri Lanka",
+            "Zip Codes Sri Lanka",
+            "Sri Lanka Post Postage Rates",
+            "EMS Sri Lanka Rates",
+            "Sri Lanka Post Tracking",
+            "Lanka Post Directory",
+            "Post Office Opening Hours",
+        ],
+        applicationName: "Lanka Post Directory",
+        appleWebApp: {
+            capable: true,
+            statusBarStyle: "default",
+            title: "Lanka Post",
+        },
+        icons: {
+            icon: "/icon-192x192.png",
+            apple: "/apple-touch-icon.png",
+        },
+        formatDetection: {
+            telephone: false,
+        },
+        openGraph: {
+            title: meta.defaultTitle,
+            description: meta.ogDescription,
+            url: siteUrl,
+            siteName: "Lanka Post Directory",
+            locale: meta.ogLocale,
+            type: "website",
+            images: [
+                {
+                    url: `${siteUrl}/opengraph-image`,
+                    width: 1200,
+                    height: 630,
+                    alt: meta.defaultTitle,
+                },
+            ],
+        },
+        twitter: {
+            card: "summary_large_image",
+            title: meta.defaultTitle,
+            description: meta.ogDescription,
+            images: [`${siteUrl}/twitter-image`],
+        },
+        verification: {
+            google:
+                process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim() ||
+                "NRSZmmfWoQ_951WXlbBILyHQXkVHfjr5jFeMXSWW2vA",
+        },
+        other: {
+            "google-adsense-account": "ca-pub-2503310431210239",
+        },
+    };
+}
 
 export const viewport: Viewport = {
     colorScheme: "light dark",
@@ -132,8 +202,11 @@ export default async function RootLayout({
         notFound();
     }
 
+    // Enable static rendering & ISR caching across all [locale] routes
+    setRequestLocale(locale);
+
     const gaId = process.env.NEXT_PUBLIC_GA_ID?.trim();
-    const initialMessages = locale === "en" ? undefined : await getMessages();
+    const initialMessages = locale === "en" ? undefined : await getMessages({ locale });
 
     return (
         <html lang={locale} suppressHydrationWarning>

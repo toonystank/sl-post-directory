@@ -1,0 +1,24 @@
+# Lanka Post Directory
+
+> Independent community directory for Sri Lanka Post offices, 5-digit postal codes, 2026 postage rates (EMS, Air Mail, Sea Parcel, COD, SLP Courier), and live parcel tracking in English, Sinhala, and Tamil.
+
+- Website: https://lankapost.vercel.app
+- Languages: English (`/`), Sinhala (`/si`), Tamil (`/ta`)
+- Sitemap: https://lankapost.vercel.app/sitemap.xml
+
+## Core Sections
+
+- [Home](https://lankapost.vercel.app/): Unified smart search for post offices, postal codes, postage rates, and parcel tracking.
+- [Browse Post Offices](https://lankapost.vercel.app/browse): Directory of 4,000+ Sri Lanka post offices searchable by name, 5-digit postal code, division, office type, and services.
+- [2026 Postage Rates](https://lankapost.vercel.app/rates): Official Sri Lanka Post international (EMS, Air Parcel, U-Packet, Sea Mail), local, and COD rate tables.
+- [Postage Calculator](https://lankapost.vercel.app/calculator): Interactive shipping cost calculator for domestic and international Sri Lanka Post services.
+- [Local & SLP Courier Rates](https://lankapost.vercel.app/rates/local): Domestic letter, registered post, parcel, and SLP Courier (Speed Post) tariffs.
+- [COD Charges](https://lankapost.vercel.app/rates/cod): Cash on Delivery (COD) fees and weight slabs.
+- [Parcel Tracking](https://lankapost.vercel.app/track): Track Sri Lanka Post COD (`BD`), SLP Courier (`NA`, `BF`), Registered Post (`RA`, `BG`), and international EMS parcels.
+- [Postal Guides](https://lankapost.vercel.app/blog): Guides on Sri Lankan postal codes, international shipping, and registered mail.
+
+## URL Patterns
+
+- Post office detail page: `/office/{slug}` (includes 5-digit postal code, phone number, division, opening hours, and services)
+- Postal division hub: `/district/{division-slug}` (lists all post offices in a Sri Lanka postal division)
+- International country rates: `/rates/{country-slug}` and `/rates/{country-slug}/{weight}` (e.g. `/rates/taiwan/1kg`, `/rates/united-kingdom/1kg`)

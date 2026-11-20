@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import AddOfficeModal from "@/components/AddOfficeModal";
 
-import { useDirectoryState } from "./directory/useDirectoryState";
+import { useDirectoryState, type InitialDirectoryData } from "./directory/useDirectoryState";
 import { ModeToggle } from "./directory/HomeHero";
 import SearchBar from "./directory/SearchBar";
 import DirectorySidebar from "./directory/DirectorySidebar";
@@ -17,7 +17,11 @@ import { ALPHABET, POPULAR_SEARCHES } from "./directory/types";
 import { cn } from "@/lib/utils";
 import { triggerHaptic } from "@/lib/haptics";
 
-export default function SearchDirectory() {
+export default function SearchDirectory({
+    initialData,
+}: {
+    initialData?: InitialDirectoryData;
+}) {
     const t = useTranslations("Search");
     const tBrowse = useTranslations("Browse");
     const tInstall = useTranslations("Install");
@@ -48,7 +52,7 @@ export default function SearchDirectory() {
         isOfflineFallback,
         updateUrl,
         fetchOffices,
-    } = useDirectoryState();
+    } = useDirectoryState(initialData);
 
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [showStickySearch, setShowStickySearch] = useState(false);

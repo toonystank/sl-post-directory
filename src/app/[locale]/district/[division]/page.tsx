@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { setRequestLocale } from "next-intl/server";
 import { Link } from "@/navigation";
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 import { loadLocalOffices } from "@/lib/local-sqlite";
@@ -7,6 +8,8 @@ import {
     buildLocalizedAlternates,
     buildLocalizedUrl,
     formatSriLankaPhone,
+    getDefaultOpenGraphImages,
+    getOgLocale,
     normalizePostalCode,
 } from "@/lib/site";
 import { ArrowRight, MapPin } from "lucide-react";
@@ -135,6 +138,8 @@ export async function generateMetadata({
             title,
             description,
             url: buildLocalizedUrl(`/district/${slug}`, locale),
+            locale: getOgLocale(locale),
+            images: getDefaultOpenGraphImages(title),
         },
     };
 }
@@ -145,6 +150,7 @@ export default async function DistrictOfficesPage({
     params: Promise<{ locale: string; division: string }>;
 }) {
     const { locale, division } = await params;
+    setRequestLocale(locale);
     const data = await getDivisionData(division);
 
     if (!data || data.offices.length === 0) {

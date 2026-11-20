@@ -36,6 +36,7 @@ function localizedEntry(
                 en: buildLocalizedUrl(pathname, "en"),
                 si: buildLocalizedUrl(pathname, "si"),
                 ta: buildLocalizedUrl(pathname, "ta"),
+                "x-default": buildLocalizedUrl(pathname, "en"),
             },
         },
     };
@@ -92,6 +93,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const coreUrls: MetadataRoute.Sitemap = [
         localizedEntry("/", { lastModified: now, changeFrequency: "daily", priority: 1.0 }),
         localizedEntry("/rates", { lastModified: now, changeFrequency: "weekly", priority: 0.95 }),
+        localizedEntry("/track", { lastModified: now, changeFrequency: "weekly", priority: 0.9 }),
         localizedEntry("/calculator", { lastModified: now, changeFrequency: "weekly", priority: 0.9 }),
         localizedEntry("/browse", { lastModified: now, changeFrequency: "weekly", priority: 0.9 }),
         localizedEntry("/rates/local", { lastModified: now, changeFrequency: "monthly", priority: 0.85 }),
