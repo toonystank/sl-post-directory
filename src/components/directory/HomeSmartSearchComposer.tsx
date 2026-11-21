@@ -1,18 +1,17 @@
 "use client";
 
-import React, { useRef, useState, useEffect, useLayoutEffect, useMemo, useCallback } from "react";
+import React, { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
 import {
     Camera,
     ClipboardPaste,
+    History,
     Loader2,
     PackageSearch,
     Search,
     X,
 } from "lucide-react";
-import { m, AnimatePresence, useReducedMotion } from "motion/react";
-
-const EXPAND_EASE = [0.22, 1, 0.36, 1] as const;
+import { m, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
 import NuwaraEliyaPostOffice from "@/components/brand/NuwaraEliyaPostOffice";
 import type { RichAutocompleteSuggestion } from "@/lib/office-index";
@@ -50,6 +49,9 @@ interface HomeSmartSearchComposerProps {
     submitLabel: string;
     clearLabel: string;
     searchFormRef: React.RefObject<HTMLFormElement | null>;
+    searchHistory: string[];
+    onSelectHistoryItem: (term: string) => void;
+    onRemoveHistoryItem: (term: string) => void;
     onEnterTypeMode: () => void;
     onCollapseTypeMode: () => void;
     onClearAll: () => void;
@@ -75,6 +77,9 @@ export default function HomeSmartSearchComposer({
     submitLabel,
     clearLabel,
     searchFormRef,
+    searchHistory,
+    onSelectHistoryItem,
+    onRemoveHistoryItem,
     onEnterTypeMode,
     onCollapseTypeMode,
     onClearAll,
@@ -88,24 +93,7 @@ export default function HomeSmartSearchComposer({
     const [pasteFeedback, setPasteFeedback] = useState<string | null>(null);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const contentRef = useRef<HTMLDivElement>(null);
-    const [contentHeight, setContentHeight] = useState<number | "auto">("auto");
-    const prefersReducedMotion = useReducedMotion();
     const lastSyncedQueryRef = useRef<string>(query);
-
-    // Measure the natural content height so the outer shell can animate between sizes
-    useLayoutEffect(() => {
-        const el = contentRef.current;
-        if (!el || typeof ResizeObserver === "undefined") return;
-        setContentHeight(el.offsetHeight);
-        const ro = new ResizeObserver((entries) => {
-            const entry = entries[0];
-            const h = entry?.borderBoxSize?.[0]?.blockSize ?? el.offsetHeight;
-            setContentHeight(Math.round(h));
-        });
-        ro.observe(el);
-        return () => ro.disconnect();
-    }, []);
     const feedbackTimerRef = useRef<number | null>(null);
 
     // Keep local composer state aligned if parent clears or sets query externally
@@ -430,7 +418,7 @@ export default function HomeSmartSearchComposer({
                     onSubmit();
                 }}
                 className={cn(
-                    "relative overflow-hidden rounded-lg border-2 border-foreground bg-card transition-[box-shadow,border-color] duration-300",
+                    "relative overflow-hidden rounded-lg border-2 border-foreground bg-card motion-safe:transition-[box-shadow,border-color] motion-safe:duration-200",
                     isExpanded
                         ? "shadow-[3px_3px_0_0_hsl(var(--foreground))]"
                         : "focus-within:shadow-[3px_3px_0_0_hsl(var(--foreground))]"
@@ -439,45 +427,35 @@ export default function HomeSmartSearchComposer({
                 {/* Centered Nuwara Eliya Post Office backdrop — veiled so text always stays legible */}
                 <div
                     className={cn(
-                        "pointer-events-none absolute inset-0 transition-opacity duration-500 ease-out",
-                        isExpanded ? "opacity-75 dark:opacity-70" : "opacity-95 dark:opacity-85"
+                        "pointer-events-none absolute inset-0 motion-safe:transition-opacity motion-safe:duration-200 ease-out",
+                        isExpanded ? "opacity-90 dark:opacity-80" : "opacity-95 dark:opacity-85"
                     )}
                     aria-hidden="true"
                 >
                     <NuwaraEliyaPostOffice expanded={isExpanded} />
                 </div>
 
-                {/* Animated height shell: smoothly grows/shrinks between resting and Type Mode */}
-                <m.div
-                    initial={false}
-                    animate={{ height: contentHeight }}
-                    transition={
-                        prefersReducedMotion
-                            ? { duration: 0 }
-                            : { duration: 0.34, ease: EXPAND_EASE }
-                    }
-                    className="relative z-10 overflow-hidden"
-                >
-                {/* Top / Main Input Surface */}
-                <div
-                    ref={contentRef}
-                    className={cn(
-                        "relative z-10 flex items-stretch",
-                        isExpanded ? "flex-col" : "flex-row min-h-[50px] sm:min-h-[58px]"
-                    )}
-                >
+                {/* Inner Shell: fixed top input row + CSS grid-rows collapsible bottom tray */}
+                <div className="relative z-10 flex flex-col">
+                    {/* Top / Main Input Surface */}
                     <div
-                        onClick={() => {
-                            onEnterTypeMode();
-                            textareaRef.current?.focus();
-                        }}
                         className={cn(
-                            "relative flex flex-1 min-w-0 cursor-text",
-                            isExpanded
-                                ? "items-start gap-2 px-3 pt-3 pb-2.5 min-h-[60px] sm:min-h-[68px]"
-                                : "items-center gap-2 pl-2.5 sm:pl-3.5 pr-2 py-2"
+                            "flex items-stretch",
+                            !isExpanded && "min-h-[50px] sm:min-h-[58px]"
                         )}
                     >
+                        <div
+                            onClick={() => {
+                                onEnterTypeMode();
+                                textareaRef.current?.focus();
+                            }}
+                            className={cn(
+                                "relative flex flex-1 min-w-0 cursor-text",
+                                isExpanded
+                                    ? "items-start gap-2 px-3 pt-3 pb-2.5 min-h-[60px] sm:min-h-[68px]"
+                                    : "items-center gap-2 pl-2.5 sm:pl-3.5 pr-2 py-2"
+                            )}
+                        >
                         {/* Leading Context Icon */}
                         <span
                             className={cn(
@@ -651,10 +629,7 @@ export default function HomeSmartSearchComposer({
 
                         {/* Top-Right Clear / Collapse Trigger when Expanded */}
                         {isExpanded && (
-                            <m.button
-                                initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.8 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ duration: 0.24, delay: 0.08, ease: EXPAND_EASE }}
+                            <button
                                 type="button"
                                 onMouseDown={(e) => e.preventDefault()}
                                 onClick={(e) => {
@@ -666,166 +641,237 @@ export default function HomeSmartSearchComposer({
                                 className="tap mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-foreground/40 bg-card text-foreground hover:border-foreground hover:bg-secondary/25 transition-colors"
                             >
                                 <X className="h-3.5 w-3.5" strokeWidth={2.5} />
-                            </m.button>
+                            </button>
                         )}
                     </div>
 
                     {/* Resting State Right Submit Button (hides when Expanded because CTA moves to the action footer) */}
                     {!isExpanded && (
-                        <m.button
-                            initial={prefersReducedMotion ? false : { opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ duration: 0.25, ease: EXPAND_EASE }}
+                        <button
                             type="submit"
                             className="tap relative z-10 flex w-12 sm:w-14 md:w-auto md:px-6 shrink-0 items-center justify-center gap-2 border-l-2 border-foreground bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
                             aria-label={submitLabel}
                         >
                             <Search className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.4} />
                             <span className="hidden md:inline">{submitLabel}</span>
-                        </m.button>
+                        </button>
                     )}
+                    </div>
 
-                    {/* Expanded Type Mode: Predictive Next-Word Chips + Mobile Quick Action Footer */}
-                    {isExpanded && (
-                        <m.div
-                            initial={prefersReducedMotion ? false : { opacity: 0, y: -8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.3, delay: 0.06, ease: EXPAND_EASE }}
-                            className="relative z-10"
-                        >
-                            {/* Predictive Next-Word & Bulk Completion Chip Strip */}
-                            {prediction.chips.length > 0 && (
+                    {/* Expanded Type Mode: Recent History (empty) or Predictive Next-Word Chips + Action Footer */}
+                    <div
+                        inert={!isExpanded || undefined}
+                        aria-hidden={!isExpanded}
+                        className={cn(
+                            "grid motion-safe:transition-[grid-template-rows,opacity] motion-safe:duration-200 motion-safe:ease-out",
+                            isExpanded
+                                ? "grid-rows-[1fr] opacity-100"
+                                : "grid-rows-[0fr] opacity-0 pointer-events-none"
+                        )}
+                    >
+                        <div className="min-h-0 overflow-hidden">
+                            <div
+                                className={cn(
+                                    "motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out",
+                                    isExpanded ? "translate-y-0" : "-translate-y-1.5"
+                                )}
+                            >
+                                {/* Recent Search History Chip Strip (only when input is empty and user has searched before) */}
+                                {!hasValue && searchHistory.length > 0 && (
+                                    <div
+                                        data-testid="search-history-chips"
+                                        className="flex flex-wrap items-center gap-1.5 border-t border-border/75 bg-muted/20 px-2.5 sm:px-3 py-2"
+                                    >
+                                        {searchHistory.map((item) => (
+                                            <span
+                                                key={item}
+                                                className="inline-flex min-h-[32px] max-w-full items-center rounded-md border border-foreground/35 bg-card text-xs font-bold text-foreground transition-colors hover:border-foreground hover:bg-muted/70"
+                                            >
+                                                <button
+                                                    type="button"
+                                                    onMouseDown={(e) => e.preventDefault()}
+                                                    onClick={() => {
+                                                        triggerHaptic("light");
+                                                        onSelectHistoryItem(item);
+                                                    }}
+                                                    className="tap inline-flex min-h-[32px] items-center gap-1.5 pl-2.5 pr-1.5 py-1 text-left max-w-[200px] sm:max-w-[240px]"
+                                                >
+                                                    <History
+                                                        className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                                                        strokeWidth={2.2}
+                                                        aria-hidden="true"
+                                                    />
+                                                    <span className="truncate">{item}</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onMouseDown={(e) => e.preventDefault()}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        triggerHaptic("light");
+                                                        onRemoveHistoryItem(item);
+                                                    }}
+                                                    aria-label={`Remove ${item} from search history`}
+                                                    className="tap mr-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-foreground hover:text-background transition-colors"
+                                                >
+                                                    <X className="h-3 w-3" strokeWidth={2.5} aria-hidden="true" />
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Predictive Next-Word & Bulk Completion Chip Strip (while typing) */}
+                                {hasValue && prediction.chips.length > 0 && (
+                                    <div
+                                        data-testid="search-prediction-chips"
+                                        className="flex flex-wrap items-center gap-1.5 border-t border-border/75 bg-muted/20 px-2.5 sm:px-3 py-2"
+                                    >
+                                        {prediction.chips.map((chip) => (
+                                            <button
+                                                key={chip.id}
+                                                type="button"
+                                                onMouseDown={(e) => e.preventDefault()}
+                                                onClick={() => handleChipClick(chip)}
+                                                className={cn(
+                                                    "tap inline-flex min-h-[32px] items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-bold transition-colors whitespace-nowrap",
+                                                    chip.primary
+                                                        ? "border-foreground bg-secondary/30 text-foreground hover:bg-secondary/50"
+                                                        : "border-foreground/35 bg-card text-foreground hover:border-foreground hover:bg-muted/70"
+                                                )}
+                                            >
+                                                <span className={cn(chip.applyKind === "add_code" && "font-mono tracking-wide")}>
+                                                    {chip.label}
+                                                </span>
+                                                {chip.meta && (
+                                                    <span className="font-mono text-[10px] font-semibold text-muted-foreground">
+                                                        {chip.meta}
+                                                    </span>
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Mobile & Desktop Quick Action Footer: Paste, Scan, Live Parcel Counter, Primary CTA */}
                                 <div
-                                    data-testid="search-prediction-chips"
-                                    className="flex flex-wrap items-center gap-1.5 border-t border-border/75 bg-muted/20 px-2.5 sm:px-3 py-2"
+                                    data-testid="search-expanded-footer"
+                                    className="flex items-center justify-between gap-1.5 sm:gap-2 border-t-[1.5px] border-foreground/20 bg-muted/25 px-2 sm:px-3 py-2"
                                 >
-                                    {prediction.chips.map((chip) => (
+                                    <div className="flex items-center gap-1.5 shrink-0">
                                         <button
-                                            key={chip.id}
                                             type="button"
                                             onMouseDown={(e) => e.preventDefault()}
-                                            onClick={() => handleChipClick(chip)}
-                                            className={cn(
-                                                "tap inline-flex min-h-[32px] items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-bold transition-colors whitespace-nowrap",
-                                                chip.primary
-                                                    ? "border-foreground bg-secondary/30 text-foreground hover:bg-secondary/50"
-                                                    : "border-foreground/35 bg-card text-foreground hover:border-foreground hover:bg-muted/70"
-                                            )}
+                                            onClick={() => void handlePasteButtonClick()}
+                                            data-testid="home-search-paste-btn"
+                                            className="tap inline-flex min-h-[38px] items-center gap-1 sm:gap-1.5 rounded-md border-[1.5px] border-foreground bg-card px-2 sm:px-2.5 text-xs font-bold text-foreground hover:bg-secondary/25 transition-colors whitespace-nowrap shrink-0"
                                         >
-                                            <span className={cn(chip.applyKind === "add_code" && "font-mono tracking-wide")}>
-                                                {chip.label}
+                                            <ClipboardPaste className="h-3.5 w-3.5 shrink-0" strokeWidth={2.3} />
+                                            <span>Paste</span>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onPointerDown={() =>
+                                                void import("@/lib/tracking/ocr-worker").then((m) =>
+                                                    m.prewarmOcr(
+                                                        locale === "si"
+                                                            ? "eng+sin"
+                                                            : locale === "ta"
+                                                              ? "eng+tam"
+                                                              : "eng"
+                                                    )
+                                                )
+                                            }
+                                            onClick={() => {
+                                                triggerHaptic("light");
+                                                setScannerOpen(true);
+                                            }}
+                                            data-testid="home-search-scan-btn"
+                                            className="tap inline-flex min-h-[38px] items-center gap-1 sm:gap-1.5 rounded-md border-[1.5px] border-foreground bg-secondary px-2 sm:px-2.5 text-xs font-extrabold text-secondary-foreground hover:opacity-95 transition-opacity whitespace-nowrap shrink-0"
+                                        >
+                                            <Camera className="h-3.5 w-3.5 shrink-0" strokeWidth={2.4} />
+                                            <span>Scan</span>
+                                        </button>
+                                    </div>
+
+                                    {/* Live Parcel Counter / Inline Status (clean typography, zero static pill clutter) */}
+                                    <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 ml-auto">
+                                        {(loading || suggestionsLoading) && (
+                                            <Loader2
+                                                className="h-3.5 w-3.5 animate-spin text-muted-foreground shrink-0"
+                                                aria-hidden="true"
+                                            />
+                                        )}
+
+                                        {pasteFeedback ? (
+                                            <span className="font-mono text-[11px] font-bold text-foreground truncate">
+                                                {pasteFeedback}
                                             </span>
-                                            {chip.meta && (
-                                                <span className="font-mono text-[10px] font-semibold text-muted-foreground">
-                                                    {chip.meta}
+                                        ) : prediction.trackingCount > 0 ? (
+                                            <span
+                                                data-testid="live-parcel-count"
+                                                className="font-mono text-[11px] sm:text-xs font-extrabold tabular-nums text-foreground whitespace-nowrap"
+                                            >
+                                                <span>{prediction.trackingCount}</span>
+                                                <span className="hidden min-[410px]:inline">
+                                                    {prediction.trackingCount === 1 ? " Parcel" : " Parcels"}
                                                 </span>
+                                                <span> Ready</span>
+                                                {prediction.trackingCount >= 10 && (
+                                                    <span className="hidden sm:inline text-muted-foreground font-semibold">
+                                                        {" "}· max {MAX_BATCH_BARCODES}
+                                                    </span>
+                                                )}
+                                            </span>
+                                        ) : null}
+
+                                        <button
+                                            type="submit"
+                                            data-testid="home-search-submit-btn"
+                                            className="tap inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-md border-[1.5px] border-foreground bg-primary px-3 sm:px-4 text-xs sm:text-sm font-bold text-primary-foreground shadow-[0_2px_0_0_hsl(var(--foreground))] hover:bg-primary/90 whitespace-nowrap shrink-0"
+                                        >
+                                            {prediction.trackingCount > 0 ? (
+                                                <>
+                                                    <PackageSearch className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" strokeWidth={2.4} />
+                                                    <span>
+                                                        {prediction.trackingCount === 1
+                                                            ? "Track"
+                                                            : `Track ${prediction.trackingCount}`}
+                                                    </span>
+                                                    {prediction.trackingCount > 1 && (
+                                                        <span className="hidden sm:inline">Parcels</span>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Search className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" strokeWidth={2.4} />
+                                                    <span>{submitLabel}</span>
+                                                </>
                                             )}
                                         </button>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* Mobile & Desktop Quick Action Footer: Paste, Scan, Live Parcel Counter, Primary CTA */}
-                            <div
-                                data-testid="search-expanded-footer"
-                                className="flex items-center justify-between gap-1.5 sm:gap-2 border-t-[1.5px] border-foreground/20 bg-muted/45 px-2 sm:px-3 py-2"
-                            >
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                    <button
-                                        type="button"
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        onClick={() => void handlePasteButtonClick()}
-                                        data-testid="home-search-paste-btn"
-                                        className="tap inline-flex min-h-[38px] items-center gap-1 sm:gap-1.5 rounded-md border-[1.5px] border-foreground bg-card px-2 sm:px-2.5 text-xs font-bold text-foreground hover:bg-secondary/25 transition-colors whitespace-nowrap shrink-0"
-                                    >
-                                        <ClipboardPaste className="h-3.5 w-3.5 shrink-0" strokeWidth={2.3} />
-                                        <span>Paste</span>
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        onClick={() => {
-                                            triggerHaptic("light");
-                                            setScannerOpen(true);
-                                        }}
-                                        data-testid="home-search-scan-btn"
-                                        className="tap inline-flex min-h-[38px] items-center gap-1 sm:gap-1.5 rounded-md border-[1.5px] border-foreground bg-secondary px-2 sm:px-2.5 text-xs font-extrabold text-secondary-foreground hover:opacity-95 transition-opacity whitespace-nowrap shrink-0"
-                                    >
-                                        <Camera className="h-3.5 w-3.5 shrink-0" strokeWidth={2.4} />
-                                        <span>Scan</span>
-                                    </button>
-                                </div>
-
-                                {/* Live Parcel Counter / Inline Status (clean typography, zero static pill clutter) */}
-                                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 ml-auto">
-                                    {(loading || suggestionsLoading) && (
-                                        <Loader2
-                                            className="h-3.5 w-3.5 animate-spin text-muted-foreground shrink-0"
-                                            aria-hidden="true"
-                                        />
-                                    )}
-
-                                    {pasteFeedback ? (
-                                        <span className="font-mono text-[11px] font-bold text-foreground truncate">
-                                            {pasteFeedback}
-                                        </span>
-                                    ) : prediction.trackingCount > 0 ? (
-                                        <span
-                                            data-testid="live-parcel-count"
-                                            className="font-mono text-[11px] sm:text-xs font-extrabold tabular-nums text-foreground whitespace-nowrap"
-                                        >
-                                            <span>{prediction.trackingCount}</span>
-                                            <span className="hidden min-[410px]:inline">
-                                                {prediction.trackingCount === 1 ? " Parcel" : " Parcels"}
-                                            </span>
-                                            <span> Ready</span>
-                                            {prediction.trackingCount >= 10 && (
-                                                <span className="hidden sm:inline text-muted-foreground font-semibold">
-                                                    {" "}· max {MAX_BATCH_BARCODES}
-                                                </span>
-                                            )}
-                                        </span>
-                                    ) : null}
-
-                                    <button
-                                        type="submit"
-                                        data-testid="home-search-submit-btn"
-                                        className="tap inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-md border-[1.5px] border-foreground bg-primary px-3 sm:px-4 text-xs sm:text-sm font-bold text-primary-foreground shadow-[0_2px_0_0_hsl(var(--foreground))] hover:bg-primary/90 whitespace-nowrap shrink-0"
-                                    >
-                                        {prediction.trackingCount > 0 ? (
-                                            <>
-                                                <PackageSearch className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" strokeWidth={2.4} />
-                                                <span>
-                                                    {prediction.trackingCount === 1
-                                                        ? "Track"
-                                                        : `Track ${prediction.trackingCount}`}
-                                                </span>
-                                                {prediction.trackingCount > 1 && (
-                                                    <span className="hidden sm:inline">Parcels</span>
-                                                )}
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Search className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" strokeWidth={2.4} />
-                                                <span>{submitLabel}</span>
-                                            </>
-                                        )}
-                                    </button>
+                                    </div>
                                 </div>
                             </div>
-                        </m.div>
-                    )}
+                        </div>
+                    </div>
                 </div>
-                </m.div>
             </form>
 
-            {/* Lazy-Loaded Unified Camera Barcode & Receipt OCR Scanner */}
+            {/* Lazy-Loaded Unified Camera Barcode, Tracking & Address Scanner */}
             {scannerOpen && (
                 <BarcodeScannerSheet
                     open={scannerOpen}
+                    mode="auto"
                     onClose={() => setScannerOpen(false)}
                     onApplyBarcodes={handleApplyScannedBarcodes}
+                    onApplyPlace={(p) => {
+                        onEnterTypeMode();
+                        syncStateToParent([], p.name);
+                        showBriefFeedback(`Found ${p.name}`);
+                        focusInput();
+                    }}
                 />
             )}
         </>

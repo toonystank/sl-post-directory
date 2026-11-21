@@ -1,5 +1,7 @@
 import type { PostOffice, SearchMode, SearchResponse } from "@/components/directory/types";
 import { formatSriLankaPhone, normalizePostalCode, postalCodeSearchVariants } from "./site";
+import { HAS_INDIC_SCRIPT_REGEX, resolveAlias } from "./place-aliases";
+import { normalizePlaceName, type PlaceDictionary, type PlaceRecord } from "./address-extract";
 
 /**
  * Compact tuple row for a single post office:
@@ -312,6 +314,7 @@ export class LocalOfficeSearchEngine {
     readonly index: CompactOfficeIndex;
     private readonly prepared: PreparedRow[];
     private readonly slugMap: Map<string, CompactOfficeRow>;
+    private cachedPlaceDict: PlaceDictionary | null = null;
     readonly divisions: string[];
     readonly types: string[];
 
@@ -363,13 +366,123 @@ export class LocalOfficeSearchEngine {
         return row ? decodeOfficeRowToPostOffice(this.index, row) : null;
     }
 
+    /**
+     * Builds and caches an exact, postal-code, and bucketed-fuzzy place dictionary
+     * across all offices in the local index for fast offline address matching.
+     */
+    getPlaceDictionary(): PlaceDictionary {
+        if (this.cachedPlaceDict) {
+            return this.cachedPlaceDict;
+        }
+
+        const normMap = new Map<string, PlaceRecord[]>();
+        const postalMap = new Map<string, PlaceRecord[]>();
+        const fuzzyBuckets = new Map<string, Array<{ norm: string; records: PlaceRecord[] }>>();
+
+        for (const item of this.prepared) {
+            const [, slug, name, postalCode, divIdx] = item.row;
+            const division = divIdx >= 0 ? this.index.d[divIdx] : undefined;
+            const record: PlaceRecord = {
+                name,
+                slug,
+                postalCode: postalCode || undefined,
+                division,
+            };
+
+            const norm = normalizePlaceName(name);
+            if (norm.length >= 2) {
+                let list = normMap.get(norm);
+                if (!list) {
+                    list = [];
+                    normMap.set(norm, list);
+                }
+                list.push(record);
+            }
+
+            if (postalCode && /^\d{5}$/.test(postalCode)) {
+                let pList = postalMap.get(postalCode);
+                if (!pList) {
+                    pList = [];
+                    postalMap.set(postalCode, pList);
+                }
+                pList.push(record);
+            }
+        }
+
+        // Prefer canonical / shorter office names (e.g. "Kandy" before "Kandy Branch")
+        const sortByCanonical = (a: PlaceRecord, b: PlaceRecord) => {
+            const aHasDigits = /\d/.test(a.name) ? 1 : 0;
+            const bHasDigits = /\d/.test(b.name) ? 1 : 0;
+            if (aHasDigits !== bHasDigits) return aHasDigits - bHasDigits;
+            return a.name.length - b.name.length;
+        };
+
+        for (const [norm, records] of normMap.entries()) {
+            records.sort(sortByCanonical);
+            const firstLetter = norm.charAt(0);
+            if (firstLetter) {
+                let bucket = fuzzyBuckets.get(firstLetter);
+                if (!bucket) {
+                    bucket = [];
+                    fuzzyBuckets.set(firstLetter, bucket);
+                }
+                bucket.push({ norm, records });
+            }
+        }
+
+        for (const records of postalMap.values()) {
+            records.sort(sortByCanonical);
+        }
+
+        const dict: PlaceDictionary = {
+            findExact(normalizedName: string): PlaceRecord[] {
+                if (!normalizedName) return [];
+                return normMap.get(normalizedName) ?? [];
+            },
+            findFuzzy(
+                normalizedName: string,
+                maxDist: number
+            ): Array<{ record: PlaceRecord; distance: number }> {
+                if (!normalizedName) return [];
+                const bucket = fuzzyBuckets.get(normalizedName.charAt(0));
+                if (!bucket) return [];
+                const matches: Array<{ record: PlaceRecord; distance: number }> = [];
+                for (const entry of bucket) {
+                    if (Math.abs(entry.norm.length - normalizedName.length) > maxDist) {
+                        continue;
+                    }
+                    const dist = boundedEditDistance(normalizedName, entry.norm, maxDist);
+                    if (dist <= maxDist) {
+                        for (const rec of entry.records) {
+                            matches.push({ record: rec, distance: dist });
+                        }
+                    }
+                }
+                matches.sort((a, b) => a.distance - b.distance);
+                return matches;
+            },
+            findByPostalCode(code5: string): PlaceRecord[] {
+                const normalized = normalizePostalCode(code5);
+                if (!normalized) return [];
+                return postalMap.get(normalized) ?? [];
+            },
+        };
+
+        this.cachedPlaceDict = dict;
+        return dict;
+    }
+
     query(params: LocalQueryParams): SearchResponse {
         const letter = (params.letter || "").trim().toUpperCase();
         const serviceLower = (params.service || "").trim().toLowerCase();
         const divisionFilterLower = (params.division || "").trim().toLowerCase();
         const typeFilterLower = (params.officeType || "").trim().toLowerCase();
         const only24Hour = Boolean(params.is24Hour);
-        const rawQ = (params.q || "").trim();
+        const rawInput = (params.q || "").trim();
+        const rawQ =
+            rawInput && HAS_INDIC_SCRIPT_REGEX.test(rawInput)
+                ? (resolveAlias(rawInput) ?? rawInput)
+                : rawInput;
         const mode: SearchMode = params.mode === "division" ? "division" : "name";
         const cursor = Math.max(0, params.cursor ?? 0);
         const limit = Math.min(Math.max(params.limit ?? 24, 1), 100);
@@ -470,8 +583,11 @@ export class LocalOfficeSearchEngine {
         mode: "name" | "division" | "all" = "name",
         maxResults = 5
     ): RichAutocompleteSuggestion[] {
-        const trimmed = rawQ.trim();
-        if (!trimmed) return [];
+        const rawTrimmed = rawQ.trim();
+        if (!rawTrimmed) return [];
+        const trimmed = HAS_INDIC_SCRIPT_REGEX.test(rawTrimmed)
+            ? (resolveAlias(rawTrimmed) ?? rawTrimmed)
+            : rawTrimmed;
         const qLower = trimmed.toLowerCase();
 
         if (mode === "division") {

@@ -16,6 +16,7 @@ import {
     Building2,
     ArrowRight,
     Banknote,
+    ChevronDown,
     ChevronRight,
     RefreshCw,
 } from "lucide-react";
@@ -510,16 +511,33 @@ export default function TrackingResultCard({
     result,
     isOfflineCache = false,
     onRefreshLive,
+    expanded,
+    defaultExpanded = true,
+    onToggleExpand,
 }: {
     result: UnifiedTrackingResult;
     isOfflineCache?: boolean;
     onRefreshLive?: (barcode: string) => void;
+    expanded?: boolean;
+    defaultExpanded?: boolean;
+    onToggleExpand?: () => void;
 }) {
     const [copiedLink, setCopiedLink] = React.useState(false);
     const [copiedCode, setCopiedCode] = React.useState(false);
+    const [localExpanded, setLocalExpanded] = React.useState(defaultExpanded);
     const [officeEngine, setOfficeEngine] = React.useState<LocalOfficeSearchEngine | null>(() =>
         getLoadedOfficeIndexSync()
     );
+
+    const isExpanded = expanded ?? localExpanded;
+    const handleToggleExpand = React.useCallback(() => {
+        triggerHaptic("light");
+        if (onToggleExpand) {
+            onToggleExpand();
+        } else {
+            setLocalExpanded((prev) => !prev);
+        }
+    }, [onToggleExpand]);
 
     React.useEffect(() => {
         if (!officeEngine) {
@@ -622,6 +640,22 @@ export default function TrackingResultCard({
         window.open(`https://wa.me/?text=${encodeURIComponent(whatsappText)}`, "_blank", "noopener,noreferrer");
     };
 
+    const compactSummary = React.useMemo(() => {
+        const parts: string[] = [];
+        const from = result.acceptingOfficeQuery || result.acceptingOffice;
+        const to = result.deliveryOfficeQuery || result.deliveryOffice;
+        const route = [from, to].filter(Boolean).join(" → ");
+        if (route) parts.push(route);
+        if (result.service === "slp" && result.events.length > 0) {
+            const latest = result.events[result.events.length - 1];
+            if (latest?.event) parts.push(latest.event);
+        }
+        if (stampData.date && stampData.date !== "SL POST") {
+            parts.push(stampData.date);
+        }
+        return parts.join(" · ");
+    }, [result, stampData.date]);
+
     return (
         <article
             data-testid={`tracking-result-${result.barcode}`}
@@ -636,8 +670,17 @@ export default function TrackingResultCard({
                 )}
             />
 
-            {/* Compact Mobile-First Header */}
-            <div className="border-b-2 border-foreground bg-muted/35 p-3 sm:px-5 sm:py-4 space-y-2.5">
+            {/* Compact Mobile-First Header (click anywhere outside buttons/links to toggle) */}
+            <div
+                onClick={(e) => {
+                    if ((e.target as HTMLElement).closest("button, a")) return;
+                    handleToggleExpand();
+                }}
+                className={cn(
+                    "cursor-pointer bg-muted/35 p-3 sm:px-5 sm:py-4 space-y-2.5",
+                    isExpanded && "border-b-2 border-foreground"
+                )}
+            >
                 {/* Row 1: Service Tag + Action Buttons */}
                 <div className="flex items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-1.5 min-w-0">
@@ -661,7 +704,7 @@ export default function TrackingResultCard({
                         )}
                     </div>
 
-                    {/* Action Bar (Native Share + Copy Link + Refresh/Print) */}
+                    {/* Action Bar (Refresh + Copy Link + Share + Print + Collapse Toggle) */}
                     <div className="flex items-center gap-1.5 shrink-0 print:hidden">
                         {onRefreshLive && (
                             <button
@@ -709,6 +752,23 @@ export default function TrackingResultCard({
                             title="Print or Save as PDF"
                         >
                             <Printer className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleToggleExpand}
+                            aria-expanded={isExpanded}
+                            data-testid={`tracking-toggle-${result.barcode}`}
+                            aria-label={isExpanded ? `Collapse ${result.barcode}` : `Expand ${result.barcode}`}
+                            className="tap inline-flex h-8 items-center gap-1 rounded-md border-[1.5px] border-foreground bg-card px-2 text-[11px] font-bold text-foreground shadow-[0_1px_0_0_hsl(var(--foreground))] hover:bg-secondary/40"
+                        >
+                            <span className="hidden xs:inline">{isExpanded ? "Hide" : "Details"}</span>
+                            <ChevronDown
+                                className={cn(
+                                    "h-3.5 w-3.5 motion-safe:transition-transform motion-safe:duration-200",
+                                    isExpanded && "rotate-180"
+                                )}
+                                aria-hidden="true"
+                            />
                         </button>
                     </div>
                 </div>
@@ -758,39 +818,59 @@ export default function TrackingResultCard({
                         className="hidden md:block shrink-0"
                     />
                 </div>
+
+                {/* Compact 1-line summary visible only when collapsed */}
+                {!isExpanded && compactSummary && (
+                    <p className="font-mono text-[11px] font-medium text-muted-foreground truncate">
+                        {compactSummary}
+                    </p>
+                )}
             </div>
 
-            {/* Body */}
-            <div className="p-3 sm:p-5 space-y-3 sm:space-y-4">
-                <ProgressStepper steps={result.steps} accentColor={result.service} />
+            {/* Collapsible Body */}
+            <div
+                inert={!isExpanded || undefined}
+                aria-hidden={!isExpanded}
+                className={cn(
+                    "grid motion-safe:transition-[grid-template-rows,opacity] motion-safe:duration-200 motion-safe:ease-out print:grid-rows-[1fr] print:opacity-100",
+                    isExpanded
+                        ? "grid-rows-[1fr] opacity-100"
+                        : "grid-rows-[0fr] opacity-0 pointer-events-none"
+                )}
+            >
+                <div className="min-h-0 overflow-hidden">
+                    <div className="p-3 sm:p-5 space-y-3 sm:space-y-4">
+                        <ProgressStepper steps={result.steps} accentColor={result.service} />
 
-                {result.deliveryEstimate && (
-                    <div className="flex items-center gap-2 rounded-xl border-[1.5px] border-foreground bg-secondary/25 px-3 py-2 text-xs font-bold text-foreground">
-                        <CalendarClock className="h-4 w-4 text-primary shrink-0" />
-                        <span>{result.deliveryEstimate}</span>
+                        {result.deliveryEstimate && (
+                            <div className="flex items-center gap-2 rounded-xl border-[1.5px] border-foreground bg-secondary/25 px-3 py-2 text-xs font-bold text-foreground">
+                                <CalendarClock className="h-4 w-4 text-primary shrink-0" />
+                                <span>{result.deliveryEstimate}</span>
+                            </div>
+                        )}
+
+                        {result.service === "cod" ? (
+                            <CodDetailsSection result={result} engine={officeEngine} />
+                        ) : (
+                            <SlpTimeline result={result} engine={officeEngine} />
+                        )}
+
+                        {/* Footer Ledger Strip */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-dashed border-foreground/25 text-[10.5px] text-muted-foreground print:hidden">
+                            <span className="font-mono">
+                                Source: {isCod ? "bepost.lk (COD)" : "slpmail.slpost.gov.lk (SLP)"}
+                            </span>
+                            <a
+                                href={getUpuTrackingUrl(result.barcode)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="tap inline-flex items-center gap-1 font-mono font-bold text-foreground hover:text-primary transition-colors"
+                            >
+                                <span>UPU International</span>
+                                <ExternalLink className="h-3 w-3" />
+                            </a>
+                        </div>
                     </div>
-                )}
-
-                {result.service === "cod" ? (
-                    <CodDetailsSection result={result} engine={officeEngine} />
-                ) : (
-                    <SlpTimeline result={result} engine={officeEngine} />
-                )}
-
-                {/* Footer Ledger Strip */}
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-dashed border-foreground/25 text-[10.5px] text-muted-foreground print:hidden">
-                    <span className="font-mono">
-                        Source: {isCod ? "bepost.lk (COD)" : "slpmail.slpost.gov.lk (SLP)"}
-                    </span>
-                    <a
-                        href={getUpuTrackingUrl(result.barcode)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="tap inline-flex items-center gap-1 font-mono font-bold text-foreground hover:text-primary transition-colors"
-                    >
-                        <span>UPU International</span>
-                        <ExternalLink className="h-3 w-3" />
-                    </a>
                 </div>
             </div>
         </article>

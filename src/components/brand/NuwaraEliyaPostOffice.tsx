@@ -304,9 +304,8 @@ function TudorGable({
  *  - In expanded mode (`414×216` up to `672×180`), `xMidYMid slice` centers the entire Post
  *    Office (clock tower spire, twin porches, main hall, grand right Tudor gable) unclipped.
  */
-export default function NuwaraEliyaPostOffice({
+const NuwaraEliyaPostOffice = React.memo(function NuwaraEliyaPostOffice({
     className,
-    expanded = false,
 }: NuwaraEliyaPostOfficeProps) {
     const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
     const brickId = `ne-brick-${uid}`;
@@ -340,11 +339,6 @@ export default function NuwaraEliyaPostOffice({
         };
     }, []);
 
-    // Veil keeps foreground search text crisp while letting the illustration read clearly
-    const topVeil = expanded ? 0.78 : 0.62;
-    const midVeil = expanded ? 0.56 : 0.54;
-    const botVeil = expanded ? 0.44 : 0.46;
-
     return (
         <div
             aria-hidden="true"
@@ -354,6 +348,7 @@ export default function NuwaraEliyaPostOffice({
                 className
             )}
         >
+            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 w-full aspect-[6/1] min-h-full transform-gpu [contain:layout_paint]">
             <svg
                 viewBox="0 0 1200 200"
                 preserveAspectRatio="xMidYMid slice"
@@ -391,11 +386,11 @@ export default function NuwaraEliyaPostOffice({
                         <stop offset="65%" stopColor="#F5EFE3" stopOpacity="0.35" />
                         <stop offset="100%" stopColor="#EFE6D5" stopOpacity="0.2" />
                     </linearGradient>
-                    {/* Card-coloured readability veil */}
+                    {/* Static card-coloured readability veil (never mutated on expand so SVG stays cached) */}
                     <linearGradient id={veilId} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="hsl(var(--card))" stopOpacity={topVeil} />
-                        <stop offset="48%" stopColor="hsl(var(--card))" stopOpacity={midVeil} />
-                        <stop offset="100%" stopColor="hsl(var(--card))" stopOpacity={botVeil} />
+                        <stop offset="0%" stopColor="hsl(var(--card))" stopOpacity={0.62} />
+                        <stop offset="48%" stopColor="hsl(var(--card))" stopOpacity={0.54} />
+                        <stop offset="100%" stopColor="hsl(var(--card))" stopOpacity={0.46} />
                     </linearGradient>
                 </defs>
 
@@ -694,6 +689,9 @@ export default function NuwaraEliyaPostOffice({
                 {/* Smooth card-coloured veil so search text & chips always stay crisp */}
                 <rect width="1200" height="200" fill={`url(#${veilId})`} />
             </svg>
+            </div>
         </div>
     );
-}
+});
+
+export default NuwaraEliyaPostOffice;

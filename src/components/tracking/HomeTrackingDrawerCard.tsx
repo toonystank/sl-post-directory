@@ -421,10 +421,10 @@ export default function HomeTrackingDrawerCard({
                             </div>
                         )}
 
-                        {/* Compact 2-row on mobile, 1-row on desktop CAPTCHA bar */}
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                            <div className="flex items-center gap-1.5">
-                                <div className="flex h-9 flex-1 sm:w-28 items-center justify-center rounded border-[1.5px] border-dashed border-foreground bg-white px-2">
+                        {/* Clean 2-row CAPTCHA bar with min-w-0 so input and Verify never clip */}
+                        <div className="flex flex-col gap-2">
+                            <div className="flex w-full min-w-0 items-center gap-1.5">
+                                <div className="flex h-9 min-w-0 flex-1 items-center justify-center rounded border-[1.5px] border-dashed border-foreground bg-white px-2">
                                     {loadingCaptcha ? (
                                         <Loader2 className="h-3.5 w-3.5 animate-spin text-neutral-600" />
                                     ) : captchaImage ? (
@@ -455,7 +455,7 @@ export default function HomeTrackingDrawerCard({
                                 </button>
                             </div>
 
-                            <div className="flex flex-1 items-center gap-1.5">
+                            <div className="flex w-full min-w-0 items-center gap-1.5">
                                 <input
                                     type="text"
                                     value={captchaCode}

@@ -241,32 +241,6 @@ function getAllValidTrackingCodes(committedCodes: string[], draftText: string): 
     return unique;
 }
 
-function getStarterChips(locale: string): PredictionChip[] {
-    if (locale === "si") {
-        return [
-            { id: "start-tw", label: "Taiwan 5kg", applyKind: "replace_draft", value: "Taiwan 5kg" },
-            { id: "start-cod", label: "COD 5000 1kg", applyKind: "replace_draft", value: "COD 5000 1kg" },
-            { id: "start-ne", label: "Nuwara Eliya", meta: "22200", applyKind: "replace_draft", value: "Nuwara Eliya" },
-            { id: "start-track", label: "BD070817564LK", meta: "Track", applyKind: "replace_draft", value: "BD070817564LK" },
-        ];
-    }
-    if (locale === "ta") {
-        return [
-            { id: "start-tw", label: "Taiwan 5kg", applyKind: "replace_draft", value: "Taiwan 5kg" },
-            { id: "start-cod", label: "COD 5000 1kg", applyKind: "replace_draft", value: "COD 5000 1kg" },
-            { id: "start-ne", label: "Nuwara Eliya", meta: "22200", applyKind: "replace_draft", value: "Nuwara Eliya" },
-            { id: "start-track", label: "BD070817564LK", meta: "Track", applyKind: "replace_draft", value: "BD070817564LK" },
-        ];
-    }
-    return [
-        { id: "start-tw", label: "Taiwan 5kg", applyKind: "replace_draft", value: "Taiwan 5kg" },
-        { id: "start-cod", label: "COD 5000 1kg", applyKind: "replace_draft", value: "COD 5000 1kg" },
-        { id: "start-ne", label: "Nuwara Eliya", meta: "22200", applyKind: "replace_draft", value: "Nuwara Eliya" },
-        { id: "start-local", label: "500g letter", applyKind: "replace_draft", value: "500g letter" },
-        { id: "start-track", label: "BD070817564LK", meta: "Track", applyKind: "replace_draft", value: "BD070817564LK" },
-    ];
-}
-
 function findCountryPrefixCompletion(rawSingleWord: string): string | null {
     const lower = rawSingleWord.toLowerCase();
     if (lower.length < 3) return null;
@@ -423,7 +397,7 @@ export function predictSearchCompletion({
     }
 
     // ------------------------------------------------------------------
-    // 2. Empty Type Mode (Zero-state starter chips)
+    // 2. Empty Type Mode (no hardcoded starter chips; history handled in UI)
     // ------------------------------------------------------------------
     if (!trimmed) {
         return {
@@ -432,7 +406,7 @@ export function predictSearchCompletion({
             isBulkHint: false,
             bulkExampleCode: null,
             bulkHintLabel: null,
-            chips: getStarterChips(locale),
+            chips: [],
             trackingCount: 0,
             isTrackingMode: false,
         };

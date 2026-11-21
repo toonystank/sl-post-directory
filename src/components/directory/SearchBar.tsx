@@ -14,6 +14,7 @@ import {
     Mail,
     ArrowRight,
     Scale,
+    Camera,
 } from "lucide-react";
 import { m, AnimatePresence } from "motion/react";
 import { Link, useRouter } from "@/navigation";
@@ -37,6 +38,11 @@ import {
 } from "@/lib/office-index-client";
 import type { RichAutocompleteSuggestion } from "@/lib/office-index";
 import { triggerHaptic } from "@/lib/haptics";
+import {
+    loadSearchHistory,
+    addSearchHistory,
+    removeSearchHistoryItem,
+} from "@/lib/search-history";
 import { SearchMode } from "./types";
 
 interface SearchBarProps {
@@ -52,6 +58,7 @@ interface SearchBarProps {
     onClear: () => void;
     loading: boolean;
     onSuggestionClick: (suggestion: string) => void;
+    onScanAddress?: () => void;
     containerRef?: React.RefObject<HTMLDivElement | null>;
     sidebarRef?: React.RefObject<HTMLDivElement | null>;
     inputRef?: React.Ref<HTMLInputElement>;
@@ -68,6 +75,7 @@ export default function SearchBar({
     onClear,
     loading,
     onSuggestionClick,
+    onScanAddress,
     containerRef,
     sidebarRef,
     inputRef,
@@ -86,6 +94,7 @@ export default function SearchBar({
     const [highlight, setHighlight] = useState(-1);
     const [exampleIndex, setExampleIndex] = useState(0);
     const [weightOverrideGrams, setWeightOverrideGrams] = useState<number | null>(null);
+    const [searchHistory, setSearchHistory] = useState<string[]>([]);
 
     const suggestionCache = useRef<Record<string, RichAutocompleteSuggestion[]>>({});
     const suggestDebounce = useRef<NodeJS.Timeout | null>(null);
@@ -114,6 +123,22 @@ export default function SearchBar({
     useEffect(() => {
         setWeightOverrideGrams(null);
     }, [query]);
+
+    // Hydrate client search history on mount for Home smart search
+    useEffect(() => {
+        if (!enableSmartHomeSearch) return;
+        setSearchHistory(loadSearchHistory());
+    }, [enableSmartHomeSearch]);
+
+    const recordHistory = useCallback(
+        (term: string) => {
+            if (!enableSmartHomeSearch) return;
+            const trimmed = term.trim();
+            if (!trimmed) return;
+            setSearchHistory(addSearchHistory(trimmed));
+        },
+        [enableSmartHomeSearch]
+    );
 
     const smartIntent: SmartSearchIntent | null = useMemo(() => {
         if (!enableSmartHomeSearch || !query.trim()) return null;
@@ -281,6 +306,7 @@ export default function SearchBar({
 
     const handleSubmit = () => {
         if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
+        recordHistory(query);
         setShowDropdown(false);
         setIsActive(false);
         // If on Home Page and user typed a clear rate query (like "thaiwan 5kg") with no matching post offices, jump straight to the SEO rate page / calculator
@@ -292,6 +318,7 @@ export default function SearchBar({
     };
 
     const handleSuggestClick = (s: RichAutocompleteSuggestion) => {
+        recordHistory(s.queryValue);
         setShowDropdown(false);
         setIsActive(false);
         if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
@@ -423,6 +450,13 @@ export default function SearchBar({
                     submitLabel={t("submit")}
                     clearLabel={t("clear")}
                     searchFormRef={searchFormRef}
+                    searchHistory={searchHistory}
+                    onSelectHistoryItem={(term) => {
+                        processValueChange(term, id);
+                    }}
+                    onRemoveHistoryItem={(term) => {
+                        setSearchHistory(removeSearchHistoryItem(term));
+                    }}
                     onEnterTypeMode={handleEnterTypeMode}
                     onCollapseTypeMode={handleCloseDropdownOnly}
                     onClearAll={() => {
@@ -534,6 +568,30 @@ export default function SearchBar({
                                 <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={2.5} />
                             </button>
                         )}
+                        {onScanAddress && (
+                            <button
+                                type="button"
+                                onPointerDown={() =>
+                                    void import("@/lib/tracking/ocr-worker").then((m) =>
+                                        m.prewarmOcr(
+                                            locale === "si"
+                                                ? "eng+sin"
+                                                : locale === "ta"
+                                                  ? "eng+tam"
+                                                  : "eng"
+                                        )
+                                    )
+                                }
+                                onClick={onScanAddress}
+                                data-testid="browse-scan-address-btn"
+                                title="Scan destination address from letter"
+                                aria-label="Scan address"
+                                className="tap inline-flex h-7 sm:h-8 items-center gap-1 rounded border-[1.5px] border-foreground bg-secondary px-2 text-xs font-extrabold text-secondary-foreground hover:opacity-95 transition-opacity"
+                            >
+                                <Camera className="h-3.5 w-3.5 shrink-0" strokeWidth={2.4} />
+                                {!isSticky && <span className="hidden sm:inline">Scan</span>}
+                            </button>
+                        )}
                     </div>
 
                     <button
@@ -600,7 +658,10 @@ export default function SearchBar({
                                         {smartIntent.kind === "tracking" && (
                                             <HomeTrackingDrawerCard
                                                 intent={smartIntent}
-                                                onCloseDrawer={handleCloseDropdownOnly}
+                                                onCloseDrawer={() => {
+                                                    recordHistory(query);
+                                                    handleCloseDropdownOnly();
+                                                }}
                                             />
                                         )}
 
@@ -666,7 +727,10 @@ export default function SearchBar({
                                                                         service: q.serviceId,
                                                                     },
                                                                 }}
-                                                                onClick={() => handleCloseDropdownOnly()}
+                                                                onClick={() => {
+                                                                    recordHistory(query);
+                                                                    handleCloseDropdownOnly();
+                                                                }}
                                                                 className="tap flex flex-col justify-between rounded-md border-[1.5px] border-foreground bg-background px-1.5 py-1.5 sm:px-2.5 sm:py-2 hover:bg-secondary/20 transition-colors min-w-0"
                                                             >
                                                                 <div className="flex items-center justify-between gap-0.5 min-w-0">
@@ -727,7 +791,10 @@ export default function SearchBar({
                                                         <Link
                                                             href={smartIntent.calculatorHref}
                                                             data-testid="smart-rate-open-calculator"
-                                                            onClick={() => handleCloseDropdownOnly()}
+                                                            onClick={() => {
+                                                                recordHistory(query);
+                                                                handleCloseDropdownOnly();
+                                                            }}
                                                             className="tap inline-flex w-full items-center justify-center gap-1.5 rounded-md border-2 border-foreground bg-[#1D4E9E] px-3 py-1.5 text-xs font-bold text-white shadow-[0_2px_0_0_hsl(var(--foreground))] hover:opacity-95"
                                                         >
                                                             <span>
@@ -791,7 +858,10 @@ export default function SearchBar({
                                                     <Link
                                                         href={smartIntent.calculatorHref}
                                                         data-testid="smart-rate-open-calculator"
-                                                        onClick={() => handleCloseDropdownOnly()}
+                                                        onClick={() => {
+                                                            recordHistory(query);
+                                                            handleCloseDropdownOnly();
+                                                        }}
                                                         className="tap inline-flex items-center gap-1.5 rounded-md border-2 border-foreground bg-[#15803D] px-3.5 py-1.5 text-xs font-bold text-white shadow-[0_2px_0_0_hsl(var(--foreground))]"
                                                     >
                                                         <span>
@@ -822,7 +892,10 @@ export default function SearchBar({
                                                     <Link
                                                         href={smartIntent.calculatorHref}
                                                         data-testid="smart-rate-open-calculator"
-                                                        onClick={() => handleCloseDropdownOnly()}
+                                                        onClick={() => {
+                                                            recordHistory(query);
+                                                            handleCloseDropdownOnly();
+                                                        }}
                                                         className="tap inline-flex items-center gap-1.5 rounded-md border-2 border-foreground bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-[0_2px_0_0_hsl(var(--foreground))]"
                                                     >
                                                         <span>{t("smartOpenLocalCalc")}</span>
@@ -841,7 +914,10 @@ export default function SearchBar({
                                                                     service: q.serviceId,
                                                                 },
                                                             }}
-                                                            onClick={() => handleCloseDropdownOnly()}
+                                                            onClick={() => {
+                                                                recordHistory(query);
+                                                                handleCloseDropdownOnly();
+                                                            }}
                                                             className="tap rounded-md border border-foreground/50 bg-card px-2.5 py-1.5 hover:border-foreground"
                                                         >
                                                             <span className="block text-[11px] font-bold text-foreground truncate">
@@ -913,7 +989,10 @@ export default function SearchBar({
                                         <button
                                             type="button"
                                             onMouseDown={(e) => e.preventDefault()}
-                                            onClick={() => onSubmit()}
+                                            onClick={() => {
+                                                recordHistory(query);
+                                                onSubmit();
+                                            }}
                                             className="tap inline-flex items-center gap-1.5 text-xs font-bold text-foreground hover:text-primary transition-colors"
                                         >
                                             <Building2 className="h-3.5 w-3.5 shrink-0 text-primary" />

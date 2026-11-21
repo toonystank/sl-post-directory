@@ -78,6 +78,33 @@ interface TrackerClientProps {
     initialQuery?: string;
 }
 
+function readHistoryFromStorage(): Map<string, HistoryEntry> {
+    const map = new Map<string, HistoryEntry>();
+    if (typeof window === "undefined") return map;
+    try {
+        const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
+        if (!raw) return map;
+        const parsed = JSON.parse(raw) as HistoryEntry[];
+        if (!Array.isArray(parsed)) return map;
+        for (const entry of parsed) {
+            if (!entry?.barcode || !entry?.result) continue;
+            const fixedResult =
+                entry.result.service === "cod"
+                    ? normalizeCodTrackingResult(entry.result)
+                    : entry.result;
+            map.set(entry.barcode, {
+                ...entry,
+                statusLabel: fixedResult.statusLabel,
+                statusCategory: fixedResult.statusCategory,
+                result: fixedResult,
+            });
+        }
+    } catch {
+        // Ignore localStorage parse errors
+    }
+    return map;
+}
+
 export default function TrackerClient({ initialQuery = "" }: TrackerClientProps) {
     const t = useTranslations("Track");
     const locale = useLocale();
@@ -103,7 +130,62 @@ export default function TrackerClient({ initialQuery = "" }: TrackerClientProps)
     const [slpError, setSlpError] = React.useState<string | null>(null);
 
     const [history, setHistory] = React.useState<HistoryEntry[]>([]);
+    const [expandedBarcodes, setExpandedBarcodes] = React.useState<Set<string>>(() => new Set());
+    const prevResultBarcodesRef = React.useRef<string[]>([]);
     const autoSubmittedRef = React.useRef(false);
+
+    React.useEffect(() => {
+        const nextCodes = results.map((r) => r.barcode);
+        const prevCodes = prevResultBarcodesRef.current;
+        prevResultBarcodesRef.current = nextCodes;
+
+        if (nextCodes.length === 0) {
+            setExpandedBarcodes(new Set());
+            return;
+        }
+        if (nextCodes.length === 1) {
+            setExpandedBarcodes(new Set([nextCodes[0]]));
+            return;
+        }
+
+        const isAppendingToBatch =
+            prevCodes.length > 0 && prevCodes.every((c) => nextCodes.includes(c));
+        if (isAppendingToBatch) {
+            setExpandedBarcodes((prev) => {
+                const kept = new Set<string>();
+                for (const code of prev) {
+                    if (nextCodes.includes(code)) kept.add(code);
+                }
+                return kept;
+            });
+        } else {
+            setExpandedBarcodes(new Set());
+        }
+    }, [results]);
+
+    const toggleCardExpanded = React.useCallback((barcode: string) => {
+        setExpandedBarcodes((prev) => {
+            const next = new Set(prev);
+            if (next.has(barcode)) {
+                next.delete(barcode);
+            } else {
+                next.add(barcode);
+            }
+            return next;
+        });
+    }, []);
+
+    const allExpanded =
+        results.length > 0 && results.every((r) => expandedBarcodes.has(r.barcode));
+
+    const handleToggleAllCards = React.useCallback(() => {
+        triggerHaptic("light");
+        if (allExpanded) {
+            setExpandedBarcodes(new Set());
+        } else {
+            setExpandedBarcodes(new Set(results.map((r) => r.barcode)));
+        }
+    }, [allExpanded, results]);
 
     // Live preview of barcodes parsed from current input
     const liveParsedBarcodes = React.useMemo(() => parseBarcodes(input), [input]);
@@ -287,18 +369,34 @@ export default function TrackerClient({ initialQuery = "" }: TrackerClientProps)
                 }
             }
 
-            setResults([]);
+            const savedMap = readHistoryFromStorage();
+            const cachedSlpResults: UnifiedTrackingResult[] = [];
+            const domesticToQuery: string[] = [];
+
+            for (const code of domestic) {
+                const cached = savedMap.get(code) ?? history.find((h) => h.barcode === code);
+                if (cached?.result?.service === "slp") {
+                    cachedSlpResults.push(cached.result);
+                } else {
+                    domesticToQuery.push(code);
+                }
+            }
+
+            setResults(cachedSlpResults);
             setNotFoundItems([]);
             setIntlItems(international);
             setSlpQueue([]);
 
-            if (domestic.length === 0) {
+            if (domesticToQuery.length === 0) {
+                if (cachedSlpResults.length > 0) {
+                    triggerHaptic("success");
+                }
                 return;
             }
 
-            // Pre-fetch CAPTCHA in parallel if any barcode is SLP-likely (NA/BF),
+            // Pre-fetch CAPTCHA in parallel if any remaining barcode is SLP-likely (NA/BF),
             // while still checking COD database FIRST.
-            const hasSlpLikely = domestic.some((b) => classifyBarcode(b) === "slp_likely");
+            const hasSlpLikely = domesticToQuery.some((b) => classifyBarcode(b) === "slp_likely");
             const captchaPrefetch = hasSlpLikely ? fetchSlpCaptcha() : null;
 
             setLoadingCod(true);
@@ -306,7 +404,7 @@ export default function TrackerClient({ initialQuery = "" }: TrackerClientProps)
                 const res = await fetch("/api/track/cod", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ barcodes: domestic }),
+                    body: JSON.stringify({ barcodes: domesticToQuery }),
                 });
 
                 const data = (await res.json()) as CodBatchApiResponse;
@@ -322,7 +420,12 @@ export default function TrackerClient({ initialQuery = "" }: TrackerClientProps)
                     if (item.found && item.result) {
                         foundCod.push(item.result);
                     } else if (item.eligibleForSlp) {
-                        pendingSlp.push(item.barcode);
+                        const fallbackCached = savedMap.get(item.barcode)?.result;
+                        if (fallbackCached) {
+                            foundCod.push(fallbackCached);
+                        } else {
+                            pendingSlp.push(item.barcode);
+                        }
                     } else {
                         definitelyNotFound.push({
                             barcode: item.barcode,
@@ -332,11 +435,12 @@ export default function TrackerClient({ initialQuery = "" }: TrackerClientProps)
                     }
                 }
 
-                setResults(foundCod);
+                const mergedResults = [...cachedSlpResults, ...foundCod];
+                setResults(mergedResults);
                 setNotFoundItems(definitelyNotFound);
                 saveToHistory(foundCod);
 
-                if (foundCod.length > 0) {
+                if (mergedResults.length > 0) {
                     triggerHaptic("success");
                 }
 
@@ -607,6 +711,11 @@ export default function TrackerClient({ initialQuery = "" }: TrackerClientProps)
 
                                 <button
                                     type="button"
+                                    onPointerDown={() =>
+                                        void import("@/lib/tracking/ocr-worker").then((m) =>
+                                            m.prewarmOcr("eng")
+                                        )
+                                    }
                                     onClick={() => {
                                         triggerHaptic("light");
                                         setScannerOpen(true);
@@ -779,12 +888,37 @@ export default function TrackerClient({ initialQuery = "" }: TrackerClientProps)
 
                 {/* Tracking Result Cards */}
                 {results.length > 0 && (
-                    <div className="space-y-4">
+                    <div className="space-y-3 sm:space-y-4">
+                        {results.length > 1 && (
+                            <div className="flex items-center justify-between gap-2 rounded-xl border-2 border-foreground bg-muted/45 px-3.5 py-2 print:hidden">
+                                <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-foreground">
+                                    Tracked Parcels ({results.length})
+                                </span>
+                                <button
+                                    type="button"
+                                    data-testid="tracking-toggle-all"
+                                    aria-expanded={allExpanded}
+                                    onClick={handleToggleAllCards}
+                                    className="tap inline-flex items-center gap-1.5 rounded-md border-[1.5px] border-foreground bg-card px-2.5 py-1 font-mono text-[11px] font-bold text-foreground shadow-[0_1px_0_0_hsl(var(--foreground))] hover:bg-secondary/40"
+                                >
+                                    <span>{allExpanded ? "Collapse all" : "Expand all"}</span>
+                                    <ChevronDown
+                                        className={cn(
+                                            "h-3.5 w-3.5 motion-safe:transition-transform motion-safe:duration-200",
+                                            allExpanded && "rotate-180"
+                                        )}
+                                        aria-hidden="true"
+                                    />
+                                </button>
+                            </div>
+                        )}
                         {results.map((res) => (
                             <TrackingResultCard
                                 key={`${res.service}-${res.barcode}`}
                                 result={res}
                                 isOfflineCache={isOfflineMode}
+                                expanded={expandedBarcodes.has(res.barcode)}
+                                onToggleExpand={() => toggleCardExpanded(res.barcode)}
                                 onRefreshLive={(code) => void runTracking(code)}
                             />
                         ))}

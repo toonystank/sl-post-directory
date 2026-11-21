@@ -148,3 +148,12 @@ test("buildCombinedSearchQuery & getNextBulkExampleCode keep bulk queries synchr
     assert.equal(buildCombinedSearchQuery(["BD00000LK"], "BF009065544LK"), "BD00000LK, BF009065544LK");
     assert.notEqual(getNextBulkExampleCode(["NA055922175LK"]).slice(0, 2), "NA");
 });
+
+test("predictSearchCompletion returns empty starter chips when draft and committed codes are empty", () => {
+    const emptyEn = predictSearchCompletion({ draftText: "", committedCodes: [], locale: "en" });
+    assert.deepEqual(emptyEn.chips, []);
+    assert.equal(emptyEn.ghostSuffix, "");
+
+    const emptySi = predictSearchCompletion({ draftText: "   ", committedCodes: [], locale: "si" });
+    assert.deepEqual(emptySi.chips, []);
+});

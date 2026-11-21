@@ -202,3 +202,16 @@ test("LocalOfficeSearchEngine normalizes unpadded 00100 codes, deduplicates empt
     assert.equal(engine.query({ officeType: "Sub Post Office" }).total, 1);
     assert.equal(engine.query({ is24Hour: true }).total, 1);
 });
+
+test("LocalOfficeSearchEngine resolves Sinhala/Tamil aliases and exposes cached PlaceDictionary", () => {
+    const engine = new LocalOfficeSearchEngine(encodeOfficeIndex(sampleRecords));
+
+    const rich = engine.autocompleteRich("මහනුවර", "all");
+    assert.equal(rich[0]?.queryValue, "Kandy");
+    assert.equal(rich[0]?.postalCode, "20000");
+
+    const dict = engine.getPlaceDictionary();
+    assert.equal(dict, engine.getPlaceDictionary());
+    assert.equal(dict.findByPostalCode("20000")[0]?.name, "Kandy");
+    assert.equal(dict.findExact("colombo")[0]?.name, "Colombo GPO");
+});
