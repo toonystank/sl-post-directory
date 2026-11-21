@@ -1,10 +1,16 @@
 "use client";
 
 import React, { useRef, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { Plus, SlidersHorizontal, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import AddOfficeModal from "@/components/AddOfficeModal";
+
+const BarcodeScannerSheet = dynamic(
+    () => import("@/components/tracking/BarcodeScannerSheet"),
+    { ssr: false }
+);
 
 import { useDirectoryState, type InitialDirectoryData } from "./directory/useDirectoryState";
 import { ModeToggle } from "./directory/HomeHero";
@@ -56,6 +62,7 @@ export default function SearchDirectory({
 
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [showStickySearch, setShowStickySearch] = useState(false);
+    const [addressScanOpen, setAddressScanOpen] = useState(false);
 
     const searchContainerRef = useRef<HTMLDivElement>(null);
     const stickySearchContainerRef = useRef<HTMLDivElement>(null);
@@ -237,6 +244,10 @@ export default function SearchDirectory({
                             onClear={handleClearQuery}
                             loading={loading}
                             onSuggestionClick={handleSuggestionClick}
+                            onScanAddress={() => {
+                                triggerHaptic("light");
+                                setAddressScanOpen(true);
+                            }}
                             containerRef={searchContainerRef}
                         />
                     </div>
@@ -315,6 +326,10 @@ export default function SearchDirectory({
                         onClear={handleClearQuery}
                         loading={loading}
                         onSuggestionClick={handleSuggestionClick}
+                        onScanAddress={() => {
+                            triggerHaptic("light");
+                            setAddressScanOpen(true);
+                        }}
                         containerRef={stickySearchContainerRef}
                     />
                 </div>
@@ -504,6 +519,16 @@ export default function SearchDirectory({
                 onClear={clearSheetFilters}
                 total={total}
             />
+
+            {addressScanOpen && (
+                <BarcodeScannerSheet
+                    open={addressScanOpen}
+                    mode="address"
+                    onClose={() => setAddressScanOpen(false)}
+                    onApplyBarcodes={() => {}}
+                    onApplyPlace={(p) => handleSuggestionClick(p.name)}
+                />
+            )}
         </section>
     );
 }

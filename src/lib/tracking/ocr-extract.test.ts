@@ -50,3 +50,23 @@ test("extractPostalCodesFromOcr ignores ordinary English words and addresses", (
     const codes = extractPostalCodesFromOcr(noise);
     assert.equal(codes.length, 0);
 });
+
+test("extractPostalCodesFromOcr never coerces Sri Lanka phone numbers or Sample D slip into tracking codes", () => {
+    assert.equal(tryParseOcrToken("94714867898"), null);
+    assert.equal(tryParseOcrToken("E4714867898"), null);
+    assert.equal(tryParseOcrToken("34714867898"), null);
+    assert.equal(tryParseOcrToken("80714867898"), null);
+    assert.equal(tryParseOcrToken("9471486789800"), null);
+
+    const sampleD = [
+        "Licence Number: B4019219",
+        "MOHAMED IQBAL",
+        "MOHAMED HAKEEM",
+        "544/24 A HEERASSAGALA ROAD",
+        "KANDY",
+        "20000",
+        "94714867898",
+        "DANNOOT000907 - 7",
+    ].join("\n");
+    assert.deepEqual(extractPostalCodesFromOcr(sampleD), []);
+});

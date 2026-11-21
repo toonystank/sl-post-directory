@@ -1,12 +1,13 @@
 "use client";
 
 /**
- * Offscreen Canvas Image Pre-Processor for Printed & Handwritten Postal Receipts.
+ * Offscreen Canvas Image Pre-Processor for Printed & Handwritten Postal Receipts and Addresses.
  *
- * - Crops strictly to the Postal Reticle ROI (cutting pixel count by ~85% so OCR runs in ~400ms).
- * - Pass 1 (`"contrast"`): Grayscale + percentile contrast stretch (ideal for printed receipts & labels).
- * - Pass 2 (`"threshold"`): Adaptive local mean thresholding / binarization (ideal for blue/black
- *   ballpoint pen handwriting on pink, yellow, or shadowed Sri Lanka Post slips).
+ * - Crops to the target Reticle ROI (keeping pixel count compact for fast mobile OCR).
+ * - Uses the RED channel (`data[i]`) as grayscale so red postmarks and franking stamps fade
+ *   toward white paper while black/blue ink remains dark and legible.
+ * - `toContrastCanvas`: Percentile/min-max contrast stretch (ideal for printed text & labels).
+ * - `toThresholdCanvas`: Adaptive local mean binarization (ideal for ballpoint pen handwriting).
  */
 
 export interface ReticleCropRect {
@@ -20,12 +21,26 @@ export interface ReticleCropRect {
     hRatio: number;
 }
 
+export type CaptureRotation = 0 | 90 | 270;
+
 export const DEFAULT_RETICLE_RECT: ReticleCropRect = {
     xRatio: 0.08,
     yRatio: 0.34,
     wRatio: 0.84,
     hRatio: 0.28,
 };
+
+export const ADDRESS_RETICLE_RECT: ReticleCropRect = {
+    xRatio: 0.06,
+    yRatio: 0.2,
+    wRatio: 0.88,
+    hRatio: 0.52,
+};
+
+export interface CaptureRoiOptions {
+    rotation?: CaptureRotation;
+    maxWidth?: number;
+}
 
 export interface PreprocessedOcrFrame {
     /** Data URL of the natural cropped ROI (shown to the user in the confirmation strip) */
@@ -36,25 +51,51 @@ export interface PreprocessedOcrFrame {
     thresholdDataUrl: string;
 }
 
+function getSourceDimensions(
+    source: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement
+): { width: number; height: number } {
+    if (source instanceof HTMLVideoElement) {
+        return { width: source.videoWidth, height: source.videoHeight };
+    }
+    if (source instanceof HTMLImageElement) {
+        return {
+            width: source.naturalWidth || source.width,
+            height: source.naturalHeight || source.height,
+        };
+    }
+    return { width: source.width, height: source.height };
+}
+
+function cloneCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
+    const out = document.createElement("canvas");
+    out.width = src.width;
+    out.height = src.height;
+    const ctx = out.getContext("2d", { willReadFrequently: true });
+    if (ctx) {
+        ctx.drawImage(src, 0, 0);
+    }
+    return out;
+}
+
 function applyContrastStretch(ctx: CanvasRenderingContext2D, width: number, height: number) {
     const imgData = ctx.getImageData(0, 0, width, height);
     const data = imgData.data;
-    const lum = new Uint8Array(width * height);
+    const red = new Uint8Array(width * height);
 
     let min = 255;
     let max = 0;
 
     for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-        // Standard luminance weighting; boosts blue/black pen ink contrast against warm paper
-        const g = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
-        lum[p] = g;
-        if (g < min) min = g;
-        if (g > max) max = g;
+        // Red channel suppresses red postmarks & franking stamps while keeping black/blue ink dark
+        const r = data[i];
+        red[p] = r;
+        if (r < min) min = r;
+        if (r > max) max = r;
     }
 
     const range = Math.max(1, max - min);
     for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-        const stretched = Math.min(255, Math.max(0, Math.round(((lum[p] - min) * 255) / range)));
+        const stretched = Math.min(255, Math.max(0, Math.round(((red[p] - min) * 255) / range)));
         data[i] = stretched;
         data[i + 1] = stretched;
         data[i + 2] = stretched;
@@ -76,9 +117,10 @@ function applyAdaptiveBinarization(ctx: CanvasRenderingContext2D, width: number,
         let rowSum = 0;
         for (let x = 0; x < width; x++) {
             const idx = (y * width + x) * 4;
-            const g = Math.round(0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2]);
-            gray[y * width + x] = g;
-            rowSum += g;
+            // Red channel fades red stamps toward paper brightness before adaptive thresholding
+            const r = data[idx];
+            gray[y * width + x] = r;
+            rowSum += r;
             integral[(y + 1) * stride + (x + 1)] = integral[y * stride + (x + 1)] + rowSum;
         }
     }
@@ -114,16 +156,42 @@ function applyAdaptiveBinarization(ctx: CanvasRenderingContext2D, width: number,
 }
 
 /**
- * Capture and pre-process a cropped frame from a live `<video>` or `HTMLImageElement`.
+ * Downscales large gallery photos so their longest edge is capped (default 1600px)
+ * before running barcode detection or multi-rotation OCR.
  */
-export function preprocessSourceForOcr(
-    source: HTMLVideoElement | HTMLImageElement,
-    crop: ReticleCropRect = DEFAULT_RETICLE_RECT
-): PreprocessedOcrFrame | null {
-    const srcW =
-        source instanceof HTMLVideoElement ? source.videoWidth : source.naturalWidth || source.width;
-    const srcH =
-        source instanceof HTMLVideoElement ? source.videoHeight : source.naturalHeight || source.height;
+export function downscaleImageToCanvas(
+    source: HTMLImageElement | HTMLCanvasElement,
+    maxSide = 1600
+): HTMLCanvasElement | null {
+    const { width: srcW, height: srcH } = getSourceDimensions(source);
+    if (!srcW || !srcH) return null;
+
+    const longest = Math.max(srcW, srcH);
+    const scale = longest > maxSide ? maxSide / longest : 1;
+    const outW = Math.max(1, Math.round(srcW * scale));
+    const outH = Math.max(1, Math.round(srcH * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = outW;
+    canvas.height = outH;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    ctx.drawImage(source, 0, 0, outW, outH);
+    return canvas;
+}
+
+/**
+ * Captures and optionally rotates the target ROI from a video frame, image, or canvas
+ * without encoding data URLs.
+ */
+export function captureRoi(
+    source: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement,
+    crop: ReticleCropRect = DEFAULT_RETICLE_RECT,
+    options: CaptureRoiOptions = {}
+): HTMLCanvasElement | null {
+    const { rotation = 0, maxWidth = 1000 } = options;
+    const { width: srcW, height: srcH } = getSourceDimensions(source);
 
     if (!srcW || !srcH) return null;
 
@@ -134,33 +202,78 @@ export function preprocessSourceForOcr(
 
     if (sw < 40 || sh < 20) return null;
 
-    // Normalize target width to max 900px for fast, crisp Tesseract recognition
-    const scale = Math.min(2, Math.max(1, 750 / sw));
-    const outW = Math.round(sw * scale);
-    const outH = Math.round(sh * scale);
+    const targetWBeforeCap = rotation === 0 ? sw : sh;
+    let scale = Math.min(2, Math.max(1, 750 / targetWBeforeCap));
+    if (targetWBeforeCap * scale > maxWidth) {
+        scale = maxWidth / targetWBeforeCap;
+    }
+
+    const drawW = Math.max(1, Math.round(sw * scale));
+    const drawH = Math.max(1, Math.round(sh * scale));
 
     const canvas = document.createElement("canvas");
-    canvas.width = outW;
-    canvas.height = outH;
+    canvas.width = rotation === 0 ? drawW : drawH;
+    canvas.height = rotation === 0 ? drawH : drawW;
+
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) return null;
 
-    // 1. Natural cropped preview
-    ctx.drawImage(source, sx, sy, sw, sh, 0, 0, outW, outH);
-    const previewDataUrl = canvas.toDataURL("image/jpeg", 0.88);
+    if (rotation === 90) {
+        ctx.translate(canvas.width, 0);
+        ctx.rotate(Math.PI / 2);
+    } else if (rotation === 270) {
+        ctx.translate(0, canvas.height);
+        ctx.rotate(-Math.PI / 2);
+    }
 
-    // 2. Pass 1: Contrast-stretched grayscale
-    applyContrastStretch(ctx, outW, outH);
-    const contrastDataUrl = canvas.toDataURL("image/png");
+    ctx.drawImage(source, sx, sy, sw, sh, 0, 0, drawW, drawH);
+    return canvas;
+}
 
-    // 3. Pass 2: Adaptive binarization for handwriting
-    ctx.drawImage(source, sx, sy, sw, sh, 0, 0, outW, outH);
-    applyAdaptiveBinarization(ctx, outW, outH);
-    const thresholdDataUrl = canvas.toDataURL("image/png");
+/**
+ * Produces a contrast-stretched red-channel grayscale copy of an ROI canvas.
+ */
+export function toContrastCanvas(roiCanvas: HTMLCanvasElement): HTMLCanvasElement {
+    const out = cloneCanvas(roiCanvas);
+    const ctx = out.getContext("2d", { willReadFrequently: true });
+    if (ctx) {
+        applyContrastStretch(ctx, out.width, out.height);
+    }
+    return out;
+}
+
+/**
+ * Produces an adaptively binarized red-channel copy of an ROI canvas (best for pen handwriting).
+ */
+export function toThresholdCanvas(roiCanvas: HTMLCanvasElement): HTMLCanvasElement {
+    const out = cloneCanvas(roiCanvas);
+    const ctx = out.getContext("2d", { willReadFrequently: true });
+    if (ctx) {
+        applyAdaptiveBinarization(ctx, out.width, out.height);
+    }
+    return out;
+}
+
+/**
+ * Encodes an ROI canvas to JPEG only when a confirmation preview needs to be displayed.
+ */
+export function canvasToPreviewJpeg(roiCanvas: HTMLCanvasElement, quality = 0.85): string {
+    return roiCanvas.toDataURL("image/jpeg", quality);
+}
+
+/**
+ * Legacy helper retained as a thin wrapper around the lazy canvas pipeline.
+ */
+export function preprocessSourceForOcr(
+    source: HTMLVideoElement | HTMLImageElement,
+    crop: ReticleCropRect = DEFAULT_RETICLE_RECT
+): PreprocessedOcrFrame | null {
+    const roi = captureRoi(source, crop);
+    if (!roi) return null;
 
     return {
-        previewDataUrl,
-        contrastDataUrl,
-        thresholdDataUrl,
+        previewDataUrl: canvasToPreviewJpeg(roi, 0.88),
+        contrastDataUrl: toContrastCanvas(roi).toDataURL("image/png"),
+        thresholdDataUrl: toThresholdCanvas(roi).toDataURL("image/png"),
     };
 }

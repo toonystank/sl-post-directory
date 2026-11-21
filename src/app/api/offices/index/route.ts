@@ -59,12 +59,15 @@ async function getSerializedIndex() {
     const json = JSON.stringify(encoded);
     const etag = `"${encoded.v}"`;
 
-    serverCachedPayload = {
+    const payload = {
         json,
         etag,
         builtAt: Date.now(),
     };
-    return serverCachedPayload;
+    if (encoded.count > 0) {
+        serverCachedPayload = payload;
+    }
+    return payload;
 }
 
 export async function GET(request: NextRequest) {

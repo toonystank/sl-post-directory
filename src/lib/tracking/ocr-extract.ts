@@ -33,6 +33,21 @@ const KNOWN_SL_PREFIXES = new Set([
     "UX",
 ]);
 
+/** Core domestic SL Post prefixes accepted when trailing "LK" is missing (11-char tokens). */
+const CORE_DOMESTIC_PREFIXES = new Set([
+    "BD",
+    "NA",
+    "BF",
+    "RA",
+    "BG",
+    "RR",
+    "RB",
+    "EE",
+    "CP",
+    "LP",
+    "VV",
+]);
+
 /**
  * Common OCR & handwriting digit -> letter confusions in prefix/suffix positions (1-2 and 12-13).
  */
@@ -186,9 +201,15 @@ export function tryParseOcrToken(rawToken: string): ExtractedOcrCode | null {
 
     // Case 1: Full 13-character S10 candidate (2 prefix + 9 digits + 2 suffix)
     if (cleaned.length === 13) {
-        const p = normalizePrefix(cleaned.slice(0, 2));
+        const rawPrefix = cleaned.slice(0, 2);
+        const rawSuffix = cleaned.slice(11, 13);
+        if (!/[A-Z]/.test(rawPrefix) || !/[A-Z]/.test(rawSuffix)) {
+            return null;
+        }
+
+        const p = normalizePrefix(rawPrefix);
         const s = normalizeSerial9(cleaned.slice(2, 11));
-        const suf = normalizeSuffix(cleaned.slice(11, 13));
+        const suf = normalizeSuffix(rawSuffix);
 
         if (!p || !s || !suf) return null;
 
@@ -218,10 +239,21 @@ export function tryParseOcrToken(rawToken: string): ExtractedOcrCode | null {
     }
 
     // Case 2: 11-character candidate where trailing "LK" was cut off or smudged on a handwritten slip
-    // Only auto-complete "LK" if the 2-letter prefix is a known SL Post prefix (BD, NA, BF, RA, BG, etc.)
+    // Require an uncorrected 2-letter core domestic prefix so phone numbers (9471..., E471...) never coerce.
     if (cleaned.length === 11) {
-        const p = normalizePrefix(cleaned.slice(0, 2));
-        if (!p || !KNOWN_SL_PREFIXES.has(p.prefix)) return null;
+        const rawPrefix = cleaned.slice(0, 2);
+        if (/^94\d{9}$/.test(cleaned) || /^0\d{9,10}$/.test(cleaned)) {
+            return null;
+        }
+        if (!/^[A-Z]{2}$/.test(rawPrefix) || !CORE_DOMESTIC_PREFIXES.has(rawPrefix)) {
+            return null;
+        }
+        if (/^.{2}7\d{8}$/.test(cleaned) && !CORE_DOMESTIC_PREFIXES.has(rawPrefix)) {
+            return null;
+        }
+
+        const p = normalizePrefix(rawPrefix);
+        if (!p || p.corrected) return null;
 
         const s = normalizeSerial9(cleaned.slice(2, 11));
         if (!s || s.corrections > 2) return null;
@@ -230,7 +262,7 @@ export function tryParseOcrToken(rawToken: string): ExtractedOcrCode | null {
             code: `${p.prefix}${s.serial}LK`,
             rawMatch: rawToken.trim(),
             wasCorrected: true,
-            score: 65 - s.corrections * 8 - (p.corrected ? 8 : 0),
+            score: 65 - s.corrections * 8,
         };
     }
 

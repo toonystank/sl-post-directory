@@ -150,9 +150,190 @@ function buildSearchIndex(offices: LocalOfficeRecord[]): void {
     idMap = ids;
 }
 
+function buildSlugDisambiguated(name: string, postalCode: string, rowId: string, usedSlugs: Set<string>): string {
+    const baseSlug = createBaseSlug(name) || rowId.toLowerCase();
+    let slug = baseSlug;
+    if (usedSlugs.has(slug)) {
+        const withPostal = `${baseSlug}-${postalCode || rowId.slice(0, 6)}`;
+        slug = usedSlugs.has(withPostal) ? `${withPostal}-${rowId.slice(0, 6)}` : withPostal;
+    }
+    usedSlugs.add(slug);
+    return slug;
+}
+
+function toDisplayCase(raw: string): string {
+    return raw
+        .toLowerCase()
+        .replace(/\b([a-z])/g, (_, ch: string) => ch.toUpperCase())
+        .replace(/\bGpo\b/g, "GPO")
+        .replace(/\bRmsc\b/g, "RMSC")
+        .replace(/\bSpo\b/g, "SPO");
+}
+
+/**
+ * Fallback loader from bundled `data10.json` + `scraped_codes.json` when neither
+ * Postgres (`DATABASE_URL`) nor `prisma/dev.db` is available in local development.
+ */
+function loadOfficesFromBundledJson(): LocalOfficeRecord[] {
+    const data10Path = path.join(process.cwd(), "data10.json");
+    const scrapedPath = path.join(process.cwd(), "scraped_codes.json");
+
+    let scrapedMap: Record<string, string> = {};
+    if (fs.existsSync(scrapedPath)) {
+        try {
+            const rawScraped = JSON.parse(fs.readFileSync(scrapedPath, "utf8")) as unknown;
+            if (rawScraped && typeof rawScraped === "object") {
+                for (const [k, v] of Object.entries(rawScraped as Record<string, unknown>)) {
+                    if (typeof v === "string") {
+                        const code = normalizePostalCode(v);
+                        if (code) scrapedMap[k.trim().toUpperCase()] = code;
+                    }
+                }
+            }
+        } catch {
+            scrapedMap = {};
+        }
+    }
+
+    const rawEntries: Array<{
+        name: string;
+        postalCode: string;
+        division?: string;
+        phone?: string;
+        delivery?: string;
+    }> = [];
+    const seenUpperNames = new Set<string>();
+
+    if (fs.existsSync(data10Path)) {
+        try {
+            const parsed = JSON.parse(fs.readFileSync(data10Path, "utf8")) as {
+                Main?: Array<Record<string, unknown>>;
+            };
+            const mainRows = Array.isArray(parsed?.Main) ? parsed.Main : [];
+            for (const item of mainRows) {
+                const rawName = typeof item["Office Name"] === "string" ? item["Office Name"] : "";
+                if (!rawName.trim()) continue;
+
+                const cleanName = rawName
+                    .replace(/\([^)]*\)/g, " ")
+                    .replace(/\s+/g, " ")
+                    .replace(/^\/\s*|\s*\/$/g, "")
+                    .trim();
+                if (!cleanName) continue;
+
+                const nameCodeMatch = rawName.match(/\(\s*(\d{5})\s*\)/);
+                const fromName = nameCodeMatch?.[1] ?? "";
+                const fromScraped = scrapedMap[cleanName.toUpperCase()] ?? "";
+                const rawPoCode =
+                    typeof item["PO Code"] === "string" || typeof item["PO Code"] === "number"
+                        ? String(item["PO Code"])
+                        : "";
+                const postalCode =
+                    fromName || fromScraped || normalizePostalCode(rawPoCode) || "";
+
+                const key = `${cleanName.toUpperCase()}|${postalCode}`;
+                if (seenUpperNames.has(cleanName.toUpperCase()) && !postalCode) continue;
+                seenUpperNames.add(cleanName.toUpperCase());
+                void key;
+
+                const ds = typeof item["DS"] === "string" ? item["DS"].trim() : "";
+                const phone = typeof item["Te. No"] === "string" ? item["Te. No"].trim() : "";
+                const delivery =
+                    typeof item["Delivery / Non Delivery"] === "string"
+                        ? item["Delivery / Non Delivery"].trim()
+                        : "";
+
+                rawEntries.push({
+                    name: cleanName,
+                    postalCode,
+                    division: ds || undefined,
+                    phone: phone || undefined,
+                    delivery: delivery || undefined,
+                });
+            }
+        } catch {
+            // Fall through to scraped_codes entries
+        }
+    }
+
+    for (const [upperName, code] of Object.entries(scrapedMap)) {
+        if (seenUpperNames.has(upperName)) continue;
+        seenUpperNames.add(upperName);
+        rawEntries.push({
+            name: toDisplayCase(upperName),
+            postalCode: code,
+        });
+    }
+
+    rawEntries.sort((a, b) => a.name.localeCompare(b.name));
+
+    const now = new Date();
+    const usedSlugs = new Set<string>();
+    return rawEntries.map((entry, idx) => {
+        const rowId = `local-${idx}`;
+        const slug = buildSlugDisambiguated(entry.name, entry.postalCode, rowId, usedSlugs);
+        const fields: LocalOfficeField[] = [
+            {
+                id: `${rowId}-type`,
+                officeId: rowId,
+                name: "Type",
+                value: "Post Office",
+            },
+            {
+                id: `${rowId}-hours`,
+                officeId: rowId,
+                name: "Working Hours",
+                value: "8:00 AM - 4:00 PM (Weekdays)",
+            },
+        ];
+        if (entry.division) {
+            fields.push({
+                id: `${rowId}-div`,
+                officeId: rowId,
+                name: "Division",
+                value: entry.division,
+            });
+        }
+        if (entry.phone) {
+            fields.push({
+                id: `${rowId}-phone`,
+                officeId: rowId,
+                name: "Phone",
+                value: entry.phone,
+            });
+        }
+        if (entry.delivery) {
+            fields.push({
+                id: `${rowId}-delivery`,
+                officeId: rowId,
+                name: "Delivery",
+                value: entry.delivery,
+            });
+        }
+
+        return {
+            id: rowId,
+            name: entry.name,
+            slug,
+            postalCode: entry.postalCode,
+            services: [],
+            rmsc: null,
+            latitude: null,
+            longitude: null,
+            createdAt: now,
+            updatedAt: now,
+            fields,
+            photos: [],
+            reviews: [],
+            controllingOffice: null,
+            controlledOffices: [],
+        };
+    });
+}
+
 /**
  * Loads and caches all Sri Lankan post offices from `prisma/dev.db`
- * using Node's built-in `node:sqlite` module in read-only mode,
+ * (or falls back to bundled `data10.json` + `scraped_codes.json`),
  * with precomputed lowercase indices for O(1) id/slug lookup and sub-ms filtering.
  */
 export function loadLocalOffices(): LocalOfficeRecord[] {
@@ -160,18 +341,21 @@ export function loadLocalOffices(): LocalOfficeRecord[] {
         return cachedOffices;
     }
 
+    const loadBundled = () => {
+        const offices = loadOfficesFromBundledJson();
+        cachedOffices = offices;
+        buildSearchIndex(offices);
+        return cachedOffices;
+    };
+
     const dbPath = path.join(process.cwd(), "prisma", "dev.db");
     if (!fs.existsSync(dbPath)) {
-        cachedOffices = [];
-        buildSearchIndex([]);
-        return cachedOffices;
+        return loadBundled();
     }
 
     const sqliteMod = getSqliteModule();
     if (!sqliteMod) {
-        cachedOffices = [];
-        buildSearchIndex([]);
-        return cachedOffices;
+        return loadBundled();
     }
 
     let db: SqliteDatabase | null = null;
@@ -183,18 +367,14 @@ export function loadLocalOffices(): LocalOfficeRecord[] {
             )
             .all();
 
+        if (rows.length === 0) {
+            return loadBundled();
+        }
+
         const usedSlugs = new Set<string>();
         const offices: LocalOfficeRecord[] = rows.map((row) => {
             const rowId = String(row.id);
-            const baseSlug = createBaseSlug(row.name) || rowId.toLowerCase();
-            let slug = baseSlug;
-            if (usedSlugs.has(slug)) {
-                const withPostal = `${baseSlug}-${row.postalCode || rowId.slice(0, 6)}`;
-                slug = usedSlugs.has(withPostal)
-                    ? `${withPostal}-${rowId.slice(0, 6)}`
-                    : withPostal;
-            }
-            usedSlugs.add(slug);
+            const slug = buildSlugDisambiguated(row.name, row.postalCode, rowId, usedSlugs);
 
             const createdMs = Number(row.createdAt);
             const updatedMs = Number(row.updatedAt);
@@ -235,9 +415,7 @@ export function loadLocalOffices(): LocalOfficeRecord[] {
         buildSearchIndex(offices);
         return cachedOffices;
     } catch {
-        cachedOffices = [];
-        buildSearchIndex([]);
-        return cachedOffices;
+        return loadBundled();
     } finally {
         try {
             db?.close();

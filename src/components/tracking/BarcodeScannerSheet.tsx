@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
+import { useLocale } from "next-intl";
 import {
     AlertCircle,
     ArrowRight,
@@ -13,6 +14,7 @@ import {
     ImagePlus,
     Layers,
     Loader2,
+    MapPin,
     PencilLine,
     Plus,
     RefreshCw,
@@ -24,6 +26,12 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { triggerHaptic } from "@/lib/haptics";
+import { ensureLocalOfficeIndex } from "@/lib/office-index-client";
+import {
+    extractDestinationFromOcr,
+    type DestinationCandidate,
+    type PlaceDictionary,
+} from "@/lib/address-extract";
 import {
     MAX_BATCH_BARCODES,
     VALID_BARCODE_REGEX,
@@ -36,15 +44,39 @@ import {
     type ExtractedOcrCode,
 } from "@/lib/tracking/ocr-extract";
 import {
+    ADDRESS_RETICLE_RECT,
     DEFAULT_RETICLE_RECT,
-    preprocessSourceForOcr,
+    canvasToPreviewJpeg,
+    captureRoi,
+    downscaleImageToCanvas,
+    toContrastCanvas,
+    toThresholdCanvas,
+    type CaptureRotation,
 } from "@/lib/tracking/ocr-preprocess";
+import {
+    prewarmOcr,
+    recognizeCanvas,
+    releaseOcrWorker,
+    type OcrLangs,
+} from "@/lib/tracking/ocr-worker";
+
+export type ScannerMode = "tracking" | "address" | "auto";
+
+export interface AppliedPlace {
+    name: string;
+    slug?: string;
+    postalCode?: string;
+}
 
 interface BarcodeScannerSheetProps {
     open: boolean;
     onClose: () => void;
     /** Called with 1 or more scanned/confirmed barcodes to populate and track */
     onApplyBarcodes: (barcodes: string[]) => void;
+    /** Mode: "tracking" (default), "address", or "auto" (both tracking & address) */
+    mode?: ScannerMode;
+    /** Called when user picks a detected destination post office ("address" or "auto" modes) */
+    onApplyPlace?: (place: AppliedPlace) => void;
 }
 
 type ScannerTab = "camera" | "photo";
@@ -58,28 +90,126 @@ interface PendingConfirmation {
     previewImage?: string;
 }
 
-// Minimal TypeScript declaration for Web BarcodeDetector API (built into Android Chrome / TWA)
-interface WebBarcodeDetector {
-    detect(image: ImageBitmapSource): Promise<Array<{ rawValue: string; format: string }>>;
+interface PendingPlaceConfirmation {
+    candidates: DestinationCandidate[];
+    previewImage?: string;
 }
+
+// Minimal detector contract shared by native BarcodeDetector and barcode-detector/ponyfill
+interface CommonBarcodeDetector {
+    detect(
+        image: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement
+    ): Promise<Array<{ rawValue: string; format: string }>>;
+}
+
+type VideoWithFrameCallback = HTMLVideoElement & {
+    requestVideoFrameCallback?: (cb: () => void) => number;
+    cancelVideoFrameCallback?: (handle: number) => void;
+};
 
 declare global {
     interface Window {
         BarcodeDetector?: {
-            new (options?: { formats: string[] }): WebBarcodeDetector;
+            new (options?: { formats: string[] }): CommonBarcodeDetector;
             getSupportedFormats?: () => Promise<string[]>;
         };
     }
+}
+
+const TARGET_BARCODE_FORMATS = ["code_128", "code_39", "qr_code", "data_matrix", "ean_13"] as const;
+const ROTATION_CYCLE: CaptureRotation[] = [0, 90, 270];
+const PHOTO_FULL_RECT = { xRatio: 0.02, yRatio: 0.02, wRatio: 0.96, hRatio: 0.96 };
+
+function logScanTiming(label: string, startedAt: number) {
+    if (process.env.NODE_ENV !== "production") {
+        console.debug("[scan]", label, `${Math.round(performance.now() - startedAt)}ms`);
+    }
+}
+
+async function createBarcodeDetector(): Promise<CommonBarcodeDetector> {
+    if (typeof window !== "undefined" && window.BarcodeDetector) {
+        try {
+            const supported = window.BarcodeDetector.getSupportedFormats
+                ? await window.BarcodeDetector.getSupportedFormats()
+                : [];
+            if (supported.length === 0 || supported.includes("code_128")) {
+                const desired =
+                    supported.length > 0
+                        ? TARGET_BARCODE_FORMATS.filter((f) => supported.includes(f))
+                        : [...TARGET_BARCODE_FORMATS];
+                return new window.BarcodeDetector({
+                    formats: desired.length > 0 ? desired : ["code_128"],
+                });
+            }
+        } catch {
+            // Fall through to WASM ponyfill
+        }
+    }
+
+    const { BarcodeDetector: PonyfillDetector } = await import("barcode-detector/ponyfill");
+    return new PonyfillDetector({
+        formats: [...TARGET_BARCODE_FORMATS],
+    });
+}
+
+function extractDetectedBarcode(raw: string): string | null {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    const upper = trimmed.toUpperCase();
+    return (
+        parseBarcodes(trimmed)[0] ||
+        tryParseOcrToken(trimmed)?.code ||
+        (VALID_BARCODE_REGEX.test(upper) ? upper : null)
+    );
+}
+
+function defaultOcrLangsForLocale(locale: string, addressEnabled: boolean): OcrLangs {
+    if (!addressEnabled) return "eng";
+    if (locale === "si") return "eng+sin";
+    if (locale === "ta") return "eng+tam";
+    return "eng";
+}
+
+function nextOcrLangs(current: OcrLangs): OcrLangs {
+    if (current === "eng") return "eng+sin";
+    if (current === "eng+sin") return "eng+tam";
+    return "eng";
+}
+
+function formatOcrLangBadge(langs: OcrLangs): string {
+    if (langs === "eng+sin") return "EN+සිං";
+    if (langs === "eng+tam") return "EN+த";
+    return "EN";
 }
 
 export default function BarcodeScannerSheet({
     open,
     onClose,
     onApplyBarcodes,
+    mode = "tracking",
+    onApplyPlace,
 }: BarcodeScannerSheetProps) {
+    const locale = useLocale();
+    const addressScanEnabled = mode !== "tracking" && Boolean(onApplyPlace);
+    const barcodeScanEnabled = mode !== "address";
+    const trackingOcrEnabled = mode !== "address";
+
+    const activeReticleRect =
+        mode === "tracking" ? DEFAULT_RETICLE_RECT : ADDRESS_RETICLE_RECT;
+
+    const defaultHint =
+        mode === "address"
+            ? "Point at the address on the letter — town name or postal code"
+            : mode === "auto"
+              ? "Point at a barcode, tracking number, or the address"
+              : "Align barcode, printed code, or handwriting inside box";
+
     const [tab, setTab] = React.useState<ScannerTab>("camera");
     const [batchMode, setBatchMode] = React.useState(false);
     const [batchList, setBatchList] = React.useState<string[]>([]);
+    const [ocrLangs, setOcrLangs] = React.useState<OcrLangs>(() =>
+        defaultOcrLangsForLocale(locale, addressScanEnabled)
+    );
 
     const [cameraReady, setCameraReady] = React.useState(false);
     const [cameraError, setCameraError] = React.useState<string | null>(null);
@@ -88,13 +218,14 @@ export default function BarcodeScannerSheet({
     const [torchOn, setTorchOn] = React.useState(false);
 
     const [ocrRunning, setOcrRunning] = React.useState(false);
-    const [statusHint, setStatusHint] = React.useState<string>(
-        "Align barcode, printed code, or handwriting inside box"
-    );
+    const [statusHint, setStatusHint] = React.useState<string>(defaultHint);
 
-    // Editable confirmation strip for OCR / handwritten codes (or manual tweak)
+    // Editable confirmation strip for tracking OCR / manual tweak
     const [pendingConfirm, setPendingConfirm] = React.useState<PendingConfirmation | null>(null);
     const [editableCode, setEditableCode] = React.useState("");
+
+    // Destination post office confirmation card (address / auto modes)
+    const [pendingPlace, setPendingPlace] = React.useState<PendingPlaceConfirmation | null>(null);
 
     // Photo / Gallery tab state
     const [photoPreviewUrl, setPhotoPreviewUrl] = React.useState<string | null>(null);
@@ -107,8 +238,56 @@ export default function BarcodeScannerSheet({
     const fileInputRef = React.useRef<HTMLInputElement | null>(null);
     const cameraCaptureInputRef = React.useRef<HTMLInputElement | null>(null);
     const ocrBusyRef = React.useRef(false);
+    const manualOcrRunningRef = React.useRef(false);
+    const lastHitRotationRef = React.useRef<CaptureRotation | null>(null);
+    const placeDictRef = React.useRef<PlaceDictionary | null>(null);
+    const detectorPromiseRef = React.useRef<Promise<CommonBarcodeDetector> | null>(null);
+
     const pendingConfirmRef = React.useRef<PendingConfirmation | null>(null);
     pendingConfirmRef.current = pendingConfirm;
+
+    const pendingPlaceRef = React.useRef<PendingPlaceConfirmation | null>(null);
+    pendingPlaceRef.current = pendingPlace;
+
+    const getSharedDetector = React.useCallback((): Promise<CommonBarcodeDetector> => {
+        if (!detectorPromiseRef.current) {
+            detectorPromiseRef.current = createBarcodeDetector().catch((err) => {
+                detectorPromiseRef.current = null;
+                throw err;
+            });
+        }
+        return detectorPromiseRef.current;
+    }, []);
+
+    // Keep default language synced when address mode toggles or sheet opens
+    React.useEffect(() => {
+        if (!addressScanEnabled) {
+            setOcrLangs("eng");
+        }
+    }, [addressScanEnabled]);
+
+    // Prewarm persistent OCR worker & local office dictionary when opened
+    React.useEffect(() => {
+        if (!open) return;
+
+        prewarmOcr(ocrLangs);
+
+        if (addressScanEnabled) {
+            void ensureLocalOfficeIndex()
+                .then((engine) => {
+                    if (engine) {
+                        placeDictRef.current = engine.getPlaceDictionary();
+                    }
+                })
+                .catch(() => {
+                    // Offline index optional if unavailable
+                });
+        }
+
+        return () => {
+            releaseOcrWorker();
+        };
+    }, [open, ocrLangs, addressScanEnabled]);
 
     const stopCameraStream = React.useCallback(() => {
         if (streamRef.current) {
@@ -149,7 +328,6 @@ export default function BarcodeScannerSheet({
             return;
         }
 
-        // Progressive fallback chain so Android/iOS cameras never fail on strict resolution constraints
         const constraintAttempts: MediaStreamConstraints[] = [
             {
                 audio: false,
@@ -179,8 +357,11 @@ export default function BarcodeScannerSheet({
             } catch (err) {
                 lastErr = err;
                 const name = err instanceof DOMException ? err.name : "";
-                // Stop retrying immediately on hard permission / security denial
-                if (name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError") {
+                if (
+                    name === "NotAllowedError" ||
+                    name === "PermissionDeniedError" ||
+                    name === "SecurityError"
+                ) {
                     break;
                 }
             }
@@ -188,7 +369,11 @@ export default function BarcodeScannerSheet({
 
         if (!stream) {
             const name = lastErr instanceof DOMException ? lastErr.name : "";
-            if (name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError") {
+            if (
+                name === "NotAllowedError" ||
+                name === "PermissionDeniedError" ||
+                name === "SecurityError"
+            ) {
                 setCameraError(
                     "Camera permission was blocked by the browser or site policy. Allow camera access and retry, or tap Take Photo below."
                 );
@@ -222,7 +407,7 @@ export default function BarcodeScannerSheet({
                 videoRef.current.srcObject = stream;
                 await videoRef.current.play();
                 setCameraReady(true);
-                setStatusHint("Scanning 1D/2D barcode & printed/written code...");
+                setStatusHint(defaultHint);
             }
         } catch {
             stopCameraStream();
@@ -230,11 +415,14 @@ export default function BarcodeScannerSheet({
                 "Could not display camera preview. Tap Retry Camera or use Take Photo below."
             );
         }
-    }, [facingMode, stopCameraStream]);
+    }, [facingMode, stopCameraStream, defaultHint]);
 
     React.useEffect(() => {
         if (!open) {
             stopCameraStream();
+            lastHitRotationRef.current = null;
+            setPendingConfirm(null);
+            setPendingPlace(null);
             return;
         }
         if (tab === "camera") {
@@ -280,6 +468,7 @@ export default function BarcodeScannerSheet({
                     return [...prev, normalized];
                 });
                 setPendingConfirm(null);
+                setPendingPlace(null);
                 setEditableCode("");
                 setStatusHint(`Added ${normalized} to batch! Point at next code...`);
             } else {
@@ -291,248 +480,343 @@ export default function BarcodeScannerSheet({
         [batchMode, onApplyBarcodes, onClose, stopCameraStream]
     );
 
+    const acceptPlace = React.useCallback(
+        (candidate: DestinationCandidate) => {
+            if (!onApplyPlace) return;
+            triggerHaptic("success");
+            stopCameraStream();
+            onApplyPlace({
+                name: candidate.name,
+                slug: candidate.slug,
+                postalCode: candidate.postalCode,
+            });
+            onClose();
+        },
+        [onApplyPlace, onClose, stopCameraStream]
+    );
+
     const showConfirmationPrompt = React.useCallback((conf: PendingConfirmation) => {
         triggerHaptic("medium");
+        setPendingPlace(null);
         setPendingConfirm(conf);
         setEditableCode(conf.code);
     }, []);
 
-    // Engine 1: Continuous 1D/2D Barcode scanning on live video stream
+    const showPlacePrompt = React.useCallback(
+        (candidates: DestinationCandidate[], previewImage?: string) => {
+            triggerHaptic("success");
+            setPendingConfirm(null);
+            setPendingPlace({ candidates, previewImage });
+            setStatusHint(`Found ${candidates[0].name} — tap Search or pick another match`);
+        },
+        []
+    );
+
+    // Engine 1: Fast native / WASM BarcodeDetector driven by video frames (tracking & auto modes)
     React.useEffect(() => {
-        if (!open || tab !== "camera" || !cameraReady) return;
+        if (!open || tab !== "camera" || !cameraReady || !barcodeScanEnabled) return;
 
         let cancelled = false;
-        let nativeDetector: WebBarcodeDetector | null = null;
+        let busy = false;
+        let lastDetectAt = 0;
+        let frameHandle: number | null = null;
+        let usesRvfc = false;
 
-        if (typeof window !== "undefined" && window.BarcodeDetector) {
-            try {
-                nativeDetector = new window.BarcodeDetector({
-                    formats: [
-                        "code_128",
-                        "code_39",
-                        "code_93",
-                        "codabar",
-                        "ean_13",
-                        "ean_8",
-                        "itf",
-                        "qr_code",
-                        "data_matrix",
-                        "aztec",
-                    ],
-                });
-            } catch {
-                try {
-                    nativeDetector = new window.BarcodeDetector();
-                } catch {
-                    nativeDetector = null;
-                }
-            }
-        }
+        const videoEl = videoRef.current as VideoWithFrameCallback | null;
+        if (!videoEl) return;
 
-        const decodeWithZxingCanvas = async (videoEl: HTMLVideoElement): Promise<string | null> => {
-            try {
-                const pre = preprocessSourceForOcr(videoEl, DEFAULT_RETICLE_RECT);
-                if (!pre) return null;
-                const { Html5Qrcode } = await import("html5-qrcode");
-                const res = await fetch(pre.previewDataUrl);
-                const blob = await res.blob();
-                const file = new File([blob], "frame.jpg", { type: "image/jpeg" });
-                const tempId = "lpd-hidden-qr-worker";
-                let holder = document.getElementById(tempId);
-                if (!holder) {
-                    holder = document.createElement("div");
-                    holder.id = tempId;
-                    holder.style.display = "none";
-                    document.body.appendChild(holder);
-                }
-                const qr = new Html5Qrcode(tempId);
-                try {
-                    const decoded = await qr.scanFile(file, false);
-                    return decoded;
-                } finally {
-                    try {
-                        qr.clear();
-                    } catch {
-                        // Ignore
-                    }
-                }
-            } catch {
-                return null;
+        let detector: CommonBarcodeDetector | null = null;
+
+        const scheduleNext = () => {
+            if (cancelled || !videoEl) return;
+            if (usesRvfc && videoEl.requestVideoFrameCallback) {
+                frameHandle = videoEl.requestVideoFrameCallback(onFrame);
+            } else {
+                frameHandle = window.requestAnimationFrame(onFrame);
             }
         };
 
-        const interval = window.setInterval(async () => {
-            if (cancelled || pendingConfirmRef.current || !videoRef.current) return;
-            const videoEl = videoRef.current;
-            if (videoEl.readyState < 2) return;
+        const onFrame = () => {
+            if (cancelled) return;
+            const now = performance.now();
 
-            try {
-                if (nativeDetector) {
-                    const hits = await nativeDetector.detect(videoEl);
-                    if (cancelled || hits.length === 0) return;
-                    for (const hit of hits) {
-                        const raw = (hit.rawValue || "").trim();
-                        const parsed =
-                            parseBarcodes(raw)[0] ||
-                            tryParseOcrToken(raw)?.code ||
-                            (VALID_BARCODE_REGEX.test(raw.toUpperCase()) ? raw.toUpperCase() : null);
-                        if (parsed) {
-                            acceptVerifiedCode(parsed);
-                            return;
-                        }
-                    }
-                } else {
-                    const fallbackHit = await decodeWithZxingCanvas(videoEl);
-                    if (cancelled || !fallbackHit) return;
-                    const parsed =
-                        parseBarcodes(fallbackHit)[0] ||
-                        tryParseOcrToken(fallbackHit)?.code ||
-                        (VALID_BARCODE_REGEX.test(fallbackHit.trim().toUpperCase())
-                            ? fallbackHit.trim().toUpperCase()
-                            : null);
-                    if (parsed) {
-                        acceptVerifiedCode(parsed);
-                    }
+            if (
+                !busy &&
+                detector &&
+                !pendingConfirmRef.current &&
+                !pendingPlaceRef.current &&
+                videoEl.readyState >= 2 &&
+                now - lastDetectAt >= 120
+            ) {
+                const roiCanvas = captureRoi(videoEl, activeReticleRect, { maxWidth: 900 });
+                if (roiCanvas) {
+                    busy = true;
+                    lastDetectAt = now;
+                    const t0 = performance.now();
+                    void detector
+                        .detect(roiCanvas)
+                        .then((hits) => {
+                            logScanTiming("barcode-live", t0);
+                            if (cancelled || hits.length === 0) return;
+                            for (const hit of hits) {
+                                const parsed = extractDetectedBarcode(hit.rawValue || "");
+                                if (parsed) {
+                                    acceptVerifiedCode(parsed);
+                                    return;
+                                }
+                            }
+                        })
+                        .catch(() => {
+                            // Frame without readable barcode
+                        })
+                        .finally(() => {
+                            busy = false;
+                        });
                 }
-            } catch {
-                // Frame without barcode
             }
-        }, 280);
+
+            scheduleNext();
+        };
+
+        void getSharedDetector()
+            .then((det) => {
+                if (cancelled) return;
+                detector = det;
+                usesRvfc = Boolean(videoEl.requestVideoFrameCallback);
+                scheduleNext();
+            })
+            .catch(() => {
+                // Barcode detector unavailable; OCR loop remains active
+            });
 
         return () => {
             cancelled = true;
-            window.clearInterval(interval);
+            if (frameHandle !== null) {
+                if (usesRvfc && videoEl.cancelVideoFrameCallback) {
+                    videoEl.cancelVideoFrameCallback(frameHandle);
+                } else {
+                    window.cancelAnimationFrame(frameHandle);
+                }
+            }
         };
-    }, [open, tab, cameraReady, acceptVerifiedCode]);
+    }, [
+        open,
+        tab,
+        cameraReady,
+        barcodeScanEnabled,
+        activeReticleRect,
+        acceptVerifiedCode,
+        getSharedDetector,
+    ]);
 
     /**
-     * Engine 2: Run 2-Pass OCR (Printed Contrast Pass + Handwritten Binarized Pass)
-     * on the cropped Reticle ROI of the live camera feed.
+     * Evaluates OCR text against mode-appropriate extractors.
+     * In auto mode, a strong destination address beats an auto-corrected tracking guess.
      */
-    const runLiveReticleOcr = React.useCallback(
-        async (isManualTrigger: boolean) => {
-            if (ocrBusyRef.current || pendingConfirmRef.current || !videoRef.current) return;
+    const evaluateOcrText = React.useCallback(
+        (
+            text: string,
+            roiCanvas: HTMLCanvasElement,
+            rotation: CaptureRotation
+        ): boolean => {
+            const extractedCodes = trackingOcrEnabled ? extractPostalCodesFromOcr(text) : [];
+            const places =
+                addressScanEnabled && placeDictRef.current
+                    ? extractDestinationFromOcr(text, placeDictRef.current)
+                    : [];
+
+            const bestCode = extractedCodes[0];
+            const topPlace = places[0];
+            const hasStrongAddress = Boolean(
+                topPlace && (topPlace.score >= 75 || topPlace.reason === "name+postal_code")
+            );
+
+            if (mode === "auto" && hasStrongAddress && bestCode?.wasCorrected) {
+                lastHitRotationRef.current = rotation;
+                showPlacePrompt(places, canvasToPreviewJpeg(roiCanvas));
+                return true;
+            }
+
+            if (bestCode) {
+                lastHitRotationRef.current = rotation;
+                showConfirmationPrompt({
+                    code: bestCode.code,
+                    rawMatch: bestCode.rawMatch,
+                    source: "ocr",
+                    wasCorrected: bestCode.wasCorrected,
+                    previewImage: canvasToPreviewJpeg(roiCanvas),
+                });
+                setStatusHint(`Detected ${bestCode.code} — confirm or edit digits below`);
+                return true;
+            }
+
+            if (places.length > 0) {
+                lastHitRotationRef.current = rotation;
+                showPlacePrompt(places, canvasToPreviewJpeg(roiCanvas));
+                return true;
+            }
+
+            return false;
+        },
+        [mode, trackingOcrEnabled, addressScanEnabled, showConfirmationPrompt, showPlacePrompt]
+    );
+
+    /**
+     * Engine 2: Live ROI OCR using persistent Tesseract worker & lazy canvas pipeline.
+     * - Background attempts run 1 filter per frame (alternating contrast / threshold) and cycle [0, 90, 270] rotations.
+     * - Manual shutter trigger checks rotation 0, then 90/270 if empty, running both filters.
+     */
+    const runLiveOcrAttempt = React.useCallback(
+        async (attemptIndex: number, isManualTrigger: boolean) => {
+            if (!videoRef.current || pendingConfirmRef.current || pendingPlaceRef.current) return;
+            if (!isManualTrigger && (ocrBusyRef.current || manualOcrRunningRef.current)) return;
             const videoEl = videoRef.current;
             if (videoEl.readyState < 2) return;
 
-            const pre = preprocessSourceForOcr(videoEl, DEFAULT_RETICLE_RECT);
-            if (!pre) return;
-
-            ocrBusyRef.current = true;
             if (isManualTrigger) {
+                if (manualOcrRunningRef.current) return;
+                manualOcrRunningRef.current = true;
                 triggerHaptic("light");
                 setOcrRunning(true);
-                setStatusHint("Reading printed / written code inside box...");
+                setStatusHint(
+                    mode === "address"
+                        ? "Reading address inside box..."
+                        : "Reading printed / written text inside box..."
+                );
             }
 
+            ocrBusyRef.current = true;
+
             try {
-                const Tesseract = await import("tesseract.js");
+                if (isManualTrigger) {
+                    const rotations: CaptureRotation[] =
+                        lastHitRotationRef.current !== null
+                            ? [
+                                  lastHitRotationRef.current,
+                                  ...ROTATION_CYCLE.filter((r) => r !== lastHitRotationRef.current),
+                              ]
+                            : ROTATION_CYCLE;
 
-                // Pass 1: Contrast-stretched ROI (fast & accurate for printed/stamped slips)
-                const pass1 = await Tesseract.recognize(pre.contrastDataUrl, "eng");
-                let extracted = extractPostalCodesFromOcr(pass1.data.text);
+                    let found = false;
+                    for (const rot of rotations) {
+                        if (pendingConfirmRef.current || pendingPlaceRef.current) break;
+                        const roi = captureRoi(videoEl, activeReticleRect, { rotation: rot });
+                        if (!roi) continue;
 
-                // Pass 2: Adaptive ink binarization (for handwritten pen ink on coloured paper)
-                if (extracted.length === 0 || (isManualTrigger && extracted[0].score < 70)) {
-                    const pass2 = await Tesseract.recognize(pre.thresholdDataUrl, "eng");
-                    const extracted2 = extractPostalCodesFromOcr(pass2.data.text);
-                    if (
-                        extracted2.length > 0 &&
-                        (extracted.length === 0 || extracted2[0].score > extracted[0].score)
-                    ) {
-                        extracted = extracted2;
+                        const t1 = performance.now();
+                        const contrastCanvas = toContrastCanvas(roi);
+                        const pass1 = await recognizeCanvas(contrastCanvas, ocrLangs, "sparse");
+                        logScanTiming(`ocr-manual-c-${rot}`, t1);
+                        if (evaluateOcrText(pass1.text, roi, rot)) {
+                            found = true;
+                            break;
+                        }
+
+                        const t2 = performance.now();
+                        const threshCanvas = toThresholdCanvas(roi);
+                        const pass2 = await recognizeCanvas(threshCanvas, ocrLangs, "sparse");
+                        logScanTiming(`ocr-manual-t-${rot}`, t2);
+                        if (evaluateOcrText(pass2.text, roi, rot)) {
+                            found = true;
+                            break;
+                        }
                     }
+
+                    if (!found) {
+                        setStatusHint(
+                            mode === "address"
+                                ? "No town or postal code read yet — move closer or hold steady"
+                                : "No tracking code or address read yet — hold steady and frame closely"
+                        );
+                    }
+                    return;
                 }
 
-                if (extracted.length > 0) {
-                    const best = extracted[0];
-                    showConfirmationPrompt({
-                        code: best.code,
-                        rawMatch: best.rawMatch,
-                        source: "ocr",
-                        wasCorrected: best.wasCorrected,
-                        previewImage: pre.previewDataUrl,
-                    });
-                    setStatusHint(`Detected ${best.code} — confirm or edit digits below`);
-                } else if (isManualTrigger) {
-                    setStatusHint(
-                        "No tracking number read yet — move closer so the 13-character code fills the box"
-                    );
-                }
+                // Single fast pass for background loop
+                const rotation =
+                    lastHitRotationRef.current ??
+                    ROTATION_CYCLE[attemptIndex % ROTATION_CYCLE.length];
+                const roi = captureRoi(videoEl, activeReticleRect, { rotation });
+                if (!roi) return;
+
+                const useThreshold = attemptIndex % 2 === 1;
+                const filtered = useThreshold ? toThresholdCanvas(roi) : toContrastCanvas(roi);
+
+                const t0 = performance.now();
+                const res = await recognizeCanvas(filtered, ocrLangs, "sparse");
+                logScanTiming(`ocr-live-${useThreshold ? "t" : "c"}-${rotation}`, t0);
+
+                if (pendingConfirmRef.current || pendingPlaceRef.current) return;
+                evaluateOcrText(res.text, roi, rotation);
             } catch {
                 if (isManualTrigger) {
                     setStatusHint("Could not read text — try holding steady with good lighting");
                 }
             } finally {
                 ocrBusyRef.current = false;
-                setOcrRunning(false);
+                if (isManualTrigger) {
+                    manualOcrRunningRef.current = false;
+                    setOcrRunning(false);
+                }
             }
         },
-        [showConfirmationPrompt]
+        [activeReticleRect, evaluateOcrText, mode, ocrLangs]
     );
 
-    // Periodic background OCR pass every 2.8s while holding camera open
+    // Non-overlapping background OCR loop (>= 700ms pause between completions)
     React.useEffect(() => {
         if (!open || tab !== "camera" || !cameraReady) return;
-        const timer = window.setInterval(() => {
-            if (!ocrBusyRef.current && !pendingConfirmRef.current) {
-                void runLiveReticleOcr(false);
-            }
-        }, 2800);
-        return () => window.clearInterval(timer);
-    }, [open, tab, cameraReady, runLiveReticleOcr]);
 
-    // Gallery / Photo Upload Analyzer (1D/2D Barcode + Multi-Pass OCR)
+        let cancelled = false;
+        let sleepTimer: number | null = null;
+
+        const waitMs = (ms: number) =>
+            new Promise<void>((resolve) => {
+                sleepTimer = window.setTimeout(() => {
+                    sleepTimer = null;
+                    resolve();
+                }, ms);
+            });
+
+        const loop = async () => {
+            let attempt = 0;
+            while (!cancelled) {
+                if (
+                    !pendingConfirmRef.current &&
+                    !pendingPlaceRef.current &&
+                    !ocrBusyRef.current &&
+                    !manualOcrRunningRef.current
+                ) {
+                    await runLiveOcrAttempt(attempt++, false);
+                }
+                if (cancelled) break;
+                await waitMs(700);
+            }
+        };
+
+        void loop();
+
+        return () => {
+            cancelled = true;
+            if (sleepTimer !== null) {
+                window.clearTimeout(sleepTimer);
+            }
+        };
+    }, [open, tab, cameraReady, runLiveOcrAttempt]);
+
+    // Gallery / Photo Upload Analyzer (Downscaled BarcodeDetector + Multi-Rotation Persistent OCR)
     const handlePhotoSelected = async (file: File) => {
         if (!file || !file.type.startsWith("image/")) return;
 
         setPhotoError(null);
         setPhotoResults([]);
+        setPendingConfirm(null);
+        setPendingPlace(null);
         setPhotoAnalyzing(true);
         const objUrl = URL.createObjectURL(file);
         setPhotoPreviewUrl(objUrl);
 
         try {
-            const foundMap = new Map<string, ExtractedOcrCode>();
-
-            // Step 1: Check 1D/2D Barcode in uploaded image
-            try {
-                const { Html5Qrcode } = await import("html5-qrcode");
-                const tempId = "lpd-hidden-photo-qr";
-                let holder = document.getElementById(tempId);
-                if (!holder) {
-                    holder = document.createElement("div");
-                    holder.id = tempId;
-                    holder.style.display = "none";
-                    document.body.appendChild(holder);
-                }
-                const qr = new Html5Qrcode(tempId);
-                try {
-                    const rawBarcode = await qr.scanFile(file, false);
-                    const code =
-                        parseBarcodes(rawBarcode)[0] ||
-                        tryParseOcrToken(rawBarcode)?.code ||
-                        rawBarcode.trim().toUpperCase();
-                    if (code && VALID_BARCODE_REGEX.test(code)) {
-                        foundMap.set(code, {
-                            code,
-                            rawMatch: rawBarcode,
-                            wasCorrected: false,
-                            score: 100,
-                        });
-                    }
-                } finally {
-                    try {
-                        qr.clear();
-                    } catch {
-                        // Ignore
-                    }
-                }
-            } catch {
-                // No 1D/2D barcode in photo; continue to OCR
-            }
-
-            // Step 2: Load image into offscreen canvas for multi-pass Printed + Handwritten OCR
             const imgEl = await new Promise<HTMLImageElement>((resolve, reject) => {
                 const img = new Image();
                 img.onload = () => resolve(img);
@@ -540,26 +824,94 @@ export default function BarcodeScannerSheet({
                 img.src = objUrl;
             });
 
-            const Tesseract = await import("tesseract.js");
+            const scaledCanvas = downscaleImageToCanvas(imgEl, 1600) ?? imgEl;
+            const foundMap = new Map<string, ExtractedOcrCode>();
 
-            // Full-frame preprocessed pass
-            const fullPre = preprocessSourceForOcr(imgEl, {
-                xRatio: 0.02,
-                yRatio: 0.02,
-                wRatio: 0.96,
-                hRatio: 0.96,
-            });
+            // Step 1: 1D/2D Barcode detection (tracking & auto modes)
+            if (barcodeScanEnabled) {
+                try {
+                    const t0 = performance.now();
+                    const detector = await getSharedDetector();
+                    const hits = await detector.detect(scaledCanvas);
+                    logScanTiming("barcode-photo", t0);
+                    for (const hit of hits) {
+                        const raw = hit.rawValue || "";
+                        const code = extractDetectedBarcode(raw);
+                        if (code && !foundMap.has(code)) {
+                            foundMap.set(code, {
+                                code,
+                                rawMatch: raw,
+                                wasCorrected: false,
+                                score: 100,
+                            });
+                        }
+                    }
+                } catch {
+                    // Continue to OCR
+                }
+            }
 
-            if (fullPre) {
-                const ocr1 = await Tesseract.recognize(fullPre.contrastDataUrl, "eng");
-                for (const item of extractPostalCodesFromOcr(ocr1.data.text)) {
-                    if (!foundMap.has(item.code)) foundMap.set(item.code, item);
+            // Step 2: Multi-rotation OCR using persistent worker (PSM.AUTO)
+            let detectedPlaces: DestinationCandidate[] = [];
+            let placePreviewUrl: string | undefined;
+
+            if (foundMap.size === 0) {
+                if (addressScanEnabled && !placeDictRef.current) {
+                    const engine = await ensureLocalOfficeIndex().catch(() => null);
+                    if (engine) placeDictRef.current = engine.getPlaceDictionary();
                 }
 
-                if (foundMap.size === 0) {
-                    const ocr2 = await Tesseract.recognize(fullPre.thresholdDataUrl, "eng");
-                    for (const item of extractPostalCodesFromOcr(ocr2.data.text)) {
-                        if (!foundMap.has(item.code)) foundMap.set(item.code, item);
+                for (const rot of ROTATION_CYCLE) {
+                    const fullPre = captureRoi(scaledCanvas, PHOTO_FULL_RECT, {
+                        rotation: rot,
+                        maxWidth: 1200,
+                    });
+                    if (!fullPre) continue;
+
+                    const t1 = performance.now();
+                    const ocr1 = await recognizeCanvas(toContrastCanvas(fullPre), ocrLangs, "auto");
+                    logScanTiming(`photo-ocr-c-${rot}`, t1);
+
+                    if (trackingOcrEnabled) {
+                        for (const item of extractPostalCodesFromOcr(ocr1.text)) {
+                            if (!foundMap.has(item.code)) foundMap.set(item.code, item);
+                        }
+                    }
+
+                    if (foundMap.size === 0 && addressScanEnabled && placeDictRef.current) {
+                        const places = extractDestinationFromOcr(ocr1.text, placeDictRef.current);
+                        if (places.length > 0) {
+                            detectedPlaces = places;
+                            placePreviewUrl = canvasToPreviewJpeg(fullPre);
+                        }
+                    }
+
+                    if (foundMap.size === 0 && detectedPlaces.length === 0) {
+                        const t2 = performance.now();
+                        const ocr2 = await recognizeCanvas(
+                            toThresholdCanvas(fullPre),
+                            ocrLangs,
+                            "auto"
+                        );
+                        logScanTiming(`photo-ocr-t-${rot}`, t2);
+
+                        if (trackingOcrEnabled) {
+                            for (const item of extractPostalCodesFromOcr(ocr2.text)) {
+                                if (!foundMap.has(item.code)) foundMap.set(item.code, item);
+                            }
+                        }
+
+                        if (foundMap.size === 0 && addressScanEnabled && placeDictRef.current) {
+                            const places = extractDestinationFromOcr(ocr2.text, placeDictRef.current);
+                            if (places.length > 0) {
+                                detectedPlaces = places;
+                                placePreviewUrl = canvasToPreviewJpeg(fullPre);
+                            }
+                        }
+                    }
+
+                    if (foundMap.size > 0 || detectedPlaces.length > 0) {
+                        break;
                     }
                 }
             }
@@ -569,18 +921,22 @@ export default function BarcodeScannerSheet({
 
             if (allDetected.length > 0) {
                 triggerHaptic("success");
-                // Pre-open editable confirmation with top match
                 setPendingConfirm({
                     code: allDetected[0].code,
                     rawMatch: allDetected[0].rawMatch,
                     source: allDetected[0].score === 100 ? "barcode" : "ocr",
                     wasCorrected: allDetected[0].wasCorrected,
-                    previewImage: fullPre?.previewDataUrl,
                 });
                 setEditableCode(allDetected[0].code);
+            } else if (detectedPlaces.length > 0) {
+                showPlacePrompt(detectedPlaces, placePreviewUrl);
             } else {
                 setPhotoError(
-                    "No barcode or 13-character SL Post tracking number was found in this image. Try cropping closer to the tracking number or enter it below."
+                    mode === "address"
+                        ? "No town name or 5-digit postal code was found in this image. Try framing the address closer or typing it in search."
+                        : mode === "auto"
+                          ? "No barcode, tracking number, or destination address was found in this image."
+                          : "No barcode or 13-character SL Post tracking number was found in this image. Try cropping closer to the tracking number or enter it below."
                 );
             }
         } catch {
@@ -608,11 +964,25 @@ export default function BarcodeScannerSheet({
     const cleanEditable = editableCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
     const isEditableValid = VALID_BARCODE_REGEX.test(cleanEditable);
 
+    const dialogTitle =
+        mode === "address"
+            ? "Scan Address"
+            : mode === "auto"
+              ? "Scan Code or Address"
+              : "Scan Parcel Code";
+
+    const reticleTag =
+        mode === "address"
+            ? "Town Name · 5-Digit Postal Code · Address"
+            : mode === "auto"
+              ? "Barcode · Tracking Code · Town / Address"
+              : "BD · NA · BF · RA · BG · 1D/2D · Handwritten";
+
     return createPortal(
         <div
             role="dialog"
             aria-modal="true"
-            aria-label="Scan barcode, printed code, or handwritten tracking number"
+            aria-label={dialogTitle}
             onClick={(e) => {
                 if (e.target === e.currentTarget) {
                     stopCameraStream();
@@ -628,29 +998,52 @@ export default function BarcodeScannerSheet({
                     <div className="flex items-center gap-2 min-w-0">
                         <ScanLine className="h-4 w-4 shrink-0" strokeWidth={2.5} />
                         <span className="font-heading text-sm sm:text-base font-extrabold uppercase tracking-tight truncate">
-                            Scan Parcel Code
+                            {dialogTitle}
                         </span>
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
-                        {/* Single vs Multi-Parcel Batch Toggle */}
-                        <button
-                            type="button"
-                            onClick={() => {
-                                triggerHaptic("light");
-                                setBatchMode((prev) => !prev);
-                            }}
-                            className={cn(
-                                "tap inline-flex h-7 items-center gap-1 rounded border-[1.5px] border-foreground px-2 font-mono text-[10px] font-bold uppercase transition-colors",
-                                batchMode
-                                    ? "bg-foreground text-background"
-                                    : "bg-card text-foreground hover:bg-muted"
-                            )}
-                            title="Toggle multi-parcel batch scanning"
-                        >
-                            <Layers className="h-3 w-3" />
-                            <span>{batchMode ? "Batch On" : "Single"}</span>
-                        </button>
+                        {/* Language Script Chip for Address OCR */}
+                        {addressScanEnabled && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    triggerHaptic("light");
+                                    setOcrLangs((prev) => nextOcrLangs(prev));
+                                }}
+                                data-testid="scanner-lang-toggle"
+                                title="Cycle OCR script (English / Sinhala / Tamil)"
+                                className={cn(
+                                    "tap inline-flex h-7 items-center gap-1 rounded border-[1.5px] border-foreground px-2 font-mono text-[10px] font-bold transition-colors",
+                                    ocrLangs !== "eng"
+                                        ? "bg-foreground text-background"
+                                        : "bg-card text-foreground hover:bg-muted"
+                                )}
+                            >
+                                <span>{formatOcrLangBadge(ocrLangs)}</span>
+                            </button>
+                        )}
+
+                        {/* Single vs Multi-Parcel Batch Toggle (tracking / auto modes only) */}
+                        {barcodeScanEnabled && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    triggerHaptic("light");
+                                    setBatchMode((prev) => !prev);
+                                }}
+                                className={cn(
+                                    "tap inline-flex h-7 items-center gap-1 rounded border-[1.5px] border-foreground px-2 font-mono text-[10px] font-bold uppercase transition-colors",
+                                    batchMode
+                                        ? "bg-foreground text-background"
+                                        : "bg-card text-foreground hover:bg-muted"
+                                )}
+                                title="Toggle multi-parcel batch scanning"
+                            >
+                                <Layers className="h-3 w-3" />
+                                <span>{batchMode ? "Batch On" : "Single"}</span>
+                            </button>
+                        )}
 
                         <button
                             type="button"
@@ -667,6 +1060,13 @@ export default function BarcodeScannerSheet({
                     </div>
                 </div>
 
+                {/* Extra-script honest note when Sinhala/Tamil OCR is toggled on */}
+                {addressScanEnabled && ocrLangs !== "eng" && (
+                    <div className="border-b border-foreground/20 bg-muted/60 px-3.5 py-1 text-[10.5px] font-medium text-muted-foreground shrink-0">
+                        Printed Sinhala/Tamil only — handwriting may not read
+                    </div>
+                )}
+
                 {/* Mode Tabs: Live Camera vs Photo / Receipt Upload */}
                 <div className="grid grid-cols-2 border-b-[1.5px] border-foreground bg-muted/60 p-1 gap-1 shrink-0">
                     <button
@@ -675,6 +1075,7 @@ export default function BarcodeScannerSheet({
                             triggerHaptic("light");
                             setTab("camera");
                             setPendingConfirm(null);
+                            setPendingPlace(null);
                         }}
                         className={cn(
                             "tap inline-flex items-center justify-center gap-1.5 rounded py-1.5 font-heading text-xs font-extrabold transition-colors",
@@ -700,7 +1101,7 @@ export default function BarcodeScannerSheet({
                         )}
                     >
                         <ImagePlus className="h-3.5 w-3.5" />
-                        <span>From Photo / Receipt</span>
+                        <span>{mode === "address" ? "From Letter Photo" : "From Photo / Receipt"}</span>
                     </button>
                 </div>
 
@@ -749,12 +1150,19 @@ export default function BarcodeScannerSheet({
                                     className="h-full w-full object-cover"
                                 />
 
-                                {/* Darkened mask around the horizontal postal reticle box */}
+                                {/* Darkened mask around the target reticle box */}
                                 <div
                                     aria-hidden="true"
-                                    className="pointer-events-none absolute inset-0 flex flex-col justify-center items-center px-5"
+                                    className="pointer-events-none absolute inset-0 flex flex-col justify-center items-center px-4"
                                 >
-                                    <div className="relative w-full h-24 sm:h-28 rounded-lg border-2 border-dashed border-secondary shadow-[0_0_0_9999px_rgba(0,0,0,0.48)]">
+                                    <div
+                                        className={cn(
+                                            "relative w-full rounded-lg border-2 border-dashed border-secondary shadow-[0_0_0_9999px_rgba(0,0,0,0.48)]",
+                                            mode === "tracking"
+                                                ? "h-24 sm:h-28"
+                                                : "h-36 sm:h-40"
+                                        )}
+                                    >
                                         {/* Corner targeting brackets */}
                                         <span className="absolute -top-0.5 -left-0.5 h-3.5 w-3.5 border-t-4 border-l-4 border-secondary rounded-tl" />
                                         <span className="absolute -top-0.5 -right-0.5 h-3.5 w-3.5 border-t-4 border-r-4 border-secondary rounded-tr" />
@@ -766,7 +1174,7 @@ export default function BarcodeScannerSheet({
 
                                         {/* Reticle Top Tag */}
                                         <span className="absolute -top-5 left-2 rounded bg-black/80 px-1.5 py-0.5 font-mono text-[9.5px] font-bold uppercase text-secondary">
-                                            BD · NA · BF · RA · BG · 1D/2D · Handwritten
+                                            {reticleTag}
                                         </span>
                                     </div>
                                 </div>
@@ -835,23 +1243,27 @@ export default function BarcodeScannerSheet({
                                 )}
                             </div>
 
-                            {/* Dedicated Shutter Button for Printed & Handwritten Codes */}
+                            {/* Dedicated Manual Trigger Button */}
                             <div className="flex items-center gap-2">
                                 <button
                                     type="button"
                                     disabled={!cameraReady || ocrRunning}
-                                    onClick={() => void runLiveReticleOcr(true)}
+                                    onClick={() => void runLiveOcrAttempt(0, true)}
                                     className="tap flex-1 inline-flex h-11 items-center justify-center gap-2 rounded-xl border-2 border-foreground bg-secondary px-4 font-heading text-xs sm:text-sm font-extrabold text-secondary-foreground shadow-[0_2px_0_0_hsl(var(--foreground))] hover:opacity-95 disabled:opacity-50"
                                 >
                                     {ocrRunning ? (
                                         <>
                                             <Loader2 className="h-4 w-4 animate-spin" />
-                                            <span>Reading Text / Handwriting...</span>
+                                            <span>Reading Text...</span>
                                         </>
                                     ) : (
                                         <>
                                             <FileText className="h-4 w-4" />
-                                            <span>Capture Printed / Written Code</span>
+                                            <span>
+                                                {mode === "address"
+                                                    ? "Read Address Now"
+                                                    : "Read Printed / Written Text Now"}
+                                            </span>
                                         </>
                                     )}
                                 </button>
@@ -859,7 +1271,7 @@ export default function BarcodeScannerSheet({
                         </div>
                     )}
 
-                    {/* ===== TAB 2: PHOTO / GALLERY RECEIPT UPLOAD ===== */}
+                    {/* ===== TAB 2: PHOTO / GALLERY UPLOAD ===== */}
                     {tab === "photo" && (
                         <div className="space-y-3">
                             <div className="grid grid-cols-2 gap-2">
@@ -890,7 +1302,7 @@ export default function BarcodeScannerSheet({
                                     /* eslint-disable-next-line @next/next/no-img-element */
                                     <img
                                         src={photoPreviewUrl}
-                                        alt="Uploaded postal receipt"
+                                        alt="Uploaded postal photo"
                                         className="max-h-36 w-auto rounded-lg border border-foreground/30 object-contain"
                                     />
                                 ) : (
@@ -901,11 +1313,19 @@ export default function BarcodeScannerSheet({
                                 <div>
                                     <p className="font-heading text-xs sm:text-sm font-extrabold text-foreground">
                                         {photoPreviewUrl
-                                            ? "Tap to choose a different receipt photo"
-                                            : "Select Receipt Photo or Screenshot"}
+                                            ? "Tap to choose a different photo"
+                                            : mode === "address"
+                                              ? "Select Letter or Envelope Photo"
+                                              : mode === "auto"
+                                                ? "Select Parcel, Letter, or Receipt Photo"
+                                                : "Select Receipt Photo or Screenshot"}
                                     </p>
                                     <p className="mt-0.5 text-[11px] text-muted-foreground">
-                                        Reads 1D/2D barcodes, printed slips, and handwritten COD/SLP numbers
+                                        {mode === "address"
+                                            ? "Reads printed town names & 5-digit postal codes on letters"
+                                            : mode === "auto"
+                                              ? "Reads barcodes, tracking numbers, and destination addresses"
+                                              : "Reads 1D/2D barcodes, printed slips, and handwritten COD/SLP numbers"}
                                     </p>
                                 </div>
                             </button>
@@ -913,7 +1333,11 @@ export default function BarcodeScannerSheet({
                             {photoAnalyzing && (
                                 <div className="flex items-center justify-center gap-2 rounded-xl border-[1.5px] border-foreground bg-background p-3 text-xs font-bold text-foreground">
                                     <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                                    <span>Scanning photo for barcodes &amp; written tracking numbers...</span>
+                                    <span>
+                                        {mode === "address"
+                                            ? "Scanning photo for town names & postal codes..."
+                                            : "Scanning photo for barcodes, tracking codes & addresses..."}
+                                    </span>
                                 </div>
                             )}
 
@@ -960,6 +1384,92 @@ export default function BarcodeScannerSheet({
                         </div>
                     )}
 
+                    {/* ===== DESTINATION POST OFFICE CONFIRMATION CARD (address / auto) ===== */}
+                    {pendingPlace && pendingPlace.candidates.length > 0 && (
+                        <div
+                            data-testid="scanner-place-card"
+                            className="animate-fade-slide-up rounded-xl border-2 border-foreground bg-secondary/25 p-3 space-y-2.5"
+                        >
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                    <MapPin className="h-4 w-4 text-primary shrink-0" strokeWidth={2.5} />
+                                    <div className="min-w-0">
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                            <span className="font-heading text-sm font-extrabold text-foreground truncate">
+                                                Destination: {pendingPlace.candidates[0].name}
+                                            </span>
+                                            {pendingPlace.candidates[0].postalCode && (
+                                                <span className="rounded border border-foreground/40 bg-card px-1.5 py-0.5 font-mono text-[10.5px] font-bold text-foreground">
+                                                    {pendingPlace.candidates[0].postalCode}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="font-mono text-[10.5px] text-muted-foreground truncate">
+                                            read: &ldquo;{pendingPlace.candidates[0].matchedText}&rdquo;
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        lastHitRotationRef.current = null;
+                                        setPendingPlace(null);
+                                        setStatusHint(defaultHint);
+                                    }}
+                                    className="tap inline-flex shrink-0 items-center gap-1 font-mono text-[10px] font-bold text-muted-foreground hover:text-foreground"
+                                >
+                                    <RefreshCw className="h-3 w-3" />
+                                    <span>Rescan</span>
+                                </button>
+                            </div>
+
+                            {pendingPlace.previewImage && (
+                                <div className="flex items-center gap-2 rounded-lg border border-foreground/30 bg-black/85 p-1.5">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                        src={pendingPlace.previewImage}
+                                        alt="Cropped address region"
+                                        className="h-12 w-auto rounded object-contain mx-auto"
+                                    />
+                                </div>
+                            )}
+
+                            <button
+                                type="button"
+                                data-testid="scanner-place-apply-btn"
+                                onClick={() => acceptPlace(pendingPlace.candidates[0])}
+                                className="tap inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-lg border-2 border-foreground bg-primary px-4 font-heading text-xs sm:text-sm font-extrabold text-primary-foreground shadow-[0_2px_0_0_hsl(var(--foreground))]"
+                            >
+                                <span>Search {pendingPlace.candidates[0].name}</span>
+                                <ArrowRight className="h-4 w-4 shrink-0" />
+                            </button>
+
+                            {pendingPlace.candidates.length > 1 && (
+                                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                                    <span className="font-mono text-[10px] font-bold text-muted-foreground">
+                                        Alternatives:
+                                    </span>
+                                    {pendingPlace.candidates.slice(1).map((alt) => (
+                                        <button
+                                            key={`${alt.slug ?? alt.name}-${alt.postalCode ?? ""}`}
+                                            type="button"
+                                            onClick={() => acceptPlace(alt)}
+                                            className="tap inline-flex items-center gap-1 rounded-md border border-foreground/50 bg-card px-2 py-1 text-xs font-bold text-foreground hover:border-foreground hover:bg-muted"
+                                        >
+                                            <span>{alt.name}</span>
+                                            {alt.postalCode && (
+                                                <span className="font-mono text-[10px] text-muted-foreground">
+                                                    {alt.postalCode}
+                                                </span>
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* ===== EDITABLE CONFIRMATION STRIP (for Handwritten / OCR / Tweaking Digits) ===== */}
                     {pendingConfirm && (
                         <div
@@ -984,9 +1494,10 @@ export default function BarcodeScannerSheet({
                                 <button
                                     type="button"
                                     onClick={() => {
+                                        lastHitRotationRef.current = null;
                                         setPendingConfirm(null);
                                         setEditableCode("");
-                                        setStatusHint("Scanning 1D/2D barcode & printed/written code...");
+                                        setStatusHint(defaultHint);
                                     }}
                                     className="tap inline-flex items-center gap-1 font-mono text-[10px] font-bold text-muted-foreground hover:text-foreground"
                                 >
@@ -1022,8 +1533,8 @@ export default function BarcodeScannerSheet({
                                         {classifyBarcode(cleanEditable) === "cod_only"
                                             ? "COD"
                                             : classifyBarcode(cleanEditable) === "slp_likely"
-                                                ? "SLP"
-                                                : "SL POST"}
+                                              ? "SLP"
+                                              : "SL POST"}
                                     </span>
                                 </div>
 
@@ -1053,7 +1564,7 @@ export default function BarcodeScannerSheet({
                     )}
 
                     {/* ===== MULTI-PARCEL BATCH TRAY ===== */}
-                    {batchMode && batchList.length > 0 && (
+                    {barcodeScanEnabled && batchMode && batchList.length > 0 && (
                         <div className="rounded-xl border-2 border-foreground bg-background p-3 space-y-2.5">
                             <div className="flex items-center justify-between gap-2">
                                 <span className="font-mono text-[11px] font-bold uppercase text-foreground">
