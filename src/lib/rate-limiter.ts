@@ -122,6 +122,8 @@ export const rateLimiters = {
     photos: createLimiter({ prefix: "rl:photos", limit: 10, windowMs: 60 * 60_000, windowLabel: "1 h" }),
     /** Parcel tracking proxy: 30 requests per minute per IP */
     tracking: createLimiter({ prefix: "rl:tracking", limit: 30, windowMs: 60_000, windowLabel: "1 m" }),
+    /** AI OCR / address extraction: 20 requests per minute per IP */
+    ocr: createLimiter({ prefix: "rl:ocr", limit: 20, windowMs: 60_000, windowLabel: "1 m" }),
 };
 
 export type AppRateLimiter = (typeof rateLimiters)[keyof typeof rateLimiters];
