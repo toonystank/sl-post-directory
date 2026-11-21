@@ -52,6 +52,7 @@ export interface PredictionChip {
     id: string;
     label: string;
     meta?: string;
+    officeSlug?: string;
     applyKind: "replace_draft" | "append_word" | "commit_bulk_slot" | "add_code";
     value: string;
     /** Highlighted as primary quick-accept chip (mirrors the inline ghost prediction on touch screens) */
@@ -649,10 +650,11 @@ export function predictSearchCompletion({
             isBulkHint: false,
             bulkExampleCode: null,
             bulkHintLabel: null,
-            chips: officeSuggestions.slice(0, 4).map((s, idx) => ({
+            chips: officeSuggestions.slice(0, 5).map((s, idx) => ({
                 id: `off-${s.slug ?? idx}`,
                 label: s.queryValue,
                 meta: s.postalCode,
+                officeSlug: s.slug,
                 applyKind: "replace_draft",
                 value: s.queryValue,
                 primary: idx === 0,
@@ -692,10 +694,11 @@ export function predictSearchCompletion({
             isBulkHint: false,
             bulkExampleCode: null,
             bulkHintLabel: null,
-            chips: officeSuggestions.slice(0, 4).map((s, idx) => ({
+            chips: officeSuggestions.slice(0, 5).map((s, idx) => ({
                 id: `off-fb-${s.slug ?? idx}`,
                 label: s.queryValue,
                 meta: s.postalCode,
+                officeSlug: s.slug,
                 applyKind: "replace_draft",
                 value: s.queryValue,
             })),

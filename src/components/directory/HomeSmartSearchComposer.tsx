@@ -52,6 +52,8 @@ interface HomeSmartSearchComposerProps {
     searchHistory: string[];
     onSelectHistoryItem: (term: string) => void;
     onRemoveHistoryItem: (term: string) => void;
+    smartPreview?: React.ReactNode;
+    onSelectOfficeChip?: (chip: { value: string; slug: string; postalCode?: string }) => void;
     onEnterTypeMode: () => void;
     onCollapseTypeMode: () => void;
     onClearAll: () => void;
@@ -80,6 +82,8 @@ export default function HomeSmartSearchComposer({
     searchHistory,
     onSelectHistoryItem,
     onRemoveHistoryItem,
+    smartPreview,
+    onSelectOfficeChip,
     onEnterTypeMode,
     onCollapseTypeMode,
     onClearAll,
@@ -290,6 +294,15 @@ export default function HomeSmartSearchComposer({
     const handleChipClick = (chip: PredictionChip) => {
         triggerHaptic("light");
         onEnterTypeMode();
+
+        if (chip.officeSlug && onSelectOfficeChip) {
+            onSelectOfficeChip({
+                value: chip.value,
+                slug: chip.officeSlug,
+                postalCode: chip.meta,
+            });
+            return;
+        }
 
         if (chip.applyKind === "commit_bulk_slot") {
             commitCurrentDraftToChip();
@@ -750,6 +763,16 @@ export default function HomeSmartSearchComposer({
                                                 )}
                                             </button>
                                         ))}
+                                    </div>
+                                )}
+
+                                {/* Inline Smart Preview (Tracking Card or Postage Rate Preview inside the search bar) */}
+                                {hasValue && smartPreview && (
+                                    <div
+                                        data-testid="search-inline-smart-preview"
+                                        className="border-t border-border/75 bg-card/85 backdrop-blur-[1px] px-2.5 sm:px-3 py-2"
+                                    >
+                                        {smartPreview}
                                     </div>
                                 )}
 
