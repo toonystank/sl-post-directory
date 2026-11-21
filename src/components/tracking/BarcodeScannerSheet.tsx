@@ -23,6 +23,7 @@ import {
     SwitchCamera,
     Upload,
     X,
+    ZoomIn,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { triggerHaptic } from "@/lib/haptics";
@@ -46,6 +47,7 @@ import {
 import {
     ADDRESS_RETICLE_RECT,
     DEFAULT_RETICLE_RECT,
+    canvasToAiJpeg,
     canvasToPreviewJpeg,
     captureRoi,
     downscaleImageToCanvas,
@@ -53,6 +55,7 @@ import {
     toThresholdCanvas,
     type CaptureRotation,
 } from "@/lib/tracking/ocr-preprocess";
+import type { AiOcrExtractionData } from "@/app/api/ocr/extract/route";
 import {
     prewarmOcr,
     recognizeCanvas,
@@ -106,6 +109,19 @@ type VideoWithFrameCallback = HTMLVideoElement & {
     requestVideoFrameCallback?: (cb: () => void) => number;
     cancelVideoFrameCallback?: (handle: number) => void;
 };
+
+type ExtendedTrackCapabilities = MediaTrackCapabilities & {
+    torch?: boolean;
+    focusMode?: string[];
+    exposureMode?: string[];
+    whiteBalanceMode?: string[];
+    zoom?: { min?: number; max?: number; step?: number };
+};
+
+interface AiOcrExtractionResult {
+    data: AiOcrExtractionData;
+    combinedText: string;
+}
 
 declare global {
     interface Window {
@@ -216,6 +232,8 @@ export default function BarcodeScannerSheet({
     const [facingMode, setFacingMode] = React.useState<"environment" | "user">("environment");
     const [torchSupported, setTorchSupported] = React.useState(false);
     const [torchOn, setTorchOn] = React.useState(false);
+    const [zoomRange, setZoomRange] = React.useState<{ min: number; max: number } | null>(null);
+    const [zoomLevel, setZoomLevel] = React.useState<number>(1);
 
     const [ocrRunning, setOcrRunning] = React.useState(false);
     const [statusHint, setStatusHint] = React.useState<string>(defaultHint);
@@ -235,11 +253,15 @@ export default function BarcodeScannerSheet({
 
     const videoRef = React.useRef<HTMLVideoElement | null>(null);
     const streamRef = React.useRef<MediaStream | null>(null);
+    const cameraStartIdRef = React.useRef(0);
+    const focusTimerRef = React.useRef<number | null>(null);
     const fileInputRef = React.useRef<HTMLInputElement | null>(null);
     const cameraCaptureInputRef = React.useRef<HTMLInputElement | null>(null);
     const ocrBusyRef = React.useRef(false);
     const manualOcrRunningRef = React.useRef(false);
     const lastHitRotationRef = React.useRef<CaptureRotation | null>(null);
+    const lastLiveCandidateRef = React.useRef<{ key: string; seenCount: number } | null>(null);
+    const aiAvailableRef = React.useRef<boolean | null>(null);
     const placeDictRef = React.useRef<PlaceDictionary | null>(null);
     const detectorPromiseRef = React.useRef<Promise<CommonBarcodeDetector> | null>(null);
 
@@ -270,6 +292,10 @@ export default function BarcodeScannerSheet({
     React.useEffect(() => {
         if (!open) return;
 
+        if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
+
         prewarmOcr(ocrLangs);
 
         if (addressScanEnabled) {
@@ -290,6 +316,11 @@ export default function BarcodeScannerSheet({
     }, [open, ocrLangs, addressScanEnabled]);
 
     const stopCameraStream = React.useCallback(() => {
+        cameraStartIdRef.current += 1;
+        if (focusTimerRef.current !== null && typeof window !== "undefined") {
+            window.clearTimeout(focusTimerRef.current);
+            focusTimerRef.current = null;
+        }
         if (streamRef.current) {
             for (const track of streamRef.current.getTracks()) {
                 try {
@@ -306,11 +337,14 @@ export default function BarcodeScannerSheet({
         setCameraReady(false);
         setTorchOn(false);
         setTorchSupported(false);
+        setZoomRange(null);
+        setZoomLevel(1);
     }, []);
 
     // Start live camera stream when modal opens on "camera" tab
     const startCameraStream = React.useCallback(async () => {
         stopCameraStream();
+        const startId = ++cameraStartIdRef.current;
         setCameraError(null);
         setStatusHint("Starting camera...");
 
@@ -329,6 +363,14 @@ export default function BarcodeScannerSheet({
         }
 
         const constraintAttempts: MediaStreamConstraints[] = [
+            {
+                audio: false,
+                video: {
+                    facingMode: { ideal: facingMode },
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 },
+                },
+            },
             {
                 audio: false,
                 video: {
@@ -367,6 +409,19 @@ export default function BarcodeScannerSheet({
             }
         }
 
+        if (startId !== cameraStartIdRef.current) {
+            if (stream) {
+                for (const track of stream.getTracks()) {
+                    try {
+                        track.stop();
+                    } catch {
+                        // Ignore
+                    }
+                }
+            }
+            return;
+        }
+
         if (!stream) {
             const name = lastErr instanceof DOMException ? lastErr.name : "";
             if (
@@ -395,19 +450,58 @@ export default function BarcodeScannerSheet({
 
         try {
             streamRef.current = stream;
-            const videoTrack = stream.getVideoTracks()[0];
-            if (videoTrack) {
-                const caps = (
-                    videoTrack.getCapabilities ? videoTrack.getCapabilities() : {}
-                ) as { torch?: boolean };
-                setTorchSupported(Boolean(caps.torch));
+            const videoEl = videoRef.current;
+            if (videoEl) {
+                videoEl.srcObject = stream;
+                await Promise.race([
+                    videoEl.play().catch(() => undefined),
+                    new Promise<void>((resolve) => {
+                        window.setTimeout(resolve, 1200);
+                    }),
+                ]);
             }
 
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-                await videoRef.current.play();
-                setCameraReady(true);
-                setStatusHint(defaultHint);
+            if (startId !== cameraStartIdRef.current) {
+                return;
+            }
+
+            setCameraReady(true);
+            setStatusHint(defaultHint);
+
+            const videoTrack = stream.getVideoTracks()[0];
+            if (videoTrack) {
+                let caps: ExtendedTrackCapabilities = {};
+                try {
+                    caps = (
+                        videoTrack.getCapabilities ? videoTrack.getCapabilities() : {}
+                    ) as ExtendedTrackCapabilities;
+                } catch {
+                    caps = {};
+                }
+                setTorchSupported(Boolean(caps.torch));
+
+                if (caps.zoom && typeof caps.zoom.max === "number" && caps.zoom.max >= 1.5) {
+                    const minZoom = typeof caps.zoom.min === "number" ? caps.zoom.min : 1;
+                    setZoomRange({ min: minZoom, max: caps.zoom.max });
+                    setZoomLevel(Math.max(1, minZoom));
+                }
+
+                // Apply single-key continuous autofocus only after video playback has settled
+                if (Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) {
+                    focusTimerRef.current = window.setTimeout(() => {
+                        focusTimerRef.current = null;
+                        if (startId !== cameraStartIdRef.current) return;
+                        void videoTrack
+                            .applyConstraints({
+                                advanced: [
+                                    { focusMode: "continuous" } as unknown as MediaTrackConstraintSet,
+                                ],
+                            })
+                            .catch(() => {
+                                // Hardware autofocus hint optional
+                            });
+                    }, 400);
+                }
             }
         } catch {
             stopCameraStream();
@@ -421,6 +515,7 @@ export default function BarcodeScannerSheet({
         if (!open) {
             stopCameraStream();
             lastHitRotationRef.current = null;
+            lastLiveCandidateRef.current = null;
             setPendingConfirm(null);
             setPendingPlace(null);
             return;
@@ -447,6 +542,51 @@ export default function BarcodeScannerSheet({
             setTorchOn(next);
         } catch {
             // Torch constraint failed
+        }
+    };
+
+    const toggleZoom = async () => {
+        const track = streamRef.current?.getVideoTracks()[0];
+        if (!track || !zoomRange) return;
+        const presets = [1, 1.5, 2].filter(
+            (v) => v >= zoomRange.min && v <= zoomRange.max
+        );
+        const options = presets.length > 0 ? presets : [zoomRange.min, Math.min(2, zoomRange.max)];
+        const currentIdx = options.findIndex((v) => Math.abs(v - zoomLevel) < 0.1);
+        const nextZoom = options[(currentIdx + 1) % options.length];
+        try {
+            await track.applyConstraints({
+                advanced: [{ zoom: nextZoom } as unknown as MediaTrackConstraintSet],
+            });
+            triggerHaptic("light");
+            setZoomLevel(nextZoom);
+        } catch {
+            // Zoom constraint failed
+        }
+    };
+
+    const handleTapToFocus = async () => {
+        const track = streamRef.current?.getVideoTracks()[0];
+        if (!track || !cameraReady || cameraError) return;
+        const caps = (
+            track.getCapabilities ? track.getCapabilities() : {}
+        ) as ExtendedTrackCapabilities;
+        if (!Array.isArray(caps.focusMode)) return;
+
+        try {
+            triggerHaptic("light");
+            if (caps.focusMode.includes("single-shot")) {
+                await track.applyConstraints({
+                    advanced: [{ focusMode: "single-shot" } as unknown as MediaTrackConstraintSet],
+                });
+            }
+            if (caps.focusMode.includes("continuous")) {
+                await track.applyConstraints({
+                    advanced: [{ focusMode: "continuous" } as unknown as MediaTrackConstraintSet],
+                });
+            }
+        } catch {
+            // Tap-to-refocus unsupported on this lens
         }
     };
 
@@ -548,7 +688,7 @@ export default function BarcodeScannerSheet({
                 videoEl.readyState >= 2 &&
                 now - lastDetectAt >= 120
             ) {
-                const roiCanvas = captureRoi(videoEl, activeReticleRect, { maxWidth: 900 });
+                const roiCanvas = captureRoi(videoEl, activeReticleRect, { maxWidth: 1100 });
                 if (roiCanvas) {
                     busy = true;
                     lastDetectAt = now;
@@ -610,14 +750,72 @@ export default function BarcodeScannerSheet({
     ]);
 
     /**
+     * Calls server-side Gemini Vision OCR (`/api/ocr/extract`) with the color JPEG capture.
+     * Returns structured text lines when available, or null cleanly when offline / unconfigured.
+     */
+    const requestAiOcrExtraction = React.useCallback(
+        async (canvas: HTMLCanvasElement): Promise<AiOcrExtractionResult | null> => {
+            if (aiAvailableRef.current === false) return null;
+            try {
+                const tAi = performance.now();
+                const res = await fetch("/api/ocr/extract", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        image: canvasToAiJpeg(canvas, 0.88),
+                        mode,
+                    }),
+                    signal: AbortSignal.timeout(12000),
+                });
+                const payload = (await res.json().catch(() => null)) as {
+                    success?: boolean;
+                    aiAvailable?: boolean;
+                    data?: AiOcrExtractionData;
+                } | null;
+                logScanTiming("ai-ocr", tAi);
+
+                if (res.status === 503 || payload?.aiAvailable === false) {
+                    aiAvailableRef.current = false;
+                    return null;
+                }
+                if (!res.ok || !payload?.success || !payload.data) {
+                    return null;
+                }
+
+                aiAvailableRef.current = true;
+                const d = payload.data;
+                const combinedParts = [
+                    ...d.trackingCodes,
+                    d.destinationTown && d.postalCode
+                        ? `${d.destinationTown} ${d.postalCode}`
+                        : d.destinationTown,
+                    d.destinationTownOriginal,
+                    d.postalCode,
+                    d.rawText,
+                ].filter((part): part is string => Boolean(part && part.trim()));
+
+                return {
+                    data: d,
+                    combinedText: combinedParts.join("\n"),
+                };
+            } catch {
+                return null;
+            }
+        },
+        [mode]
+    );
+
+    /**
      * Evaluates OCR text against mode-appropriate extractors.
      * In auto mode, a strong destination address beats an auto-corrected tracking guess.
+     * Background attempts require 2 consecutive matching frames for fuzzy/auto-corrected hits.
      */
     const evaluateOcrText = React.useCallback(
         (
             text: string,
             roiCanvas: HTMLCanvasElement,
-            rotation: CaptureRotation
+            rotation: CaptureRotation,
+            isBackgroundAttempt = false
         ): boolean => {
             const extractedCodes = trackingOcrEnabled ? extractPostalCodesFromOcr(text) : [];
             const places =
@@ -631,14 +829,30 @@ export default function BarcodeScannerSheet({
                 topPlace && (topPlace.score >= 75 || topPlace.reason === "name+postal_code")
             );
 
+            const confirmConsensus = (fuzzyKey: string): boolean => {
+                if (!isBackgroundAttempt) return true;
+                const prev = lastLiveCandidateRef.current;
+                if (prev && prev.key === fuzzyKey) {
+                    prev.seenCount += 1;
+                    return prev.seenCount >= 2;
+                }
+                lastLiveCandidateRef.current = { key: fuzzyKey, seenCount: 1 };
+                return false;
+            };
+
             if (mode === "auto" && hasStrongAddress && bestCode?.wasCorrected) {
                 lastHitRotationRef.current = rotation;
+                lastLiveCandidateRef.current = null;
                 showPlacePrompt(places, canvasToPreviewJpeg(roiCanvas));
                 return true;
             }
 
             if (bestCode) {
+                if (bestCode.wasCorrected && !confirmConsensus(`code:${bestCode.code}`)) {
+                    return false;
+                }
                 lastHitRotationRef.current = rotation;
+                lastLiveCandidateRef.current = null;
                 showConfirmationPrompt({
                     code: bestCode.code,
                     rawMatch: bestCode.rawMatch,
@@ -650,8 +864,16 @@ export default function BarcodeScannerSheet({
                 return true;
             }
 
-            if (places.length > 0) {
+            if (places.length > 0 && topPlace) {
+                if (
+                    !hasStrongAddress &&
+                    topPlace.score < 92 &&
+                    !confirmConsensus(`place:${topPlace.slug || topPlace.name}`)
+                ) {
+                    return false;
+                }
                 lastHitRotationRef.current = rotation;
+                lastLiveCandidateRef.current = null;
                 showPlacePrompt(places, canvasToPreviewJpeg(roiCanvas));
                 return true;
             }
@@ -662,9 +884,9 @@ export default function BarcodeScannerSheet({
     );
 
     /**
-     * Engine 2: Live ROI OCR using persistent Tesseract worker & lazy canvas pipeline.
-     * - Background attempts run 1 filter per frame (alternating contrast / threshold) and cycle [0, 90, 270] rotations.
-     * - Manual shutter trigger checks rotation 0, then 90/270 if empty, running both filters.
+     * Engine 2: Live ROI OCR using Gemini Vision (manual shutter) + persistent Tesseract worker.
+     * - Background attempts run upright (`rotation = 0`) with 2-frame consensus for fuzzy matches.
+     * - Manual shutter trigger tries AI Vision first, falling back to multi-rotation sharpened OCR.
      */
     const runLiveOcrAttempt = React.useCallback(
         async (attemptIndex: number, isManualTrigger: boolean) => {
@@ -679,9 +901,11 @@ export default function BarcodeScannerSheet({
                 triggerHaptic("light");
                 setOcrRunning(true);
                 setStatusHint(
-                    mode === "address"
-                        ? "Reading address inside box..."
-                        : "Reading printed / written text inside box..."
+                    aiAvailableRef.current !== false
+                        ? "Reading text with AI Vision..."
+                        : mode === "address"
+                          ? "Reading address inside box..."
+                          : "Reading printed / written text inside box..."
                 );
             }
 
@@ -689,6 +913,19 @@ export default function BarcodeScannerSheet({
 
             try {
                 if (isManualTrigger) {
+                    if (addressScanEnabled && !placeDictRef.current) {
+                        const engine = await ensureLocalOfficeIndex().catch(() => null);
+                        if (engine) placeDictRef.current = engine.getPlaceDictionary();
+                    }
+
+                    const uprightRoi = captureRoi(videoEl, activeReticleRect, { rotation: 0 });
+                    if (uprightRoi && aiAvailableRef.current !== false) {
+                        const aiResult = await requestAiOcrExtraction(uprightRoi);
+                        if (aiResult?.combinedText && evaluateOcrText(aiResult.combinedText, uprightRoi, 0, false)) {
+                            return;
+                        }
+                    }
+
                     const rotations: CaptureRotation[] =
                         lastHitRotationRef.current !== null
                             ? [
@@ -700,14 +937,17 @@ export default function BarcodeScannerSheet({
                     let found = false;
                     for (const rot of rotations) {
                         if (pendingConfirmRef.current || pendingPlaceRef.current) break;
-                        const roi = captureRoi(videoEl, activeReticleRect, { rotation: rot });
+                        const roi =
+                            rot === 0 && uprightRoi
+                                ? uprightRoi
+                                : captureRoi(videoEl, activeReticleRect, { rotation: rot });
                         if (!roi) continue;
 
                         const t1 = performance.now();
                         const contrastCanvas = toContrastCanvas(roi);
                         const pass1 = await recognizeCanvas(contrastCanvas, ocrLangs, "sparse");
                         logScanTiming(`ocr-manual-c-${rot}`, t1);
-                        if (evaluateOcrText(pass1.text, roi, rot)) {
+                        if (evaluateOcrText(pass1.text, roi, rot, false)) {
                             found = true;
                             break;
                         }
@@ -716,7 +956,7 @@ export default function BarcodeScannerSheet({
                         const threshCanvas = toThresholdCanvas(roi);
                         const pass2 = await recognizeCanvas(threshCanvas, ocrLangs, "sparse");
                         logScanTiming(`ocr-manual-t-${rot}`, t2);
-                        if (evaluateOcrText(pass2.text, roi, rot)) {
+                        if (evaluateOcrText(pass2.text, roi, rot, false)) {
                             found = true;
                             break;
                         }
@@ -732,10 +972,8 @@ export default function BarcodeScannerSheet({
                     return;
                 }
 
-                // Single fast pass for background loop
-                const rotation =
-                    lastHitRotationRef.current ??
-                    ROTATION_CYCLE[attemptIndex % ROTATION_CYCLE.length];
+                // Single fast upright pass for background viewfinder scanning
+                const rotation: CaptureRotation = 0;
                 const roi = captureRoi(videoEl, activeReticleRect, { rotation });
                 if (!roi) return;
 
@@ -747,7 +985,7 @@ export default function BarcodeScannerSheet({
                 logScanTiming(`ocr-live-${useThreshold ? "t" : "c"}-${rotation}`, t0);
 
                 if (pendingConfirmRef.current || pendingPlaceRef.current) return;
-                evaluateOcrText(res.text, roi, rotation);
+                evaluateOcrText(res.text, roi, rotation, true);
             } catch {
                 if (isManualTrigger) {
                     setStatusHint("Could not read text — try holding steady with good lighting");
@@ -760,7 +998,7 @@ export default function BarcodeScannerSheet({
                 }
             }
         },
-        [activeReticleRect, evaluateOcrText, mode, ocrLangs]
+        [activeReticleRect, addressScanEnabled, evaluateOcrText, mode, ocrLangs, requestAiOcrExtraction]
     );
 
     // Non-overlapping background OCR loop (>= 700ms pause between completions)
@@ -824,7 +1062,8 @@ export default function BarcodeScannerSheet({
                 img.src = objUrl;
             });
 
-            const scaledCanvas = downscaleImageToCanvas(imgEl, 1600) ?? imgEl;
+            const scaledCanvas = downscaleImageToCanvas(imgEl, 1600);
+            const detectTarget: HTMLCanvasElement | HTMLImageElement = scaledCanvas ?? imgEl;
             const foundMap = new Map<string, ExtractedOcrCode>();
 
             // Step 1: 1D/2D Barcode detection (tracking & auto modes)
@@ -832,7 +1071,7 @@ export default function BarcodeScannerSheet({
                 try {
                     const t0 = performance.now();
                     const detector = await getSharedDetector();
-                    const hits = await detector.detect(scaledCanvas);
+                    const hits = await detector.detect(detectTarget);
                     logScanTiming("barcode-photo", t0);
                     for (const hit of hits) {
                         const raw = hit.rawValue || "";
@@ -851,7 +1090,7 @@ export default function BarcodeScannerSheet({
                 }
             }
 
-            // Step 2: Multi-rotation OCR using persistent worker (PSM.AUTO)
+            // Step 2: Gemini Vision AI extraction (handles handwritten & rotated Sinhala/Tamil/English)
             let detectedPlaces: DestinationCandidate[] = [];
             let placePreviewUrl: string | undefined;
 
@@ -861,10 +1100,45 @@ export default function BarcodeScannerSheet({
                     if (engine) placeDictRef.current = engine.getPlaceDictionary();
                 }
 
+                if (scaledCanvas && aiAvailableRef.current !== false) {
+                    const aiResult = await requestAiOcrExtraction(scaledCanvas);
+                    if (aiResult) {
+                        if (trackingOcrEnabled) {
+                            for (const rawCode of aiResult.data.trackingCodes) {
+                                const parsed = extractDetectedBarcode(rawCode);
+                                if (parsed && !foundMap.has(parsed)) {
+                                    foundMap.set(parsed, {
+                                        code: parsed,
+                                        rawMatch: rawCode,
+                                        wasCorrected: false,
+                                        score: 99,
+                                    });
+                                }
+                            }
+                            for (const item of extractPostalCodesFromOcr(aiResult.combinedText)) {
+                                if (!foundMap.has(item.code)) foundMap.set(item.code, item);
+                            }
+                        }
+                        if (foundMap.size === 0 && addressScanEnabled && placeDictRef.current) {
+                            const places = extractDestinationFromOcr(
+                                aiResult.combinedText,
+                                placeDictRef.current
+                            );
+                            if (places.length > 0) {
+                                detectedPlaces = places;
+                                placePreviewUrl = canvasToPreviewJpeg(scaledCanvas);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Step 3: Fallback multi-rotation OCR using persistent worker (PSM.AUTO)
+            if (foundMap.size === 0 && detectedPlaces.length === 0) {
                 for (const rot of ROTATION_CYCLE) {
-                    const fullPre = captureRoi(scaledCanvas, PHOTO_FULL_RECT, {
+                    const fullPre = captureRoi(detectTarget, PHOTO_FULL_RECT, {
                         rotation: rot,
-                        maxWidth: 1200,
+                        maxWidth: 1400,
                     });
                     if (!fullPre) continue;
 
@@ -1141,12 +1415,29 @@ export default function BarcodeScannerSheet({
                     {/* ===== TAB 1: LIVE CAMERA VIEWFINDER ===== */}
                     {tab === "camera" && (
                         <div className="space-y-3">
-                            <div className="relative overflow-hidden rounded-xl border-2 border-foreground bg-black aspect-[4/3] max-h-[270px] w-full mx-auto flex items-center justify-center">
+                            <div
+                                onClick={() => void handleTapToFocus()}
+                                className="relative overflow-hidden rounded-xl border-2 border-foreground bg-black aspect-[4/3] max-h-[270px] w-full mx-auto flex items-center justify-center cursor-crosshair"
+                            >
                                 <video
                                     ref={videoRef}
                                     playsInline
                                     muted
                                     autoPlay
+                                    onLoadedMetadata={() => {
+                                        if (streamRef.current) {
+                                            setCameraReady(true);
+                                            setStatusHint((prev) =>
+                                                prev === "Starting camera..." ? defaultHint : prev
+                                            );
+                                        }
+                                    }}
+                                    onPlaying={() => {
+                                        setCameraReady(true);
+                                        setStatusHint((prev) =>
+                                            prev === "Starting camera..." ? defaultHint : prev
+                                        );
+                                    }}
                                     className="h-full w-full object-cover"
                                 />
 
@@ -1179,12 +1470,35 @@ export default function BarcodeScannerSheet({
                                     </div>
                                 </div>
 
-                                {/* Top-right hardware controls (Torch + Flip Camera) */}
+                                {/* Top-right hardware controls (Zoom + Torch + Flip Camera) */}
                                 <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 z-10">
+                                    {zoomRange && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                void toggleZoom();
+                                            }}
+                                            aria-label="Toggle camera zoom"
+                                            title="Cycle camera zoom"
+                                            className={cn(
+                                                "tap inline-flex h-8 items-center justify-center gap-1 rounded-md border-[1.5px] border-foreground px-2 font-mono text-[10.5px] font-extrabold transition-colors",
+                                                zoomLevel > 1.05
+                                                    ? "bg-secondary text-secondary-foreground"
+                                                    : "bg-black/70 text-white hover:bg-black"
+                                            )}
+                                        >
+                                            <ZoomIn className="h-3.5 w-3.5" />
+                                            <span>{zoomLevel.toFixed(zoomLevel % 1 === 0 ? 0 : 1)}x</span>
+                                        </button>
+                                    )}
                                     {torchSupported && (
                                         <button
                                             type="button"
-                                            onClick={() => void toggleTorch()}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                void toggleTorch();
+                                            }}
                                             aria-label="Toggle flashlight"
                                             className={cn(
                                                 "tap inline-flex h-8 w-8 items-center justify-center rounded-md border-[1.5px] border-foreground transition-colors",
@@ -1198,7 +1512,10 @@ export default function BarcodeScannerSheet({
                                     )}
                                     <button
                                         type="button"
-                                        onClick={handleFlipCamera}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleFlipCamera();
+                                        }}
                                         aria-label="Switch camera"
                                         className="tap inline-flex h-8 w-8 items-center justify-center rounded-md border-[1.5px] border-foreground bg-black/70 text-white hover:bg-black"
                                     >
@@ -1414,6 +1731,7 @@ export default function BarcodeScannerSheet({
                                     type="button"
                                     onClick={() => {
                                         lastHitRotationRef.current = null;
+                                        lastLiveCandidateRef.current = null;
                                         setPendingPlace(null);
                                         setStatusHint(defaultHint);
                                     }}
@@ -1495,6 +1813,7 @@ export default function BarcodeScannerSheet({
                                     type="button"
                                     onClick={() => {
                                         lastHitRotationRef.current = null;
+                                        lastLiveCandidateRef.current = null;
                                         setPendingConfirm(null);
                                         setEditableCode("");
                                         setStatusHint(defaultHint);
