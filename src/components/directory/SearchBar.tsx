@@ -101,8 +101,19 @@ export default function SearchBar({
     const suggestAbort = useRef<AbortController | null>(null);
     const localContainerRef = useRef<HTMLDivElement>(null);
     const searchFormRef = useRef<HTMLFormElement>(null);
+    const savedScrollYRef = useRef<number | null>(null);
+    const skipScrollRestoreRef = useRef(false);
+    const scrollRafRef = useRef<number | null>(null);
     const actualContainerRef = containerRef || localContainerRef;
     const listId = `suggestions-${id}`;
+
+    useEffect(() => {
+        return () => {
+            if (scrollRafRef.current !== null && typeof window !== "undefined") {
+                window.cancelAnimationFrame(scrollRafRef.current);
+            }
+        };
+    }, []);
 
     const cyclingExamples = useMemo(
         () => getSearchCyclingExamples(locale),
@@ -240,6 +251,86 @@ export default function SearchBar({
         []
     );
 
+    const scrollSearchBarToTop = useCallback(() => {
+        if (!enableSmartHomeSearch || typeof window === "undefined") return;
+        const formEl = searchFormRef.current;
+        if (!formEl) return;
+
+        // Preserve exact pre-search scroll offset only on initial transition into search mode
+        if (savedScrollYRef.current === null) {
+            savedScrollYRef.current = window.scrollY;
+        }
+        skipScrollRestoreRef.current = false;
+
+        if (scrollRafRef.current !== null) {
+            window.cancelAnimationFrame(scrollRafRef.current);
+        }
+        scrollRafRef.current = window.requestAnimationFrame(() => {
+            scrollRafRef.current = null;
+            const currentFormEl = searchFormRef.current;
+            if (!currentFormEl) return;
+
+            const headerEl = document.querySelector<HTMLElement>("header.sticky");
+            const headerRect = headerEl?.getBoundingClientRect();
+            const headerStyle = headerEl ? window.getComputedStyle(headerEl) : null;
+            const isStickyVisible = Boolean(
+                headerEl &&
+                headerRect &&
+                headerRect.height > 0 &&
+                (headerStyle?.position === "sticky" || headerStyle?.position === "fixed")
+            );
+            const stickyHeight = isStickyVisible && headerRect ? headerRect.height : 0;
+            const targetTop = stickyHeight + 10;
+
+            const formRect = currentFormEl.getBoundingClientRect();
+            const delta = formRect.top - targetTop;
+            if (Math.abs(delta) > 4) {
+                const prefersReducedMotion =
+                    typeof window.matchMedia === "function" &&
+                    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+                const nextScrollY = Math.max(0, window.scrollY + delta);
+                window.scrollTo({
+                    top: nextScrollY,
+                    behavior: prefersReducedMotion ? "auto" : "smooth",
+                });
+            }
+        });
+    }, [enableSmartHomeSearch]);
+
+    const restorePreviousScroll = useCallback(() => {
+        if (!enableSmartHomeSearch || typeof window === "undefined") return;
+        if (scrollRafRef.current !== null) {
+            window.cancelAnimationFrame(scrollRafRef.current);
+            scrollRafRef.current = null;
+        }
+        if (skipScrollRestoreRef.current) {
+            skipScrollRestoreRef.current = false;
+            savedScrollYRef.current = null;
+            return;
+        }
+        if (savedScrollYRef.current !== null) {
+            const targetY = savedScrollYRef.current;
+            savedScrollYRef.current = null;
+            if (Math.abs(window.scrollY - targetY) > 2) {
+                const prefersReducedMotion =
+                    typeof window.matchMedia === "function" &&
+                    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+                window.scrollTo({
+                    top: targetY,
+                    behavior: prefersReducedMotion ? "auto" : "smooth",
+                });
+            }
+        }
+    }, [enableSmartHomeSearch]);
+
+    const closeForNavigation = useCallback(() => {
+        if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
+        skipScrollRestoreRef.current = true;
+        savedScrollYRef.current = null;
+        setShowDropdown(false);
+        setIsActive(false);
+    }, []);
+
     const processValueChange = useCallback(
         (val: string, sourceId: string) => {
             onQueryChange(val, sourceId);
@@ -249,6 +340,9 @@ export default function SearchBar({
                 setSuggestions([]);
                 setShowDropdown(false);
                 return;
+            }
+            if (!isActive) {
+                scrollSearchBarToTop();
             }
             setIsActive(true);
             setShowDropdown(true);
@@ -267,7 +361,7 @@ export default function SearchBar({
                 80
             );
         },
-        [effectiveAutocompleteMode, fetchSuggestions, onQueryChange]
+        [effectiveAutocompleteMode, fetchSuggestions, isActive, onQueryChange, scrollSearchBarToTop]
     );
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -275,8 +369,7 @@ export default function SearchBar({
     };
 
     const navigateToSmartCalculator = (intent: SmartSearchIntent) => {
-        setShowDropdown(false);
-        setIsActive(false);
+        closeForNavigation();
         triggerHaptic("light");
         if (intent.kind === "tracking") {
             router.push(intent.trackHref);
@@ -304,10 +397,8 @@ export default function SearchBar({
     }, [enableSmartHomeSearch, smartIntent, suggestions, query]);
 
     const handleSubmit = () => {
-        if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
         recordHistory(query);
-        setShowDropdown(false);
-        setIsActive(false);
+        closeForNavigation();
         // If on Home Page and user typed a clear rate query (like "thaiwan 5kg") with no matching post offices, jump straight to the SEO rate page / calculator
         if (enableSmartHomeSearch && smartIntent && visibleSuggestions.length === 0) {
             navigateToSmartCalculator(smartIntent);
@@ -318,9 +409,7 @@ export default function SearchBar({
 
     const handleSuggestClick = (s: RichAutocompleteSuggestion) => {
         recordHistory(s.queryValue);
-        setShowDropdown(false);
-        setIsActive(false);
-        if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
+        closeForNavigation();
         triggerHaptic("light");
         if (enableSmartHomeSearch && s.kind === "office" && s.slug) {
             router.push(`/office/${s.slug}`);
@@ -329,17 +418,21 @@ export default function SearchBar({
         onSuggestionClick(s.queryValue);
     };
 
-    const handleCloseDropdownOnly = () => {
+    const handleCloseDropdownOnly = useCallback(() => {
         if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
         setShowDropdown(false);
         setIsActive(false);
-    };
+        if (!query.trim()) {
+            restorePreviousScroll();
+        }
+    }, [query, restorePreviousScroll]);
 
     const handleClearAndClose = () => {
         if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
         setSuggestions([]);
         setShowDropdown(false);
         setIsActive(false);
+        restorePreviousScroll();
         onClear();
     };
 
@@ -376,11 +469,14 @@ export default function SearchBar({
             if (!inThis && !inSidebar && isActive) {
                 setShowDropdown(false);
                 setIsActive(false);
+                if (!query.trim()) {
+                    restorePreviousScroll();
+                }
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [actualContainerRef, sidebarRef, isActive]);
+    }, [actualContainerRef, sidebarRef, isActive, query, restorePreviousScroll]);
 
     useEffect(() => {
         if (!enableSmartHomeSearch) {
@@ -390,10 +486,13 @@ export default function SearchBar({
     }, [searchMode, enableSmartHomeSearch]);
 
     const handleEnterTypeMode = useCallback(() => {
+        if (!isActive) {
+            scrollSearchBarToTop();
+        }
         setIsActive(true);
         void ensureLocalOfficeIndex();
         if (query.trim()) setShowDropdown(true);
-    }, [query]);
+    }, [isActive, query, scrollSearchBarToTop]);
 
     const handleComposerSubmit = () => {
         if (open && highlight >= 0 && visibleSuggestions[highlight]) {
@@ -411,7 +510,7 @@ export default function SearchBar({
                         intent={smartIntent}
                         onCloseDrawer={() => {
                             recordHistory(query);
-                            handleCloseDropdownOnly();
+                            closeForNavigation();
                         }}
                     />
                 )}
@@ -480,7 +579,7 @@ export default function SearchBar({
                                         }}
                                         onClick={() => {
                                             recordHistory(query);
-                                            handleCloseDropdownOnly();
+                                            closeForNavigation();
                                         }}
                                         className="tap flex flex-col justify-between rounded-md border-[1.5px] border-foreground bg-background px-1.5 py-1.5 sm:px-2.5 sm:py-2 hover:bg-secondary/20 transition-colors min-w-0"
                                     >
@@ -544,7 +643,7 @@ export default function SearchBar({
                                     data-testid="smart-rate-open-calculator"
                                     onClick={() => {
                                         recordHistory(query);
-                                        handleCloseDropdownOnly();
+                                        closeForNavigation();
                                     }}
                                     className="tap inline-flex w-full items-center justify-center gap-1.5 rounded-md border-2 border-foreground bg-[#1D4E9E] px-3 py-1.5 text-xs font-bold text-white shadow-[0_2px_0_0_hsl(var(--foreground))] hover:opacity-95"
                                 >
@@ -611,7 +710,7 @@ export default function SearchBar({
                                 data-testid="smart-rate-open-calculator"
                                 onClick={() => {
                                     recordHistory(query);
-                                    handleCloseDropdownOnly();
+                                    closeForNavigation();
                                 }}
                                 className="tap inline-flex items-center gap-1.5 rounded-md border-2 border-foreground bg-[#15803D] px-3.5 py-1.5 text-xs font-bold text-white shadow-[0_2px_0_0_hsl(var(--foreground))]"
                             >
@@ -645,7 +744,7 @@ export default function SearchBar({
                                 data-testid="smart-rate-open-calculator"
                                 onClick={() => {
                                     recordHistory(query);
-                                    handleCloseDropdownOnly();
+                                    closeForNavigation();
                                 }}
                                 className="tap inline-flex items-center gap-1.5 rounded-md border-2 border-foreground bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-[0_2px_0_0_hsl(var(--foreground))]"
                             >
@@ -667,7 +766,7 @@ export default function SearchBar({
                                     }}
                                     onClick={() => {
                                         recordHistory(query);
-                                        handleCloseDropdownOnly();
+                                        closeForNavigation();
                                     }}
                                     className="tap rounded-md border border-foreground/50 bg-card px-2.5 py-1.5 hover:border-foreground"
                                 >
