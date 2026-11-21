@@ -795,7 +795,6 @@ export default function HomeSmartSearchComposer({
 
                                         <button
                                             type="button"
-                                            onMouseDown={(e) => e.preventDefault()}
                                             onPointerDown={() =>
                                                 void import("@/lib/tracking/ocr-worker").then((m) =>
                                                     m.prewarmOcr(
@@ -808,6 +807,7 @@ export default function HomeSmartSearchComposer({
                                                 )
                                             }
                                             onClick={() => {
+                                                textareaRef.current?.blur();
                                                 triggerHaptic("light");
                                                 setScannerOpen(true);
                                             }}

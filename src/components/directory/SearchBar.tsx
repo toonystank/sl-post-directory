@@ -950,7 +950,12 @@ export default function SearchBar({
                                         )
                                     )
                                 }
-                                onClick={onScanAddress}
+                                onClick={() => {
+                                    if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+                                        document.activeElement.blur();
+                                    }
+                                    onScanAddress();
+                                }}
                                 data-testid="browse-scan-address-btn"
                                 title="Scan destination address from letter"
                                 aria-label="Scan address"
