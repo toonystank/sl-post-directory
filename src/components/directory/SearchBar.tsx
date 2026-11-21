@@ -253,6 +253,8 @@ export default function SearchBar({
 
     const scrollSearchBarToTop = useCallback(() => {
         if (!enableSmartHomeSearch || typeof window === "undefined") return;
+        // Only auto-scroll on mobile viewports (< md) where the soft keyboard overlays results
+        if (window.innerWidth >= 768) return;
         const formEl = searchFormRef.current;
         if (!formEl) return;
 
