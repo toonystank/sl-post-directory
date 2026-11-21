@@ -253,6 +253,8 @@ export default function BarcodeScannerSheet({
 
     const videoRef = React.useRef<HTMLVideoElement | null>(null);
     const streamRef = React.useRef<MediaStream | null>(null);
+    const cameraStartIdRef = React.useRef(0);
+    const focusTimerRef = React.useRef<number | null>(null);
     const fileInputRef = React.useRef<HTMLInputElement | null>(null);
     const cameraCaptureInputRef = React.useRef<HTMLInputElement | null>(null);
     const ocrBusyRef = React.useRef(false);
@@ -314,6 +316,11 @@ export default function BarcodeScannerSheet({
     }, [open, ocrLangs, addressScanEnabled]);
 
     const stopCameraStream = React.useCallback(() => {
+        cameraStartIdRef.current += 1;
+        if (focusTimerRef.current !== null && typeof window !== "undefined") {
+            window.clearTimeout(focusTimerRef.current);
+            focusTimerRef.current = null;
+        }
         if (streamRef.current) {
             for (const track of streamRef.current.getTracks()) {
                 try {
@@ -337,6 +344,7 @@ export default function BarcodeScannerSheet({
     // Start live camera stream when modal opens on "camera" tab
     const startCameraStream = React.useCallback(async () => {
         stopCameraStream();
+        const startId = ++cameraStartIdRef.current;
         setCameraError(null);
         setStatusHint("Starting camera...");
 
@@ -359,8 +367,8 @@ export default function BarcodeScannerSheet({
                 audio: false,
                 video: {
                     facingMode: { ideal: facingMode },
-                    width: { ideal: 1920, min: 1280 },
-                    height: { ideal: 1080, min: 720 },
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 },
                 },
             },
             {
@@ -401,6 +409,19 @@ export default function BarcodeScannerSheet({
             }
         }
 
+        if (startId !== cameraStartIdRef.current) {
+            if (stream) {
+                for (const track of stream.getTracks()) {
+                    try {
+                        track.stop();
+                    } catch {
+                        // Ignore
+                    }
+                }
+            }
+            return;
+        }
+
         if (!stream) {
             const name = lastErr instanceof DOMException ? lastErr.name : "";
             if (
@@ -429,11 +450,34 @@ export default function BarcodeScannerSheet({
 
         try {
             streamRef.current = stream;
+            const videoEl = videoRef.current;
+            if (videoEl) {
+                videoEl.srcObject = stream;
+                await Promise.race([
+                    videoEl.play().catch(() => undefined),
+                    new Promise<void>((resolve) => {
+                        window.setTimeout(resolve, 1200);
+                    }),
+                ]);
+            }
+
+            if (startId !== cameraStartIdRef.current) {
+                return;
+            }
+
+            setCameraReady(true);
+            setStatusHint(defaultHint);
+
             const videoTrack = stream.getVideoTracks()[0];
             if (videoTrack) {
-                const caps = (
-                    videoTrack.getCapabilities ? videoTrack.getCapabilities() : {}
-                ) as ExtendedTrackCapabilities;
+                let caps: ExtendedTrackCapabilities = {};
+                try {
+                    caps = (
+                        videoTrack.getCapabilities ? videoTrack.getCapabilities() : {}
+                    ) as ExtendedTrackCapabilities;
+                } catch {
+                    caps = {};
+                }
                 setTorchSupported(Boolean(caps.torch));
 
                 if (caps.zoom && typeof caps.zoom.max === "number" && caps.zoom.max >= 1.5) {
@@ -442,36 +486,22 @@ export default function BarcodeScannerSheet({
                     setZoomLevel(Math.max(1, minZoom));
                 }
 
-                // Request continuous autofocus, exposure & white balance when hardware supports it
-                const advancedConstraints: Record<string, string> = {};
+                // Apply single-key continuous autofocus only after video playback has settled
                 if (Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) {
-                    advancedConstraints.focusMode = "continuous";
+                    focusTimerRef.current = window.setTimeout(() => {
+                        focusTimerRef.current = null;
+                        if (startId !== cameraStartIdRef.current) return;
+                        void videoTrack
+                            .applyConstraints({
+                                advanced: [
+                                    { focusMode: "continuous" } as unknown as MediaTrackConstraintSet,
+                                ],
+                            })
+                            .catch(() => {
+                                // Hardware autofocus hint optional
+                            });
+                    }, 400);
                 }
-                if (Array.isArray(caps.exposureMode) && caps.exposureMode.includes("continuous")) {
-                    advancedConstraints.exposureMode = "continuous";
-                }
-                if (
-                    Array.isArray(caps.whiteBalanceMode) &&
-                    caps.whiteBalanceMode.includes("continuous")
-                ) {
-                    advancedConstraints.whiteBalanceMode = "continuous";
-                }
-                if (Object.keys(advancedConstraints).length > 0) {
-                    void videoTrack
-                        .applyConstraints({
-                            advanced: [advancedConstraints as unknown as MediaTrackConstraintSet],
-                        })
-                        .catch(() => {
-                            // Hardware autofocus hints optional
-                        });
-                }
-            }
-
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-                await videoRef.current.play();
-                setCameraReady(true);
-                setStatusHint(defaultHint);
             }
         } catch {
             stopCameraStream();
@@ -1394,6 +1424,20 @@ export default function BarcodeScannerSheet({
                                     playsInline
                                     muted
                                     autoPlay
+                                    onLoadedMetadata={() => {
+                                        if (streamRef.current) {
+                                            setCameraReady(true);
+                                            setStatusHint((prev) =>
+                                                prev === "Starting camera..." ? defaultHint : prev
+                                            );
+                                        }
+                                    }}
+                                    onPlaying={() => {
+                                        setCameraReady(true);
+                                        setStatusHint((prev) =>
+                                            prev === "Starting camera..." ? defaultHint : prev
+                                        );
+                                    }}
                                     className="h-full w-full object-cover"
                                 />
 
