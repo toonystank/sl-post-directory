@@ -4,7 +4,7 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 import { useTheme } from "next-themes";
 import { useSession, signOut } from "next-auth/react";
-import { Link, usePathname } from "@/navigation";
+import { Link } from "@/navigation";
 import {
     Sun,
     Moon,
@@ -22,9 +22,10 @@ import {
 } from "lucide-react";
 import { Sheet, SheetContent } from "./Sheet";
 import { useCurrency } from "@/context/CurrencyContext";
-import { useInstantLocale, stripLocalePrefix } from "@/context/InstantLocaleContext";
+import { useInstantLocale } from "@/context/InstantLocaleContext";
 import { usePWA } from "@/context/PWAContext";
 import { CURRENCY_META, type Currency } from "@/lib/currency";
+import { triggerHaptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -58,7 +59,6 @@ export default function MoreSheet({ open, onOpenChange }: MoreSheetProps) {
     const tNav = useTranslations("Nav");
     const tInstall = useTranslations("Install");
     const { locale, setLocale } = useInstantLocale();
-    const pathname = stripLocalePrefix(usePathname() || "/");
     const { theme, setTheme } = useTheme();
     const { currency, setCurrency } = useCurrency();
     const {
@@ -83,7 +83,7 @@ export default function MoreSheet({ open, onOpenChange }: MoreSheetProps) {
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent title={t("title")}>
                 {/* App & Offline */}
-                <section className="mb-5 rounded-lg border-2 border-foreground bg-card p-3.5">
+                <section className="mb-5 rounded-2xl border border-border bg-card p-3.5 shadow-[var(--shadow-elev-1)]">
                     <div className="flex items-center justify-between gap-2 mb-2.5">
                         <h3 className="label-mono">{tInstall("sectionTitle")}</h3>
                         {isInstalled && (
@@ -98,9 +98,10 @@ export default function MoreSheet({ open, onOpenChange }: MoreSheetProps) {
                         {!isInstalled && (
                             <Button
                                 type="button"
-                                className="w-full justify-center gap-2"
+                                className="w-full justify-center gap-2 rounded-xl"
                                 data-testid="more-install-app-btn"
                                 onClick={() => {
+                                    triggerHaptic("light");
                                     close();
                                     void triggerInstall();
                                 }}
@@ -114,7 +115,7 @@ export default function MoreSheet({ open, onOpenChange }: MoreSheetProps) {
                             <Button
                                 type="button"
                                 variant="secondary"
-                                className="w-full justify-center gap-2"
+                                className="w-full justify-center gap-2 rounded-xl"
                                 onClick={applyUpdate}
                             >
                                 <RefreshCw className="h-4 w-4" aria-hidden="true" />
@@ -140,9 +141,12 @@ export default function MoreSheet({ open, onOpenChange }: MoreSheetProps) {
                             <button
                                 type="button"
                                 disabled={isCachingLocalAssets}
-                                onClick={() => void warmLocalAssets()}
+                                onClick={() => {
+                                    triggerHaptic("light");
+                                    void warmLocalAssets();
+                                }}
                                 data-testid="more-sync-offline-btn"
-                                className="tap self-start inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50"
+                                className="tap self-start inline-flex items-center gap-1.5 rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50"
                             >
                                 <RefreshCw
                                     className={cn("h-3.5 w-3.5", isCachingLocalAssets && "animate-spin")}
@@ -154,41 +158,74 @@ export default function MoreSheet({ open, onOpenChange }: MoreSheetProps) {
                     </div>
                 </section>
 
-                {/* Language (instant 0ms switch) */}
-                <section className="mb-5">
-                    <h3 className="label-mono mb-2">{t("language")}</h3>
-                    <div className="grid grid-cols-3 gap-2">
-                        {LOCALES.map((l) => {
-                            const active = locale === l.code;
-                            return (
-                                <button
-                                    key={l.code}
-                                    type="button"
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={() => {
-                                        setLocale(l.code);
-                                        close();
-                                    }}
-                                    className={cn(
-                                        "tap flex h-12 flex-col items-center justify-center rounded-md border-2 text-sm font-semibold",
-                                        active
-                                            ? "border-foreground bg-secondary text-secondary-foreground"
-                                            : "border-border hover:border-foreground/40"
-                                    )}
-                                    aria-pressed={active}
-                                >
-                                    <span lang={l.code}>{l.label}</span>
-                                </button>
-                            );
-                        })}
+                {/* Preferences (Language · Appearance · Currency) */}
+                <section className="mb-5 space-y-3 rounded-2xl border border-border bg-card p-3.5 shadow-[var(--shadow-elev-1)]">
+                    <div>
+                        <h3 className="label-mono mb-2">{t("language")}</h3>
+                        <div className="grid grid-cols-3 gap-1 rounded-xl bg-muted p-1">
+                            {LOCALES.map((l) => {
+                                const active = locale === l.code;
+                                return (
+                                    <button
+                                        key={l.code}
+                                        type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => {
+                                            triggerHaptic("selection");
+                                            setLocale(l.code);
+                                            close();
+                                        }}
+                                        className={cn(
+                                            "tap flex h-10 flex-col items-center justify-center rounded-lg text-sm font-semibold transition-all",
+                                            active
+                                                ? "bg-card text-foreground shadow-[var(--shadow-elev-1)]"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                        aria-pressed={active}
+                                    >
+                                        <span lang={l.code}>{l.label}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
-                </section>
 
-                {/* Currency — only relevant on the Rates tab */}
-                {pathname?.startsWith("/calculator") && (
-                    <section className="mb-5">
+                    <div>
+                        <h3 className="label-mono mb-2">{t("appearance")}</h3>
+                        <div className="grid grid-cols-3 gap-1 rounded-xl bg-muted p-1">
+                            {([
+                                { value: "light", icon: Sun, label: t("light") },
+                                { value: "dark", icon: Moon, label: t("dark") },
+                                { value: "system", icon: MonitorSmartphone, label: t("system") },
+                            ] as const).map(({ value, icon: Icon, label }) => {
+                                const active = mounted && theme === value;
+                                return (
+                                    <button
+                                        key={value}
+                                        type="button"
+                                        onClick={() => {
+                                            triggerHaptic("selection");
+                                            setTheme(value);
+                                        }}
+                                        className={cn(
+                                            "tap flex h-11 flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-semibold transition-all",
+                                            active
+                                                ? "bg-card text-foreground shadow-[var(--shadow-elev-1)]"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                        aria-pressed={active}
+                                    >
+                                        <Icon className="h-4 w-4" />
+                                        <span>{label}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <div>
                         <h3 className="label-mono mb-2">{t("currency")}</h3>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 gap-1 rounded-xl bg-muted p-1">
                             {(["LKR", "USD"] as Currency[]).map((code) => {
                                 const meta = CURRENCY_META[code];
                                 const active = currency === code;
@@ -196,12 +233,15 @@ export default function MoreSheet({ open, onOpenChange }: MoreSheetProps) {
                                     <button
                                         key={code}
                                         type="button"
-                                        onClick={() => setCurrency(code)}
+                                        onClick={() => {
+                                            triggerHaptic("selection");
+                                            setCurrency(code);
+                                        }}
                                         className={cn(
-                                            "tap flex h-12 items-center justify-center gap-2 rounded-md border-2 text-sm font-bold",
+                                            "tap flex h-10 items-center justify-center gap-2 rounded-lg text-sm font-bold transition-all",
                                             active
-                                                ? "border-foreground bg-foreground text-background"
-                                                : "border-border hover:border-foreground/40"
+                                                ? "bg-card text-foreground shadow-[var(--shadow-elev-1)]"
+                                                : "text-muted-foreground hover:text-foreground"
                                         )}
                                         aria-pressed={active}
                                     >
@@ -211,63 +251,35 @@ export default function MoreSheet({ open, onOpenChange }: MoreSheetProps) {
                                 );
                             })}
                         </div>
-                    </section>
-                )}
-
-                {/* Theme */}
-                <section className="mb-5">
-                    <h3 className="label-mono mb-2">{t("appearance")}</h3>
-                    <div className="grid grid-cols-3 gap-2">
-                        {([
-                            { value: "light", icon: Sun, label: t("light") },
-                            { value: "dark", icon: Moon, label: t("dark") },
-                            { value: "system", icon: MonitorSmartphone, label: t("system") },
-                        ] as const).map(({ value, icon: Icon, label }) => {
-                            const active = mounted && theme === value;
-                            return (
-                                <button
-                                    key={value}
-                                    onClick={() => setTheme(value)}
-                                    className={cn(
-                                        "tap flex h-14 flex-col items-center justify-center gap-1 rounded-md border-2 text-xs font-semibold",
-                                        active ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground/40"
-                                    )}
-                                    aria-pressed={active}
-                                >
-                                    <Icon className="h-4 w-4" />
-                                    {label}
-                                </button>
-                            );
-                        })}
                     </div>
                 </section>
 
                 {/* Account & Quick Links */}
                 <section className="mb-5">
-                    <h3 className="label-mono mb-1">{t("account")}</h3>
-                    <div className="-mx-3">
-                        <Link href="/blog" onClick={close} className="tap flex items-center gap-3 rounded-md px-3 py-3 font-medium hover:bg-muted">
+                    <h3 className="label-mono mb-2 px-1">{t("account")}</h3>
+                    <div className="rounded-2xl border border-border bg-card divide-y divide-border/70 overflow-hidden shadow-[var(--shadow-elev-1)]">
+                        <Link href="/blog" onClick={close} className="tap flex items-center gap-3 px-3.5 py-3 font-medium hover:bg-muted/60">
                             <BookOpen className="h-5 w-5 text-muted-foreground" /> {tNav("blog")}
                         </Link>
                         {session ? (
                             <>
-                                <Link href="/dashboard/profile" onClick={close} className="tap flex items-center gap-3 rounded-md px-3 py-3 hover:bg-muted">
+                                <Link href="/dashboard/profile" onClick={close} className="tap flex items-center gap-3 px-3.5 py-3 hover:bg-muted/60">
                                     <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
                                         {user?.name?.charAt(0)?.toUpperCase() || <User className="h-4 w-4" />}
                                     </span>
                                     <span className="font-semibold">{user?.name}</span>
                                 </Link>
                                 {isAdmin && (
-                                    <Link href="/dashboard" onClick={close} className="tap flex items-center gap-3 rounded-md px-3 py-3 font-medium hover:bg-muted">
+                                    <Link href="/dashboard" onClick={close} className="tap flex items-center gap-3 px-3.5 py-3 font-medium hover:bg-muted/60">
                                         <LayoutDashboard className="h-5 w-5 text-muted-foreground" /> {tNav("dashboard")}
                                     </Link>
                                 )}
-                                <Row onClick={() => signOut({ callbackUrl: "/" })} className="text-primary">
+                                <Row onClick={() => signOut({ callbackUrl: "/" })} className="rounded-none px-3.5 text-primary">
                                     <LogOut className="h-5 w-5" /> {tNav("logout")}
                                 </Row>
                             </>
                         ) : (
-                            <Link href="/login" onClick={close} className="tap flex items-center gap-3 rounded-md px-3 py-3 font-medium hover:bg-muted">
+                            <Link href="/login" onClick={close} className="tap flex items-center gap-3 px-3.5 py-3 font-medium hover:bg-muted/60">
                                 <LogIn className="h-5 w-5 text-muted-foreground" /> {t("loginCta")}
                             </Link>
                         )}
@@ -275,8 +287,8 @@ export default function MoreSheet({ open, onOpenChange }: MoreSheetProps) {
                 </section>
 
                 {/* About */}
-                <section className="rounded-md border border-dashed border-foreground/30 p-4 text-sm">
-                    <div className="airmail-stripe -mx-4 -mt-4 mb-3 h-1.5 rounded-t-md" aria-hidden="true" />
+                <section className="overflow-hidden rounded-2xl border border-dashed border-border bg-card p-4 text-sm">
+                    <div className="airmail-stripe -mx-4 -mt-4 mb-3 h-1.5" aria-hidden="true" />
                     <p className="font-semibold mb-1">{t("aboutTitle")}</p>
                     <p className="text-muted-foreground leading-relaxed">{t("disclaimer")}</p>
                     <div className="mt-3 flex flex-wrap items-center gap-4">

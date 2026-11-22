@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { m } from "motion/react";
 import { useCurrency } from "@/context/CurrencyContext";
 import { CURRENCY_META, type Currency } from "@/lib/currency";
+import { triggerHaptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
 const CURRENCIES: Currency[] = ["LKR", "USD"];
@@ -13,7 +14,13 @@ const CURRENCIES: Currency[] = ["LKR", "USD"];
  * Compact segmented currency switcher ("Rs. LKR | $ USD") placed beside the language selector.
  * Defaults to LKR and animates smoothly between options via shared layoutId.
  */
-export default function CurrencySwitcher({ className }: { className?: string }) {
+export default function CurrencySwitcher({
+    className,
+    compact = false,
+}: {
+    className?: string;
+    compact?: boolean;
+}) {
     const t = useTranslations("App");
     const { currency, setCurrency } = useCurrency();
     const switcherId = React.useId();
@@ -24,7 +31,10 @@ export default function CurrencySwitcher({ className }: { className?: string }) 
             aria-label={t("currencyLabel")}
             data-testid="currency-switcher"
             className={cn(
-                "inline-flex items-center rounded-full border-2 border-foreground bg-card p-0.5 shrink-0",
+                "inline-flex items-center rounded-full bg-card p-0.5 shrink-0",
+                compact
+                    ? "h-8 border border-border shadow-[var(--shadow-elev-1)]"
+                    : "border-2 border-foreground",
                 className
             )}
         >
@@ -39,9 +49,13 @@ export default function CurrencySwitcher({ className }: { className?: string }) 
                         aria-checked={active}
                         aria-label={`${meta.label} (${meta.symbol} ${code})`}
                         data-testid={`currency-option-${code}`}
-                        onClick={() => setCurrency(code)}
+                        onClick={() => {
+                            triggerHaptic("selection");
+                            setCurrency(code);
+                        }}
                         className={cn(
-                            "tap relative inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[11px] font-bold leading-none min-h-[24px] transition-colors",
+                            "tap relative inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[11px] font-bold leading-none transition-colors",
+                            compact ? "min-h-[26px]" : "min-h-[24px]",
                             active ? "text-background" : "text-muted-foreground hover:text-foreground"
                         )}
                     >

@@ -297,7 +297,14 @@
     "popularCountries": "ජනප්‍රිය",
     "allCountriesCount": "සියලුම රටවල් ({count})",
     "matchingCountriesCount": "ගැලපෙන {count}",
-    "noCountriesFound": "\"{query}\" සඳහා රටවල් හමු නොවීය"
+    "noCountriesFound": "\"{query}\" සඳහා රටවල් හමු නොවීය",
+    "tapBreakdown": "ගාස්තු විස්තර බලන්න",
+    "hideBreakdown": "විස්තර සඟවන්න",
+    "chooseCountry": "ගමනාන්ත රට තෝරන්න",
+    "changeCountryAria": "ගමනාන්ත රට වෙනස් කරන්න",
+    "switchWeightUnitAria": "බර ඒකකය ග්‍රෑම් සහ කිලෝග්‍රෑම් අතර මාරු කරන්න",
+    "weightLimitLabel": "සේවා බර සීමාව",
+    "netPayoutShort": "ශුද්ධ මුදල"
   },
   "Blog": {
     "kicker": "තොරතුරු සහ මාර්ගෝපදේශ",

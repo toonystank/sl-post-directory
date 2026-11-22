@@ -6,6 +6,8 @@ import AuthProvider from "@/context/AuthContext";
 import { CurrencyProvider } from "@/context/CurrencyContext";
 import Navbar from "@/components/Navbar";
 import BottomTabBar from "@/components/shell/BottomTabBar";
+import NativeAppBridge from "@/components/shell/NativeAppBridge";
+import NativeToast from "@/components/shell/NativeToast";
 import SiteFooter from "@/components/shell/SiteFooter";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { InstallPrompt } from "@/components/InstallPrompt";
@@ -241,6 +243,7 @@ export default async function RootLayout({
                                 >
                                     <MotionProvider>
                                         <PWAProvider>
+                                            <NativeAppBridge />
                                             <ServiceWorkerRegister />
                                             <Navbar />
                                             <main className="flex-1 pb-tabbar">
@@ -249,6 +252,7 @@ export default async function RootLayout({
                                             <InstallPrompt />
                                             <SiteFooter />
                                             <AdBanner position="sticky-bottom" />
+                                            <NativeToast />
                                             <BottomTabBar />
                                         </PWAProvider>
                                     </MotionProvider>

@@ -2,22 +2,41 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
+import { ChevronDown, ChevronRight, Truck } from "lucide-react";
 import { Link } from "@/navigation";
 import { Button } from "@/components/ui/button";
+import CountryFlag from "@/components/brand/CountryFlag";
 import Postmark from "@/components/brand/Postmark";
+import { triggerHaptic } from "@/lib/haptics";
+import { cn } from "@/lib/utils";
 
 const POPULAR_RATE_LINKS = [
-    { href: "/rates/taiwan/1kg", label: "Taiwan 1kg" },
-    { href: "/rates/united-kingdom/1kg", label: "UK 1kg" },
-    { href: "/rates/united-states/1kg", label: "USA 1kg" },
-    { href: "/rates/australia/2kg", label: "Australia 2kg" },
-    { href: "/rates/united-arab-emirates/1kg", label: "UAE / Dubai 1kg" },
-    { href: "/rates/japan/1kg", label: "Japan 1kg" },
-    { href: "/rates/canada/1kg", label: "Canada 1kg" },
-    { href: "/rates/india/1kg", label: "India 1kg" },
-    { href: "/rates/local", label: "Local & SLP Courier" },
-    { href: "/rates/cod", label: "COD Charges" },
+    { href: "/rates/taiwan/1kg", label: "Taiwan 1kg", flagCode: "TW" },
+    { href: "/rates/united-kingdom/1kg", label: "UK 1kg", flagCode: "GB" },
+    { href: "/rates/united-states/1kg", label: "USA 1kg", flagCode: "US" },
+    { href: "/rates/australia/2kg", label: "Australia 2kg", flagCode: "AU" },
+    { href: "/rates/united-arab-emirates/1kg", label: "UAE / Dubai 1kg", flagCode: "AE" },
+    { href: "/rates/japan/1kg", label: "Japan 1kg", flagCode: "JP" },
+    { href: "/rates/canada/1kg", label: "Canada 1kg", flagCode: "CA" },
+    { href: "/rates/india/1kg", label: "India 1kg", flagCode: "IN" },
+    { href: "/rates/local", label: "Local & SLP Courier", flagCode: "LK" },
+    { href: "/rates/cod", label: "COD Charges", flagCode: "LK" },
 ];
+
+const TRACKING_HISTORY_KEY = "lpd_tracking_history_v1";
+const TERMINAL_STATUSES = new Set([
+    "delivered",
+    "settled",
+    "returned",
+    "not_found",
+    "error",
+]);
+
+interface ActiveParcelPeek {
+    barcode: string;
+    statusLabel: string;
+    statusCategory: string;
+}
 
 export interface DivisionLink {
     name: string;
@@ -32,12 +51,88 @@ export default function HomeBottomSection({
     divisions?: DivisionLink[];
 }) {
     const t = useTranslations("Home");
+    const [divisionsOpen, setDivisionsOpen] = React.useState(false);
+    const [activeParcel, setActiveParcel] = React.useState<ActiveParcelPeek | null>(null);
+
+    React.useEffect(() => {
+        if (typeof window === "undefined") return;
+        const readLatestParcel = () => {
+            try {
+                const raw = window.localStorage.getItem(TRACKING_HISTORY_KEY);
+                if (!raw) {
+                    setActiveParcel(null);
+                    return;
+                }
+                const parsed = JSON.parse(raw) as Array<{
+                    barcode?: string;
+                    statusLabel?: string;
+                    statusCategory?: string;
+                }>;
+                if (!Array.isArray(parsed) || parsed.length === 0) {
+                    setActiveParcel(null);
+                    return;
+                }
+                const valid = parsed.filter((e) => e?.barcode && e?.statusLabel);
+                if (valid.length === 0) {
+                    setActiveParcel(null);
+                    return;
+                }
+                const chosen =
+                    valid.find(
+                        (e) =>
+                            e.statusCategory && !TERMINAL_STATUSES.has(e.statusCategory)
+                    ) ?? valid[0];
+                setActiveParcel({
+                    barcode: String(chosen.barcode),
+                    statusLabel: String(chosen.statusLabel),
+                    statusCategory: String(chosen.statusCategory || "in_transit"),
+                });
+            } catch {
+                setActiveParcel(null);
+            }
+        };
+
+        readLatestParcel();
+        window.addEventListener("storage", readLatestParcel);
+        window.addEventListener("focus", readLatestParcel);
+        return () => {
+            window.removeEventListener("storage", readLatestParcel);
+            window.removeEventListener("focus", readLatestParcel);
+        };
+    }, []);
 
     return (
-        <section className="bg-card/50 py-10 md:py-14 flex-1">
-            <div className="container mx-auto px-4 space-y-10">
-                {/* Popular Postage Rate Links (fast mobile shortcuts + Googlebot crawl hub) */}
-                <div className="rounded-xl border-2 border-foreground bg-card p-4 sm:p-5">
+        <section className="bg-card/50 py-6 md:py-14 flex-1">
+            <div className="container mx-auto px-4 space-y-6 md:space-y-10">
+                {/* Active Parcel Peek Card (mobile + desktop when user has tracked parcels) */}
+                {activeParcel && (
+                    <Link
+                        href={`/track?q=${encodeURIComponent(activeParcel.barcode)}`}
+                        onClick={() => triggerHaptic("light")}
+                        className="tap flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5 shadow-[var(--shadow-elev-1)] hover:border-foreground/40 transition-colors"
+                    >
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary/25 text-foreground">
+                            <Truck className="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                            <span className="flex items-center gap-2">
+                                <span className="font-mono text-xs font-extrabold tracking-wide text-foreground truncate">
+                                    {activeParcel.barcode}
+                                </span>
+                                <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-tight text-secondary-foreground shrink-0">
+                                    {activeParcel.statusLabel}
+                                </span>
+                            </span>
+                            <span className="block text-xs text-muted-foreground truncate mt-0.5">
+                                {activeParcel.barcode}
+                            </span>
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    </Link>
+                )}
+
+                {/* Popular Postage Rate Links (horizontal snap carousel on mobile; wrap grid on desktop + Googlebot crawl hub) */}
+                <div className="rounded-2xl border border-border md:border-2 md:border-foreground bg-card p-4 sm:p-5 shadow-[var(--shadow-elev-1)] md:shadow-none">
                     <div className="flex items-center justify-between gap-2 mb-3">
                         <h2 className="font-heading text-lg sm:text-xl font-extrabold [font-stretch:82%]">
                             Popular Sri Lanka Post Rates
@@ -49,39 +144,70 @@ export default function HomeBottomSection({
                             All countries &rarr;
                         </Link>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex gap-2 overflow-x-auto scrollbar-hide snap-carousel pb-1 md:flex-wrap md:overflow-visible md:pb-0">
                         {POPULAR_RATE_LINKS.map((item) => (
                             <Link
                                 key={item.href}
                                 href={item.href}
-                                className="tap rounded-full border-[1.5px] border-foreground/60 bg-background px-3 py-1.5 font-mono text-xs font-semibold hover:border-foreground hover:bg-secondary/35 transition-colors"
+                                onClick={() => triggerHaptic("light")}
+                                className="tap inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border md:border-[1.5px] md:border-foreground/60 bg-background px-3 py-1.5 font-mono text-xs font-semibold hover:border-foreground hover:bg-secondary/35 transition-colors whitespace-nowrap"
                             >
-                                {item.label}
+                                <CountryFlag
+                                    code={item.flagCode}
+                                    decorative
+                                    className="w-4 h-3 shrink-0"
+                                />
+                                <span>{item.label}</span>
                             </Link>
                         ))}
                     </div>
                 </div>
 
-                {/* Browse Post Offices by Postal Division (internal link hub to all 30 division pages & 4,000+ offices) */}
+                {/* Browse Post Offices by Postal Division (collapsed accordion on < md, expanded in SSR DOM on md+) */}
                 {divisions.length > 0 && (
-                    <div className="rounded-xl border-2 border-foreground bg-card p-4 sm:p-5">
-                        <div className="flex items-center justify-between gap-2 mb-3">
+                    <div className="rounded-2xl border border-border md:border-2 md:border-foreground bg-card p-4 sm:p-5 shadow-[var(--shadow-elev-1)] md:shadow-none">
+                        <div className="flex items-center justify-between gap-2">
                             <h2 className="font-heading text-lg sm:text-xl font-extrabold [font-stretch:82%]">
                                 Browse Post Offices by Division
                             </h2>
-                            <Link
-                                href="/browse"
-                                className="text-xs sm:text-sm font-semibold text-primary hover:underline shrink-0"
-                            >
-                                All offices &rarr;
-                            </Link>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <Link
+                                    href="/browse"
+                                    className="hidden md:inline text-xs sm:text-sm font-semibold text-primary hover:underline shrink-0"
+                                >
+                                    All offices &rarr;
+                                </Link>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        triggerHaptic("selection");
+                                        setDivisionsOpen((prev) => !prev);
+                                    }}
+                                    aria-expanded={divisionsOpen}
+                                    className="tap md:hidden inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 font-mono text-[11px] font-bold text-foreground"
+                                >
+                                    <span>{divisions.length}</span>
+                                    <ChevronDown
+                                        className={cn(
+                                            "h-3.5 w-3.5 transition-transform duration-150",
+                                            divisionsOpen && "rotate-180"
+                                        )}
+                                        aria-hidden="true"
+                                    />
+                                </button>
+                            </div>
                         </div>
-                        <div className="flex flex-wrap gap-2">
+                        <div
+                            className={cn(
+                                "flex-wrap gap-2 md:mt-3",
+                                divisionsOpen ? "flex mt-3" : "hidden md:flex"
+                            )}
+                        >
                             {divisions.map((div) => (
                                 <Link
                                     key={div.slug}
                                     href={`/district/${div.slug}`}
-                                    className="tap rounded-full border-[1.5px] border-foreground/50 bg-background px-3 py-1.5 text-xs font-semibold hover:border-foreground hover:bg-secondary/35 transition-colors"
+                                    className="tap rounded-full border border-border md:border-[1.5px] md:border-foreground/50 bg-background px-3 py-1.5 text-xs font-semibold hover:border-foreground hover:bg-secondary/35 transition-colors"
                                 >
                                     {div.name}
                                 </Link>
@@ -103,7 +229,7 @@ export default function HomeBottomSection({
                         {children}
                     </div>
 
-                    <div className="rounded-md border-2 border-foreground bg-card p-6 shadow-[4px_4px_0_0_hsl(var(--foreground))] flex flex-col justify-between gap-4 overflow-hidden">
+                    <div className="rounded-2xl md:rounded-md border border-border md:border-2 md:border-foreground bg-card p-6 shadow-[var(--shadow-elev-1)] md:shadow-[4px_4px_0_0_hsl(var(--foreground))] flex flex-col justify-between gap-4 overflow-hidden">
                         <div className="airmail-stripe -mx-6 -mt-6 mb-2 h-1.5" aria-hidden="true" />
                         <div className="flex items-start justify-between gap-3">
                             <h3 className="font-heading text-2xl font-extrabold [font-stretch:82%]">
@@ -114,7 +240,7 @@ export default function HomeBottomSection({
                         <p className="text-sm text-muted-foreground leading-relaxed">
                             {t("ratesBody")}
                         </p>
-                        <Button asChild className="w-full">
+                        <Button asChild className="w-full rounded-xl md:rounded-md">
                             <Link href="/calculator">{t("ratesCta")}</Link>
                         </Button>
                     </div>

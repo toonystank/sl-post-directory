@@ -297,7 +297,14 @@
     "popularCountries": "Popular",
     "allCountriesCount": "All countries ({count})",
     "matchingCountriesCount": "{count} matching",
-    "noCountriesFound": "No countries match \"{query}\""
+    "noCountriesFound": "No countries match \"{query}\"",
+    "tapBreakdown": "Tap for fee breakdown",
+    "hideBreakdown": "Hide breakdown",
+    "chooseCountry": "Select Destination Country",
+    "changeCountryAria": "Change destination country",
+    "switchWeightUnitAria": "Switch weight unit between grams and kilograms",
+    "weightLimitLabel": "Service Weight Limit",
+    "netPayoutShort": "Net Payout"
   },
   "Blog": {
     "kicker": "Reference & Dispatch",

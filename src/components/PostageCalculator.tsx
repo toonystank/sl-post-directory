@@ -4,16 +4,28 @@ import { useState, useEffect, useId, useMemo } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { m, AnimatePresence } from "motion/react";
 import {
-    Mail,
-    Banknote,
-    Scale,
     AlertTriangle,
+    Banknote,
+    Book,
+    BookOpen,
     Check,
-    Plane,
-    Ship,
+    ChevronDown,
+    FileText,
     Info,
+    Landmark,
+    Mail,
     Minus,
+    Newspaper,
+    Package,
+    Plane,
     Plus,
+    Scale,
+    ShieldCheck,
+    Ship,
+    Stamp,
+    Tag,
+    Truck,
+    Zap,
 } from "lucide-react";
 import Postmark from "@/components/brand/Postmark";
 import CountryFlag from "@/components/brand/CountryFlag";
@@ -23,11 +35,11 @@ import { CURRENCY_META, Currency, formatCurrencyAmount, splitCurrencyPrice } fro
 import { MODE_COLORS, getServiceColor, serviceStyle } from "@/lib/service-colors";
 import {
     getLocalizedCountryName,
-    getLocalizedZoneName,
     getServiceTagline,
     stepCodAmount,
     stepWeight,
 } from "@/lib/calculator-ui";
+import { triggerHaptic } from "@/lib/haptics";
 import {
     DEFAULT_RATE_CONFIG,
     calculateAllDomesticServices,
@@ -47,11 +59,57 @@ import { cn } from "@/lib/utils";
 const DOMESTIC_WEIGHT_PRESETS = [30, 100, 250, 500, 1000, 2000, 5000, 10000];
 const COD_WEIGHT_PRESETS = [250, 500, 1000, 2000, 5000, 10000, 20000, 40000];
 const INTL_WEIGHT_PRESETS = [20, 50, 100, 250, 500, 1000, 2000, 5000];
+
+const MOBILE_DOMESTIC_WEIGHT_PRESETS = [30, 100, 250, 1000, 5000];
+const MOBILE_COD_WEIGHT_PRESETS = [250, 500, 1000, 2000, 5000];
+const MOBILE_INTL_WEIGHT_PRESETS = [250, 500, 1000, 2000, 5000];
+
 const COD_AMOUNT_PRESETS = [1000, 2500, 5000, 10000, 25000, 50000];
 
 let cachedRateConfig: RateConfig | null = null;
 let cachedRateConfigTimestamp = 0;
 const RATE_CACHE_TTL_MS = 10 * 60_000;
+
+/** Distinct icon per service so users build immediate colour + icon muscle memory. */
+function getServiceIcon(serviceId: string): typeof Mail {
+    switch (serviceId) {
+        case "ems":
+            return Zap;
+        case "air_parcel":
+        case "parcel":
+            return Package;
+        case "air_letter":
+            return Plane;
+        case "air_printed":
+            return BookOpen;
+        case "u_packet":
+            return Tag;
+        case "tds":
+            return ShieldCheck;
+        case "sea_parcel":
+            return Ship;
+        case "sea_letter":
+        case "letter":
+            return Mail;
+        case "sea_printed":
+            return Book;
+        case "open_article":
+            return FileText;
+        case "courier":
+        case "speed_post":
+            return Truck;
+        case "state":
+            return Landmark;
+        case "newspaper":
+            return Newspaper;
+        case "postcard":
+            return Stamp;
+        case "cod":
+            return Banknote;
+        default:
+            return Mail;
+    }
+}
 
 /** Index of the cheapest valid quote (only when 2+ are valid), else -1. */
 function cheapestIndex(prices: (number | null)[]): number {
@@ -69,6 +127,13 @@ function sanitizeDigits(value: string): string {
     return value.replace(/[^\d]/g, "");
 }
 
+function formatWeightDraft(gramsStr: string, unit: "g" | "kg"): string {
+    const grams = parseInt(gramsStr, 10);
+    if (!Number.isFinite(grams) || grams <= 0) return "";
+    if (unit === "g") return String(grams);
+    return Number((grams / 1000).toFixed(3)).toString();
+}
+
 function formatCompactAmount(amount: number): string {
     if (amount >= 1000) {
         const k = amount / 1000;
@@ -77,23 +142,11 @@ function formatCompactAmount(amount: number): string {
     return String(amount);
 }
 
-/** Numbered step badge ("1", "2", "3") for clear visual flow */
-function StepBadge({ step }: { step: number }) {
-    return (
-        <span
-            aria-hidden="true"
-            className="inline-flex h-4 w-4 md:h-5 md:w-5 shrink-0 items-center justify-center rounded-[4px] bg-foreground font-mono text-[10px] md:text-[11px] font-bold text-background"
-        >
-            {step}
-        </span>
-    );
-}
-
 /**
- * Colour-coded service tile:
- * - Full-width service title on top row so names like "Printed Matter" or Sinhala/Tamil titles never get cut off.
- * - "CHEAPEST" pill placed in the bottom-right corner next to the price.
- * - Selected state shows a solid service-coloured top header bar ("SELECTED · [ShortTag] ✓").
+ * Muscle-memory full-colour service tile:
+ * - Distinct background tint + darker 3D tactile bottom lip + unmistakable icon.
+ * - Selected tiles get a crisp high-contrast outer ring and white check badge.
+ * - Unavailable or overweight tiles cleanly desaturate with a subtle status badge.
  */
 function ServiceCard({
     serviceId,
@@ -102,7 +155,6 @@ function ServiceCard({
     dimmed,
     cheapest,
     cheapestLabel,
-    selectedCardHeader,
     locale,
     currency,
     lkrPerUsd,
@@ -117,7 +169,6 @@ function ServiceCard({
     dimmed: boolean;
     cheapest: boolean;
     cheapestLabel: string;
-    selectedCardHeader: string;
     locale: string;
     currency: Currency;
     lkrPerUsd: number;
@@ -131,6 +182,68 @@ function ServiceCard({
     const tagline = getServiceTagline(serviceId, locale);
     const isIndic = locale === "si" || locale === "ta";
     const priceParts = price !== null ? splitCurrencyPrice(price, currency, lkrPerUsd) : null;
+    const Icon = getServiceIcon(serviceId);
+
+    const topStripe =
+        serviceId === "ems"
+            ? "ems-stripe"
+            : serviceId === "air_letter" || serviceId === "air_printed"
+                ? "par-avion-stripe"
+                : null;
+
+    if (dimmed || priceParts === null) {
+        return (
+            <m.button
+                type="button"
+                onClick={onSelect}
+                aria-pressed={selected}
+                whileTap={{ scale: 0.98 }}
+                transition={{ type: "spring", stiffness: 480, damping: 30 }}
+                style={serviceStyle(color)}
+                className={cn(
+                    "svc tap relative flex flex-col justify-between overflow-hidden rounded-[16px] border px-2.5 py-2 text-left transition-colors min-h-[74px] md:min-h-[86px]",
+                    selected
+                        ? "border-destructive bg-muted/90 ring-2 ring-destructive/40"
+                        : "border-border bg-muted/70 opacity-75 hover:opacity-95"
+                )}
+            >
+                <div className="flex w-full items-center justify-between gap-1.5">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-foreground/10 text-muted-foreground">
+                        <Icon className="h-3.5 w-3.5" strokeWidth={2.3} aria-hidden="true" />
+                    </span>
+                    <span
+                        className={cn(
+                            "rounded-full border px-1.5 py-0.5 font-mono text-[9px] md:text-[10px] font-bold truncate",
+                            status?.tone === "error"
+                                ? "border-destructive/40 bg-destructive/10 text-destructive"
+                                : "border-border bg-card text-muted-foreground"
+                        )}
+                    >
+                        {status?.text ?? "—"}
+                    </span>
+                </div>
+
+                <div className="mt-1.5 w-full min-w-0">
+                    <span
+                        className={cn(
+                            "block font-bold leading-tight text-foreground/85 truncate",
+                            isIndic ? "text-[11px] md:text-xs" : "text-[12px] md:text-sm"
+                        )}
+                    >
+                        {name}
+                    </span>
+                    <p
+                        className={cn(
+                            "text-muted-foreground truncate leading-tight mt-0.5",
+                            isIndic ? "text-[9px] md:text-[10.5px]" : "text-[10px] md:text-xs"
+                        )}
+                    >
+                        {tagline.cardHint}
+                    </p>
+                </div>
+            </m.button>
+        );
+    }
 
     return (
         <m.button
@@ -138,110 +251,99 @@ function ServiceCard({
             onClick={onSelect}
             aria-pressed={selected}
             whileHover={{ y: -1.5 }}
-            whileTap={{ scale: 0.985 }}
+            whileTap={{ scale: 0.975 }}
             transition={{ type: "spring", stiffness: 480, damping: 30 }}
-            style={serviceStyle(color)}
+            style={{
+                ...serviceStyle(color),
+                backgroundColor: "var(--svc)",
+                boxShadow: "0 3px 0 0 var(--cl)",
+            }}
             className={cn(
-                "svc tap relative flex flex-col justify-between overflow-hidden rounded-md text-left transition-colors min-h-[56px] md:min-h-[76px] lg:min-h-[96px]",
-                selected
-                    ? "border-2 border-[var(--c)] bg-[color-mix(in_oklab,var(--c)_13%,hsl(var(--card)))] dark:bg-[color-mix(in_oklab,var(--c)_18%,hsl(var(--card)))] shadow-[0_2px_0_0_var(--c)] ring-1 ring-[var(--c)]/40"
-                    : dimmed
-                        ? "border-[1.5px] border-border/70 bg-muted/40 opacity-70 hover:border-foreground/40"
-                        : "border-[1.5px] border-border bg-card hover:border-[var(--c)]"
+                "svc tap relative flex flex-col justify-between overflow-hidden rounded-[16px] border border-white/20 px-2.5 py-2 text-left text-white transition-all min-h-[78px] md:min-h-[90px]",
+                selected &&
+                    "ring-2 ring-foreground ring-offset-2 ring-offset-background"
             )}
         >
-            {/* Selected state: solid service-colored top banner */}
-            {selected ? (
-                <div className="flex w-full items-center justify-between gap-1 bg-[var(--svc)] dark:bg-[var(--c)] px-1.5 py-0.5 lg:px-2.5 lg:py-1 text-white dark:text-[#14110E]">
-                    <span
-                        className={cn(
-                            "min-w-0 font-mono font-bold uppercase tracking-tight truncate",
-                            isIndic ? "text-[8.5px] md:text-[10px]" : "text-[8.5px] sm:text-[9.5px] md:text-[10.5px]"
-                        )}
-                    >
-                        {selectedCardHeader}
-                    </span>
-                    <Check className="w-2.5 h-2.5 lg:w-3.5 lg:h-3.5 shrink-0" strokeWidth={3} aria-hidden="true" />
-                </div>
-            ) : (
-                /* Unselected state: left colour bar (two-tone when service has an accent) */
+            {topStripe && (
                 <span
                     aria-hidden="true"
-                    className="absolute inset-y-0 left-0 w-1.5"
-                    style={{ background: "linear-gradient(to bottom, var(--c) 0 68%, var(--ca) 68% 100%)" }}
+                    className={cn("absolute inset-x-0 top-0 h-[3px]", topStripe)}
                 />
             )}
 
-            <div
-                className={cn(
-                    "flex flex-1 flex-col justify-between w-full",
-                    selected ? "px-2 py-0.5 lg:px-3 lg:py-2" : "py-1 pl-2.5 pr-1.5 lg:py-2 lg:pl-3.5 lg:pr-2.5"
-                )}
-            >
-                <div className="w-full min-w-0">
-                    <div className="flex items-center gap-1 lg:gap-1.5 w-full min-w-0">
+            <div className={cn("w-full min-w-0", topStripe && "pt-0.5")}>
+                <div className="flex w-full items-center justify-between gap-1.5">
+                    <span className="flex items-center gap-1.5 min-w-0">
                         <span
-                            aria-hidden="true"
-                            className="h-1.5 w-1.5 lg:h-2 lg:w-2 rounded-full bg-[var(--c)] shrink-0"
-                        />
+                            style={{
+                                backgroundColor: color.iconBg ?? "rgba(255, 255, 255, 0.22)",
+                                color: color.iconFg ?? "#FFFFFF",
+                            }}
+                            className="flex h-6 w-6 md:h-7 md:w-7 shrink-0 items-center justify-center rounded-full"
+                        >
+                            <Icon className="h-3.5 w-3.5 md:h-4 md:w-4" strokeWidth={2.4} aria-hidden="true" />
+                        </span>
                         <span
                             className={cn(
-                                "font-bold text-foreground leading-tight break-words",
-                                isIndic ? "text-[10.5px] sm:text-xs md:text-sm lg:text-[15px]" : "text-xs md:text-sm lg:text-[15px]"
+                                "font-extrabold leading-tight text-white truncate",
+                                isIndic ? "text-[11px] sm:text-xs md:text-sm" : "text-[12px] md:text-sm"
                             )}
                         >
                             {name}
                         </span>
-                    </div>
-                    <p
-                        className={cn(
-                            "text-muted-foreground truncate leading-tight pl-2.5 lg:pl-3.5 lg:mt-0.5",
-                            isIndic ? "text-[8.5px] md:text-[10.5px] lg:text-xs" : "text-[9.5px] md:text-[11px] lg:text-xs"
-                        )}
-                    >
-                        {tagline.cardHint}
-                    </p>
-                </div>
+                    </span>
 
-                <div className="flex items-baseline justify-between gap-1 w-full mt-0.5 lg:mt-1.5 pl-2.5 lg:pl-3.5">
-                    {priceParts !== null ? (
-                        <span className="font-mono text-sm sm:text-base md:text-lg lg:text-xl font-bold text-[var(--c)] tabular-nums leading-tight">
-                            {currency === "USD" ? (
-                                <>
-                                    <span className="text-[11px] md:text-xs font-semibold mr-px">{priceParts.symbol}</span>
-                                    {priceParts.value}
-                                </>
-                            ) : (
-                                <>
-                                    <span className="text-[10px] md:text-xs font-semibold">{priceParts.symbol}</span>{" "}
-                                    {priceParts.value}
-                                </>
-                            )}
-                        </span>
-                    ) : (
+                    {selected && (
                         <span
-                            className={cn(
-                                "font-mono text-[10.5px] lg:text-xs font-medium truncate",
-                                status?.tone === "error" ? "text-destructive" : "text-muted-foreground"
-                            )}
+                            style={{ color: "var(--svc)" }}
+                            className="flex h-4 w-4 md:h-5 md:w-5 shrink-0 items-center justify-center rounded-full bg-white shadow-xs"
                         >
-                            {status?.text ?? "—"}
+                            <Check className="h-2.5 w-2.5 md:h-3 md:w-3" strokeWidth={3.2} aria-hidden="true" />
                         </span>
                     )}
-                    <span className="flex shrink-0 items-center gap-1">
-                        {note && <span className="font-mono text-[9.5px] lg:text-[10.5px] font-semibold text-muted-foreground">{note}</span>}
-                        {cheapest && (
-                            <span
-                                className={cn(
-                                    "rounded-full bg-green-100 px-1.5 py-px lg:px-2 lg:py-0.5 font-bold uppercase tracking-wide text-green-800 dark:bg-green-900/50 dark:text-green-300",
-                                    isIndic ? "text-[8.5px] lg:text-[9.5px]" : "text-[9px] lg:text-[10px]"
-                                )}
-                            >
-                                {cheapestLabel}
-                            </span>
-                        )}
-                    </span>
                 </div>
+
+                <p
+                    className={cn(
+                        "truncate text-white/85 leading-tight mt-0.5",
+                        isIndic ? "text-[9px] md:text-[10.5px]" : "text-[10px] md:text-[11px]"
+                    )}
+                >
+                    {tagline.cardHint}
+                </p>
+            </div>
+
+            <div className="mt-1.5 flex w-full items-center justify-between gap-1.5">
+                <span className="font-mono text-[14px] sm:text-[15px] md:text-lg font-black text-white tabular-nums leading-none shrink-0">
+                    {currency === "USD" ? (
+                        <>
+                            <span className="text-[11px] md:text-xs font-bold mr-px">{priceParts.symbol}</span>
+                            {priceParts.value}
+                        </>
+                    ) : (
+                        <>
+                            <span className="text-[10.5px] md:text-xs font-bold">{priceParts.symbol}</span>{" "}
+                            {priceParts.value}
+                        </>
+                    )}
+                </span>
+                <span className="flex shrink-0 items-center gap-1">
+                    {note && (
+                        <span className="font-mono text-[9.5px] font-bold text-white/85">
+                            {note}
+                        </span>
+                    )}
+                    {cheapest && (
+                        <span
+                            className={cn(
+                                "shrink-0 rounded-full bg-black/25 px-1.5 py-0.5 font-bold uppercase tracking-wide text-white",
+                                isIndic ? "text-[8px] md:text-[9px]" : "text-[8.5px] md:text-[9.5px]"
+                            )}
+                        >
+                            {cheapestLabel}
+                        </span>
+                    )}
+                </span>
             </div>
         </m.button>
     );
@@ -271,6 +373,16 @@ export default function PostageCalculator({
     const tHome = useTranslations("Home");
     const tc = useTranslations("Calculator");
     const { currency, lkrPerUsd } = useCurrency();
+
+    const defaultInitialWeight =
+        initialWeight && /^\d+$/.test(initialWeight) && Number(initialWeight) > 0
+            ? initialWeight
+            : initialMode === "cod"
+                ? "250"
+                : initialMode === "ems"
+                    ? "20"
+                    : "30";
+
     const [config, setConfig] = useState<RateConfig>(DEFAULT_RATE_CONFIG);
     const [destination, setDestination] = useState<Destination>(initialMode);
     const [serviceId, setServiceId] = useState<string>(
@@ -291,15 +403,13 @@ export default function PostageCalculator({
     );
     const [intlRegistered, setIntlRegistered] = useState(Boolean(initialMode === "ems" && initialRegistered));
     const [showCountryWhyNote, setShowCountryWhyNote] = useState(false);
-    const [weight, setWeight] = useState<string>(
-        initialWeight && /^\d+$/.test(initialWeight) && Number(initialWeight) > 0
-            ? initialWeight
-            : initialMode === "cod"
-                ? "250"
-                : initialMode === "ems"
-                    ? "20"
-                    : "30"
-    );
+    const [countryPickerOpen, setCountryPickerOpen] = useState(false);
+    const [breakdownExpanded, setBreakdownExpanded] = useState(false);
+
+    const [weight, setWeight] = useState<string>(defaultInitialWeight);
+    const [weightUnit, setWeightUnit] = useState<"g" | "kg">("g");
+    const [weightInputText, setWeightInputText] = useState<string>(defaultInitialWeight);
+
     const [codAmount, setCodAmount] = useState<string>(
         initialCodAmount && /^\d+$/.test(initialCodAmount) && Number(initialCodAmount) > 0
             ? initialCodAmount
@@ -338,6 +448,8 @@ export default function PostageCalculator({
         const w = sp.get("weight");
         if (w && /^\d+$/.test(w) && Number(w) > 0) {
             setWeight(w);
+            setWeightUnit("g");
+            setWeightInputText(w);
         }
 
         const cod = sp.get("codAmount");
@@ -404,7 +516,6 @@ export default function PostageCalculator({
             return;
         }
 
-        // Hydrate immediately from localStorage SWR cache so calculator opens with zero fetch delay
         let isLocalFresh = false;
         try {
             const raw = window.localStorage.getItem(RATE_STORAGE_KEY);
@@ -451,7 +562,6 @@ export default function PostageCalculator({
             }
         };
 
-        // Defer network check slightly so initial calculator paint & interactions stay unblocked
         const timer = window.setTimeout(fetchConfig, 400);
         return () => {
             active = false;
@@ -504,11 +614,6 @@ export default function PostageCalculator({
         [config.emsCountries, emsCountryCode]
     );
 
-    const activeEmsZone = useMemo(
-        () => config.emsZones.find((z) => z.id === activeEmsCountry?.zoneId),
-        [config.emsZones, activeEmsCountry]
-    );
-
     const intlQuotes = useMemo(
         () =>
             calculateAllInternationalServices(config, emsCountryCode, weightGrams, {
@@ -554,7 +659,6 @@ export default function PostageCalculator({
         [filteredIntlQuotes]
     );
 
-    // Colour of the currently highlighted result (drives the receipt banner background tint + border)
     const activeServiceKey =
         destination === "cod"
             ? "cod"
@@ -570,31 +674,46 @@ export default function PostageCalculator({
                 : getServiceColor(selectedService?.id);
 
     const activeTagline = getServiceTagline(activeServiceKey, locale);
+    const ActiveServiceIcon = getServiceIcon(activeServiceKey);
 
     const bannerStripe =
         destination === "cod"
-            ? "bg-[var(--c)]"
+            ? "bg-[var(--svc)]"
             : destination === "ems"
                 ? activeIntlQuote.service.id === "ems"
                     ? "ems-stripe"
                     : activeIntlQuote.service.id === "air_letter" || activeIntlQuote.service.id === "air_printed"
                         ? "par-avion-stripe"
-                        : "bg-[var(--c)]"
+                        : "bg-[var(--svc)]"
                 : "airmail-stripe";
 
-    const weightPresets =
+    const desktopWeightPresets =
         destination === "cod"
             ? COD_WEIGHT_PRESETS
             : destination === "ems"
                 ? INTL_WEIGHT_PRESETS
                 : DOMESTIC_WEIGHT_PRESETS;
 
+    const mobileWeightPresets =
+        destination === "cod"
+            ? MOBILE_COD_WEIGHT_PRESETS
+            : destination === "ems"
+                ? MOBILE_INTL_WEIGHT_PRESETS
+                : MOBILE_DOMESTIC_WEIGHT_PRESETS;
+
     const defaultWeightForMode = (mode: Destination) =>
         mode === "cod" ? "250" : mode === "ems" ? "20" : "30";
 
+    const applyGramsWeight = (gramsStr: string, targetUnit: "g" | "kg" = weightUnit) => {
+        setWeight(gramsStr);
+        setWeightInputText(formatWeightDraft(gramsStr, targetUnit));
+    };
+
     const resetCalculatorForMode = (mode: Destination) => {
+        const nextW = defaultWeightForMode(mode);
         setDestination(mode);
-        setWeight(defaultWeightForMode(mode));
+        setWeightUnit("g");
+        applyGramsWeight(nextW, "g");
         setServiceId(
             config.domesticServices.some((s) => s.id === "letter")
                 ? "letter"
@@ -612,34 +731,67 @@ export default function PostageCalculator({
         setIntlServiceId("ems");
         setIntlRegistered(false);
         setShowCountryWhyNote(false);
+        setBreakdownExpanded(false);
     };
 
     const handleModeChange = (mode: Destination) => {
+        triggerHaptic("selection");
         resetCalculatorForMode(mode);
     };
 
     const handleIntlTransportChange = (transport: InternationalTransport) => {
+        if (transport === intlTransport) return;
+        triggerHaptic("selection");
         setIntlTransport(transport);
-        setWeight("20");
-        setIntlServiceId(transport === "air" ? "ems" : "sea_letter");
+        // Preserve entered parcel weight when switching Air <-> Sea so users can compare directly!
+        const nextId: InternationalServiceId =
+            transport === "air"
+                ? "ems"
+                : weightGrams > 2000
+                    ? "sea_parcel"
+                    : "sea_letter";
+        setIntlServiceId(nextId);
         setIntlRegistered(false);
     };
 
+    const handleWeightTextChange = (raw: string) => {
+        if (weightUnit === "g") {
+            const clean = sanitizeDigits(raw);
+            setWeightInputText(clean);
+            setWeight(clean);
+            return;
+        }
+        const clean = raw.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1");
+        setWeightInputText(clean);
+        if (!clean || clean === ".") {
+            setWeight("");
+            return;
+        }
+        const parsedKg = parseFloat(clean);
+        if (Number.isFinite(parsedKg)) {
+            const grams = Math.min(99999, Math.round(parsedKg * 1000));
+            setWeight(grams > 0 ? String(grams) : "");
+        }
+    };
+
+    const handleToggleWeightUnit = () => {
+        triggerHaptic("selection");
+        const nextUnit = weightUnit === "g" ? "kg" : "g";
+        setWeightUnit(nextUnit);
+        setWeightInputText(formatWeightDraft(weight, nextUnit));
+    };
+
     const handleStepWeight = (direction: "up" | "down") => {
+        triggerHaptic("selection");
         const next = stepWeight(weightGrams, direction, 10, 40000);
-        setWeight(String(next));
+        applyGramsWeight(String(next));
     };
 
     const handleStepCodAmount = (direction: "up" | "down") => {
+        triggerHaptic("selection");
         const next = stepCodAmount(collectAmountNum, direction, 500, 100000);
         setCodAmount(String(next));
     };
-
-    const localizedZone = getLocalizedZoneName(
-        activeEmsZone?.id,
-        activeEmsZone?.name ?? "EMS Zone",
-        locale
-    );
 
     const localizedCountryName = getLocalizedCountryName(
         activeEmsCountry?.code,
@@ -647,11 +799,11 @@ export default function PostageCalculator({
         locale
     );
 
-    // Derive banner state for the active mode
+    // Derive Hero Price Receipt Banner state (zone-free!)
     const banner = (() => {
         if (destination === "domestic") {
             const title = activeTagline.name || selectedService?.name || "Domestic Mail";
-            const badgeLabel = (activeTagline.shortName || selectedService?.shortName || "Letter").toUpperCase();
+            const badgeLabel = activeTagline.shortName || selectedService?.shortName || "Letter";
             const maxWeightLabel = activeDomesticResult.maxWeight
                 ? tc("maxWeight", { weight: formatWeightLabel(activeDomesticResult.maxWeight) })
                 : undefined;
@@ -660,7 +812,7 @@ export default function PostageCalculator({
                 return {
                     flagCode: "LK",
                     locationPill: tc("locationLocal"),
-                    selectedBadge: tc("selectedPrefix", { service: badgeLabel }),
+                    badgeLabel,
                     title,
                     subtitle: `${activeTagline.cardHint} · ${activeDomesticResult.error}`,
                     total: null as number | null,
@@ -682,7 +834,7 @@ export default function PostageCalculator({
             return {
                 flagCode: "LK",
                 locationPill: tc("locationLocal"),
-                selectedBadge: tc("selectedPrefix", { service: badgeLabel }),
+                badgeLabel,
                 title,
                 subtitle: `${activeTagline.cardHint} · ${activeDomesticResult.tierLabel}`,
                 total: activeDomesticResult.totalCost,
@@ -700,7 +852,7 @@ export default function PostageCalculator({
                 return {
                     flagCode: "LK",
                     locationPill: tc("locationCod"),
-                    selectedBadge: tc("selectedCod"),
+                    badgeLabel: tc("modeCod"),
                     title,
                     subtitle: `${activeTagline.cardHint} · ${codResult.error}`,
                     total: null as number | null,
@@ -713,7 +865,7 @@ export default function PostageCalculator({
             return {
                 flagCode: "LK",
                 locationPill: tc("locationCod"),
-                selectedBadge: tc("selectedCod"),
+                badgeLabel: tc("modeCod"),
                 title,
                 subtitle: `${codResult.tierLabel} · ${tc("collectAmount", {
                     amount:
@@ -741,19 +893,9 @@ export default function PostageCalculator({
         const serviceLabel = isRegActive
             ? tc("registeredPrefix", { service: localizedShortName })
             : localizedFullName;
-        const badgeLabel = (isRegActive
-            ? tc("regBadgePrefix", { service: localizedShortName })
-            : localizedShortName
-        ).toUpperCase();
-
-        const shortZone =
-            activeIntlQuote.service.id === "ems"
-                ? localizedZone.short
-                : tc("groupLabel", { group: activeEmsCountry?.group ?? "—" });
-
-        const locationPill = activeEmsCountry
-            ? `${localizedCountryName} · ${shortZone}`
-            : shortZone;
+        const badgeLabel = isRegActive
+            ? tc("registeredPrefix", { service: localizedShortName })
+            : localizedShortName;
 
         const maxW = activeIntlQuote.result.maxWeight ?? activeIntlQuote.service.maxWeight;
         const rightFooter = maxW ? tc("maxWeight", { weight: formatWeightLabel(maxW) }) : undefined;
@@ -761,8 +903,8 @@ export default function PostageCalculator({
         if (!activeIntlQuote.available) {
             return {
                 flagCode: activeEmsCountry?.code ?? "GB",
-                locationPill,
-                selectedBadge: tc("selectedPrefix", { service: badgeLabel }),
+                locationPill: localizedCountryName,
+                badgeLabel,
                 title: serviceLabel,
                 subtitle: `${activeTagline.cardHint} · ${activeIntlQuote.shortUnavailableTag ?? "Unavailable"}`,
                 total: null as number | null,
@@ -779,8 +921,8 @@ export default function PostageCalculator({
         if (activeIntlQuote.result.error) {
             return {
                 flagCode: activeEmsCountry?.code ?? "GB",
-                locationPill,
-                selectedBadge: tc("selectedPrefix", { service: badgeLabel }),
+                locationPill: localizedCountryName,
+                badgeLabel,
                 title: serviceLabel,
                 subtitle: `${activeTagline.cardHint} · ${activeIntlQuote.result.error}`,
                 total: null as number | null,
@@ -803,8 +945,8 @@ export default function PostageCalculator({
 
         return {
             flagCode: activeEmsCountry?.code ?? "GB",
-            locationPill,
-            selectedBadge: tc("selectedPrefix", { service: badgeLabel }),
+            locationPill: localizedCountryName,
+            badgeLabel,
             title: serviceLabel,
             subtitle: `${activeTagline.cardHint} · ${activeIntlQuote.result.tierLabel}`,
             total: activeIntlQuote.result.totalCost,
@@ -815,329 +957,249 @@ export default function PostageCalculator({
         };
     })();
 
+    const priceParts =
+        banner.total !== null ? splitCurrencyPrice(banner.total, currency, lkrPerUsd) : null;
+
     return (
         <form
             onSubmit={(e) => e.preventDefault()}
             aria-label={tc("formAriaLabel")}
-            className="w-full flex flex-col gap-1 md:gap-3 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start"
+            className="w-full flex flex-col gap-1.5 md:gap-3 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start"
         >
-            {/* Left Workbench Column on Desktop (Mode Bar + Receipt Banner + Step 1 & Step 2 Controls) */}
-            <div className="contents lg:flex lg:flex-col lg:col-span-5 lg:gap-4">
-            {/* 1. Segmented Mode Bar */}
-            <fieldset className="contents">
-                <legend className="sr-only">{tc("modeLabel")}</legend>
-                <div className="grid grid-cols-3 gap-1 rounded-lg border-2 border-foreground bg-card p-0.5 md:p-1">
-                    {modeOptions.map(({ id, label, icon: Icon }) => {
-                        const inputId = `${uid}-mode-${id}`;
-                        const checked = destination === id;
-                        return (
-                            <div key={id} className="flex svc" style={serviceStyle(MODE_COLORS[id as keyof typeof MODE_COLORS])}>
-                                <input
-                                    type="radio"
-                                    id={inputId}
-                                    name="calculatorMode"
-                                    value={id}
-                                    checked={checked}
-                                    onChange={() => handleModeChange(id)}
-                                    className="sr-only peer"
-                                />
-                                <label
-                                    htmlFor={inputId}
-                                    className={cn(
-                                        "tap relative flex w-full min-h-[38px] md:min-h-[54px] cursor-pointer flex-col items-center justify-center gap-0.5 rounded-md px-1 py-0.5 font-bold transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-ring peer-focus-visible:outline-offset-1 text-center",
-                                        isIndic ? "text-[10.5px] md:text-sm" : "text-xs md:text-sm",
-                                        checked
-                                            ? "text-white dark:text-background"
-                                            : "text-[var(--c)] hover:bg-muted"
-                                    )}
-                                >
-                                    {checked && (
-                                        <m.span
-                                            layoutId={`calc-mode-pill-${uid}`}
-                                            transition={{ type: "spring", stiffness: 450, damping: 32 }}
-                                            style={{ backgroundColor: "var(--c)" }}
-                                            className="absolute inset-0 rounded-md shadow-[0_2px_0_0_hsl(var(--foreground))]"
-                                            aria-hidden="true"
-                                        />
-                                    )}
-                                    <Icon className="relative z-10 w-4 h-4 md:w-6 md:h-6 shrink-0" strokeWidth={2.2} aria-hidden="true" />
-                                    <span className="relative z-10 leading-tight truncate max-w-full">{label}</span>
-                                </label>
-                            </div>
-                        );
-                    })}
-                </div>
-            </fieldset>
-
-            {/* 2. Pinned Top Live Receipt Banner — Tinted with Selected Service Colour & Full Un-Cut Country Flag Pill */}
-            <div
-                role="status"
-                aria-live="polite"
-                data-testid="live-receipt-banner"
-                data-active-service={activeServiceKey}
-                className="svc rounded-lg border-2 border-[var(--c)] bg-[color-mix(in_oklab,var(--c)_13%,hsl(var(--card)))] dark:bg-[color-mix(in_oklab,var(--c)_18%,hsl(var(--card)))] overflow-hidden shadow-[3px_3px_0_0_var(--c)] transition-colors duration-150"
-                style={serviceStyle(activeColor)}
-            >
-                <div className={cn("h-1.5 md:h-2", bannerStripe)} aria-hidden="true" />
-                <div className="px-2.5 py-1.5 md:px-4 md:py-3">
-                    {/* Top Pill Bar: Full Country + Zone Pill on left + Compact Selected Badge on right */}
-                    <div className="flex items-center justify-between gap-1.5 mb-1">
-                        <span
-                            data-testid="banner-country-pill"
-                            className={cn(
-                                "inline-flex min-w-0 items-center gap-1.5 rounded-full border border-foreground/30 bg-card px-2 py-0.5 font-bold text-foreground shadow-2xs",
-                                isIndic ? "text-[10px] md:text-xs" : "text-[11px] md:text-xs"
-                            )}
-                        >
-                            <CountryFlag
-                                code={banner.flagCode}
-                                title={banner.locationPill}
-                                className="w-4 h-3 md:w-5 md:h-3.5 shrink-0"
-                            />
-                            <span className="truncate">{banner.locationPill}</span>
-                        </span>
-
-                        <span
-                            data-testid="banner-selected-service"
-                            className={cn(
-                                "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 font-mono font-bold uppercase tracking-wide shadow-2xs",
-                                isIndic ? "text-[9px] md:text-[10.5px]" : "text-[9.5px] md:text-[11px]",
-                                activeServiceKey === "ems"
-                                    ? "bg-[#FF8533] text-[#1A1714]"
-                                    : "bg-[var(--svc)] text-white dark:bg-[var(--c)] dark:text-[#14110E]"
-                            )}
-                        >
-                            {banner.selectedBadge}
-                        </span>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                            <p
-                                className={cn(
-                                    "font-heading font-extrabold [font-stretch:88%] leading-tight text-foreground break-words",
-                                    isIndic
-                                        ? "text-[13px] sm:text-sm md:text-base"
-                                        : "text-[14px] sm:text-base md:text-lg"
-                                )}
-                            >
-                                {banner.title}
-                            </p>
-                            {banner.error ? (
-                                <p className="flex items-center gap-1 font-mono text-[10.5px] md:text-xs font-medium text-destructive mt-0.5">
-                                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                                    <span className="truncate">{banner.error}</span>
-                                </p>
-                            ) : (
-                                <p
-                                    className={cn(
-                                        "font-mono text-foreground/80 truncate mt-0.5",
-                                        isIndic ? "text-[9.5px] md:text-xs" : "text-[10px] md:text-xs"
-                                    )}
-                                >
-                                    {banner.subtitle}
-                                </p>
-                            )}
-                        </div>
-
-                        <div className="flex items-center gap-2.5 shrink-0">
-                            <div className="text-right">
-                                <span className="inline-flex items-center justify-end gap-1 font-mono text-[9.5px] font-semibold uppercase tracking-wider text-foreground/75 leading-none">
-                                    <span>{tc("total")}</span>
-                                    <span
-                                        data-testid="banner-currency-indicator"
-                                        className="rounded border border-foreground/30 bg-background/80 px-1 py-px text-[9px] font-bold text-foreground"
-                                    >
-                                        {CURRENCY_META[currency].symbol} {currency}
-                                    </span>
-                                </span>
-                                <m.span
-                                    key={`${activeServiceKey}-${currency}-${banner.total ?? "err"}`}
-                                    initial={{ opacity: 0.65, y: 3 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.18, ease: "easeOut" }}
-                                    data-testid="banner-total-price"
-                                    className={cn(
-                                        "block font-mono text-xl sm:text-2xl md:text-4xl font-bold tabular-nums leading-tight",
-                                        banner.error ? "text-muted-foreground" : "text-[var(--c)]"
-                                    )}
-                                >
-                                    {banner.total !== null
-                                        ? (() => {
-                                            const parts = splitCurrencyPrice(banner.total, currency, lkrPerUsd);
-                                            return currency === "USD"
-                                                ? `${parts.symbol}${parts.value}`
-                                                : `${parts.symbol} ${parts.value}`;
-                                        })()
-                                        : "—"}
-                                </m.span>
-                                {currency === "USD" && banner.total !== null && (
-                                    <span className="block font-mono text-[10px] font-medium text-foreground/75 tabular-nums leading-none mt-0.5">
-                                        {tc("lkrEquivalent", { amount: banner.total.toLocaleString() })}
-                                    </span>
-                                )}
-                            </div>
-                            <Postmark
-                                code={currency}
-                                date={currency === "USD" ? `1$≈${Math.round(lkrPerUsd)}` : "17 NOV 26"}
-                                size="sm"
-                                tone="red"
-                                rotate={-10}
-                                className="hidden sm:block"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="border-t border-dashed border-foreground/30 pt-1 mt-1 flex flex-wrap items-center justify-between gap-x-2.5 gap-y-0.5 font-mono text-[10.5px] md:text-xs">
-                        {banner.items.length > 0 ? (
-                            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-foreground/80">
-                                {banner.items.map((item) => (
-                                    <span key={item.label}>
-                                        {item.label}{" "}
-                                        <strong className="text-foreground font-bold">{item.value}</strong>
-                                    </span>
-                                ))}
-                            </div>
-                        ) : (
-                            <span className="text-foreground/80 leading-snug">
-                                {banner.footerNote ??
-                                    (weightGrams <= 0 ? tc("enterValidWeight") : tc("adjustWeight"))}
-                            </span>
-                        )}
-                        <span className="font-semibold text-foreground flex items-center gap-2">
-                            {currency === "USD" && (
-                                <span className="text-[10px] text-muted-foreground font-medium">
-                                    {tc("exchangeRateNote", { rate: lkrPerUsd.toFixed(0) })}
-                                </span>
-                            )}
-                            {banner.rightFooter && <span>{banner.rightFooter}</span>}
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            {/* 3. Unified Compact Input Card: Step 1 Weight ([ - | ⚖️ 20 g | + ]) + Step 2 Country / COD Amount */}
-            <div className="rounded-lg border-[1.5px] border-foreground bg-card p-1.5 md:p-3.5 shadow-[2px_2px_0_0_hsl(var(--foreground))] space-y-1.5">
-                {/* Step 1: Centered Editable Weight Stepper ([ − | ⚖️ 20 g | + ]) */}
-                <div>
-                    <div className="flex items-center justify-between mb-1">
-                        <label
-                            htmlFor={weightInputId}
-                            className={cn(
-                                "flex items-center gap-1.5 font-heading font-extrabold uppercase tracking-wide text-foreground cursor-pointer",
-                                isIndic ? "text-[10.5px] md:text-xs" : "text-xs md:text-sm"
-                            )}
-                        >
-                            <StepBadge step={1} />
-                            <span>{tc("step1Title")}</span>
-                        </label>
-                        <span className="font-mono text-[11px] md:text-xs font-bold text-foreground tabular-nums">
-                            {weightGrams > 0 ? `= ${formatWeightLabel(weightGrams)}` : tc("enterGrams")}
-                        </span>
-                    </div>
-
-                    <div className="grid grid-cols-[38px_1fr_38px] items-center rounded-md border-[1.5px] border-foreground bg-background overflow-hidden focus-within:ring-[3px] focus-within:ring-primary/25">
-                        <button
-                            type="button"
-                            onClick={() => handleStepWeight("down")}
-                            aria-label={tc("decreaseWeight")}
-                            className="tap flex h-8 md:h-10 w-full items-center justify-center border-r border-foreground/30 bg-card text-foreground hover:bg-muted"
-                        >
-                            <Minus className="w-4 h-4" strokeWidth={2.5} aria-hidden="true" />
-                        </button>
-
-                        <label
-                            htmlFor={weightInputId}
-                            className="flex items-center justify-center gap-1.5 h-8 md:h-10 cursor-text px-2"
-                        >
-                            <Scale
-                                className="w-3.5 h-3.5 md:w-4 md:h-4 text-muted-foreground shrink-0 pointer-events-none"
-                                aria-hidden="true"
-                            />
-                            <input
-                                id={weightInputId}
-                                name="weight"
-                                type="text"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                enterKeyHint="done"
-                                autoComplete="off"
-                                value={weight}
-                                onChange={(e) => setWeight(sanitizeDigits(e.target.value))}
-                                placeholder="20"
-                                style={{ width: `${Math.max(2, (weight || "20").length + 0.5)}ch` }}
-                                className="h-full bg-transparent text-center font-mono text-base md:text-lg font-bold text-foreground focus:outline-none tabular-nums"
-                            />
-                            <span className="pointer-events-none font-mono text-xs md:text-sm font-bold text-muted-foreground">
-                                g
-                            </span>
-                        </label>
-
-                        <button
-                            type="button"
-                            onClick={() => handleStepWeight("up")}
-                            aria-label={tc("increaseWeight")}
-                            className="tap flex h-8 md:h-10 w-full items-center justify-center border-l border-foreground/30 bg-card text-foreground hover:bg-muted"
-                        >
-                            <Plus className="w-4 h-4" strokeWidth={2.5} aria-hidden="true" />
-                        </button>
-                    </div>
-
-                    <div className="mt-1 grid grid-cols-8 gap-1">
-                        {weightPresets.map((preset) => {
-                            const active = weightGrams === preset;
+            {/* Left Workbench Column on Desktop: Mode Segmented Control + Pinned Hero Price Receipt + Input Card */}
+            <div className="contents lg:flex lg:flex-col lg:col-span-5 lg:gap-3.5">
+                {/* 1. Compact Segmented Mode Control */}
+                <fieldset className="contents">
+                    <legend className="sr-only">{tc("modeLabel")}</legend>
+                    <div className="grid grid-cols-3 h-[38px] md:h-[52px] gap-1 rounded-xl bg-muted p-1 md:border-2 md:border-foreground md:bg-card">
+                        {modeOptions.map(({ id, label, icon: Icon }) => {
+                            const inputId = `${uid}-mode-${id}`;
+                            const checked = destination === id;
                             return (
-                                <button
-                                    key={preset}
-                                    type="button"
-                                    onClick={() => setWeight(String(preset))}
-                                    aria-pressed={active}
-                                    className={cn(
-                                        "tap flex items-center justify-center rounded-full border py-0.5 font-mono text-[10px] md:text-xs font-bold transition-colors min-h-[22px] md:min-h-[26px]",
-                                        active
-                                            ? "border-foreground bg-foreground text-background"
-                                            : "border-foreground/35 bg-background text-foreground hover:border-foreground"
-                                    )}
-                                >
-                                    {formatWeightLabel(preset)}
-                                </button>
+                                <div key={id} className="flex svc" style={serviceStyle(MODE_COLORS[id as keyof typeof MODE_COLORS])}>
+                                    <input
+                                        type="radio"
+                                        id={inputId}
+                                        name="calculatorMode"
+                                        value={id}
+                                        checked={checked}
+                                        onChange={() => handleModeChange(id)}
+                                        className="sr-only peer"
+                                    />
+                                    <label
+                                        htmlFor={inputId}
+                                        className={cn(
+                                            "tap relative flex w-full cursor-pointer items-center justify-center gap-1.5 md:flex-col md:gap-0.5 rounded-lg px-1.5 py-0.5 font-extrabold transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-ring peer-focus-visible:outline-offset-1 text-center",
+                                            isIndic ? "text-[11px] md:text-xs" : "text-xs md:text-sm",
+                                            checked ? "text-white" : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        {checked && (
+                                            <m.span
+                                                layoutId={`calc-mode-pill-${uid}`}
+                                                transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                                                style={{ backgroundColor: "var(--svc)" }}
+                                                className="absolute inset-0 rounded-lg shadow-xs"
+                                                aria-hidden="true"
+                                            />
+                                        )}
+                                        <Icon className="relative z-10 w-3.5 h-3.5 md:w-5 md:h-5 shrink-0" strokeWidth={2.3} aria-hidden="true" />
+                                        <span className="relative z-10 leading-tight truncate max-w-full">{label}</span>
+                                    </label>
+                                </div>
                             );
                         })}
                     </div>
-                </div>
+                </fieldset>
 
-                {/* Step 2 (International): Destination Country & Air/Sea Mode inside the unified card */}
-                {destination === "ems" && (
-                    <div className="border-t border-border/80 pt-1.5 space-y-1">
-                        <div className="flex items-center justify-between gap-1.5">
-                            <label
-                                htmlFor={emsCountryId}
-                                className={cn(
-                                    "flex items-center gap-1.5 font-heading font-extrabold uppercase tracking-wide text-foreground cursor-pointer min-w-0",
-                                    isIndic ? "text-[10.5px] md:text-xs" : "text-xs md:text-sm"
-                                )}
-                            >
-                                <StepBadge step={2} />
-                                <span className="truncate">{tc("step2IntlTitle")}</span>
-                            </label>
-                            <button
-                                type="button"
-                                onClick={() => setShowCountryWhyNote((prev) => !prev)}
-                                aria-expanded={showCountryWhyNote}
-                                className="inline-flex items-center gap-1 font-mono text-[10px] md:text-[11px] font-semibold text-primary hover:underline shrink-0"
-                            >
-                                <Info className="w-3 h-3 shrink-0" aria-hidden="true" />
-                                <span>{showCountryWhyNote ? tc("hideNote") : tc("missingWhy")}</span>
-                            </button>
+                {/* 2. Pinned HERO PRICE RECEIPT CARD (warm-paper elevated, ABOVE Country Selector, zero nested buttons) */}
+                <div
+                    role="status"
+                    aria-live="polite"
+                    data-testid="live-receipt-banner"
+                    data-active-service={activeServiceKey}
+                    style={serviceStyle(activeColor)}
+                    className="svc sticky top-[54px] md:static z-20 w-full rounded-2xl bg-card border-2 border-[var(--c)] overflow-hidden shadow-[0_6px_18px_-4px_rgba(26,23,20,0.14)] dark:shadow-[0_6px_20px_-4px_rgba(0,0,0,0.45)] transition-colors duration-150"
+                >
+                    <div className={cn("h-[3px] md:h-1", bannerStripe)} aria-hidden="true" />
+                    <div className="px-3 py-1.5 md:px-4 md:py-3 space-y-1">
+                        {/* Row 1: Tappable Country Flag + Full Name pill (left, ZERO truncation) | Weight Pill (right) */}
+                        <div className="flex items-center justify-between gap-2">
+                            {destination === "ems" ? (
+                                <button
+                                    type="button"
+                                    data-testid="banner-country-pill"
+                                    aria-label={tc("changeCountryAria")}
+                                    onClick={() => {
+                                        triggerHaptic("light");
+                                        setCountryPickerOpen(true);
+                                    }}
+                                    className="tap inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-0.5 text-[11.5px] md:text-xs font-extrabold text-foreground min-w-0 text-left hover:border-foreground/50 transition-colors cursor-pointer"
+                                >
+                                    <CountryFlag
+                                        code={banner.flagCode}
+                                        decorative
+                                        className="w-4 h-3 shrink-0"
+                                    />
+                                    <span className="leading-snug">{localizedCountryName}</span>
+                                    <ChevronDown className="w-3 h-3 shrink-0 opacity-70" aria-hidden="true" />
+                                </button>
+                            ) : (
+                                <span
+                                    data-testid="banner-country-pill"
+                                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-0.5 text-[11.5px] md:text-xs font-extrabold text-foreground min-w-0"
+                                >
+                                    <CountryFlag
+                                        code={banner.flagCode}
+                                        decorative
+                                        className="w-4 h-3 shrink-0"
+                                    />
+                                    <span className="leading-snug">{banner.locationPill}</span>
+                                </span>
+                            )}
+
+                            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 font-mono text-[10.5px] md:text-xs font-extrabold text-foreground shrink-0 tabular-nums">
+                                <Scale className="w-2.5 h-2.5 opacity-70" aria-hidden="true" />
+                                <span>{weightGrams > 0 ? formatWeightLabel(weightGrams) : "0 g"}</span>
+                            </span>
                         </div>
 
-                        <div className="grid grid-cols-[1fr_auto] gap-1 md:gap-2 items-center">
+                        {/* Row 2: Solid Service Pill + Subtitle left | HUGE Tabular Price right */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                triggerHaptic("selection");
+                                setBreakdownExpanded((prev) => !prev);
+                            }}
+                            aria-expanded={breakdownExpanded}
+                            className="tap w-full flex items-end justify-between gap-2 text-left pt-0.5 cursor-pointer"
+                        >
+                            <span className="flex flex-col items-start gap-0.5 min-w-0 flex-1">
+                                <span className="flex items-center gap-1.5 min-w-0">
+                                    <span
+                                        data-testid="banner-selected-service"
+                                        style={{ backgroundColor: "var(--svc)" }}
+                                        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] md:text-[11px] font-extrabold text-white shrink-0"
+                                    >
+                                        <ActiveServiceIcon className="w-3 h-3 shrink-0" strokeWidth={2.5} aria-hidden="true" />
+                                        <span>{banner.badgeLabel}</span>
+                                    </span>
+                                    {banner.items.length > 0 && (
+                                        <span className="lg:hidden inline-flex items-center text-muted-foreground">
+                                            <ChevronDown
+                                                className={cn(
+                                                    "w-3.5 h-3.5 transition-transform duration-150",
+                                                    breakdownExpanded && "rotate-180"
+                                                )}
+                                                aria-hidden="true"
+                                            />
+                                            <span className="sr-only">
+                                                {breakdownExpanded ? tc("hideBreakdown") : tc("tapBreakdown")}
+                                            </span>
+                                        </span>
+                                    )}
+                                </span>
+                                {banner.error ? (
+                                    <span className="flex items-center gap-1 font-mono text-[10.5px] md:text-xs font-semibold text-destructive w-full truncate">
+                                        <AlertTriangle className="w-3 h-3 shrink-0" aria-hidden="true" />
+                                        <span className="truncate">{banner.error}</span>
+                                    </span>
+                                ) : (
+                                    <span className="text-[10.5px] md:text-xs font-medium text-muted-foreground truncate w-full">
+                                        {banner.subtitle}
+                                    </span>
+                                )}
+                            </span>
+
+                            <span className="flex items-center gap-2 shrink-0">
+                                <span className="flex flex-col items-end">
+                                    <span className="inline-flex items-center gap-1 font-mono text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground leading-none mb-0.5">
+                                        <span>{tc("total")}</span>
+                                        <span>·</span>
+                                        <span data-testid="banner-currency-indicator">
+                                            {CURRENCY_META[currency].symbol} {currency}
+                                        </span>
+                                    </span>
+                                    <m.span
+                                        key={`${activeServiceKey}-${currency}-${banner.total ?? "err"}`}
+                                        initial={{ opacity: 0.65, y: 3 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.16, ease: "easeOut" }}
+                                        data-testid="banner-total-price"
+                                        className={cn(
+                                            "block font-mono text-[22px] sm:text-2xl md:text-3xl font-black tabular-nums leading-none tracking-tight",
+                                            banner.error ? "text-muted-foreground" : "text-[var(--c)]"
+                                        )}
+                                    >
+                                        {priceParts
+                                            ? currency === "USD"
+                                                ? `${priceParts.symbol}${priceParts.value}`
+                                                : `${priceParts.symbol} ${priceParts.value}`
+                                            : "—"}
+                                    </m.span>
+                                    {currency === "USD" && banner.total !== null && (
+                                        <span className="block font-mono text-[9.5px] font-medium text-muted-foreground tabular-nums leading-none mt-0.5">
+                                            {tc("lkrEquivalent", { amount: banner.total.toLocaleString() })}
+                                        </span>
+                                    )}
+                                </span>
+                                <Postmark
+                                    code={currency}
+                                    date={currency === "USD" ? `1$≈${Math.round(lkrPerUsd)}` : "17 NOV 26"}
+                                    size="sm"
+                                    tone="red"
+                                    rotate={-10}
+                                    className="hidden md:block shrink-0"
+                                />
+                            </span>
+                        </button>
+
+                        {/* Expandable Fee Breakdown Strip (always open on lg+, toggleable on mobile) */}
+                        <div
+                            className={cn(
+                                "border-t border-dashed border-border pt-1.5 mt-1 flex-wrap items-center justify-between gap-x-2.5 gap-y-0.5 font-mono text-[10.5px] md:text-xs",
+                                breakdownExpanded ? "flex" : "hidden lg:flex"
+                            )}
+                        >
+                            {banner.items.length > 0 ? (
+                                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-muted-foreground">
+                                    {banner.items.map((item) => (
+                                        <span key={item.label}>
+                                            {item.label}{" "}
+                                            <strong className="text-foreground font-bold">{item.value}</strong>
+                                        </span>
+                                    ))}
+                                </div>
+                            ) : (
+                                <span className="text-muted-foreground leading-snug">
+                                    {banner.footerNote ??
+                                        (weightGrams <= 0 ? tc("enterValidWeight") : tc("adjustWeight"))}
+                                </span>
+                            )}
+                            <span className="font-semibold text-foreground flex items-center gap-2">
+                                {currency === "USD" && (
+                                    <span className="text-[10px] text-muted-foreground font-medium">
+                                        {tc("exchangeRateNote", { rate: lkrPerUsd.toFixed(0) })}
+                                    </span>
+                                )}
+                                {banner.rightFooter && <span>{banner.rightFooter}</span>}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 3. Unified Compact Input Card: Full-Width Country Selector (Intl) / Amount (COD) + Editable Weight Bar */}
+                <div className="rounded-2xl border border-border md:border-[1.5px] md:border-foreground bg-card p-2 md:p-3.5 shadow-[var(--shadow-elev-1)] space-y-1.5">
+                    {destination === "ems" && (
+                        <div className="space-y-1">
                             <CountrySelector
                                 id={emsCountryId}
                                 countries={sortedEmsCountries}
                                 value={emsCountryCode}
                                 locale={locale}
                                 isIndic={isIndic}
+                                open={countryPickerOpen}
+                                onOpenChange={setCountryPickerOpen}
                                 onChange={setEmsCountryCode}
                                 labels={{
                                     searchPlaceholder: tc("searchCountryPlaceholder"),
@@ -1149,27 +1211,463 @@ export default function PostageCalculator({
                                     noResultsLabel: (q) => tc("noCountriesFound", { query: q }),
                                     suspendedSuffix: tc("suspendedSuffix"),
                                     noteSuffix: tc("noteSuffix"),
+                                    changeLabel: tc("change"),
+                                    sheetTitle: tc("chooseCountry"),
                                 }}
                             />
+
+                            {(activeEmsCountry?.restrictionNote ||
+                                (intlTransport === "sea" && activeEmsCountry?.seaMailAvailable === false)) && (
+                                <p
+                                    className={cn(
+                                        "flex items-start gap-1.5 rounded-xl border px-2.5 py-1.5 text-[11px] md:text-xs leading-snug",
+                                        activeEmsCountry?.suspensionStatus === "suspended"
+                                            ? "border-destructive/60 bg-destructive/10 text-destructive"
+                                            : "border-secondary bg-secondary/20 text-foreground"
+                                    )}
+                                >
+                                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
+                                    <span>
+                                        {intlTransport === "sea" && activeEmsCountry?.seaMailAvailable === false && activeEmsCountry.seaMailNote
+                                            ? activeEmsCountry.seaMailNote
+                                            : activeEmsCountry?.restrictionNote}
+                                    </span>
+                                </p>
+                            )}
+                        </div>
+                    )}
+
+                    {destination === "cod" && (
+                        <div className="space-y-1">
+                            <div className="flex items-center justify-between px-0.5">
+                                <label
+                                    htmlFor={codAmountId}
+                                    className="font-mono text-[10px] md:text-xs font-bold uppercase tracking-wider text-muted-foreground cursor-pointer"
+                                >
+                                    {tc("step2CodTitle")}
+                                </label>
+                                <span className="font-mono text-[10px] font-semibold text-muted-foreground">
+                                    {tc("maxCodAmount")}
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-[42px_1fr_42px] h-[42px] items-center rounded-xl border border-border md:border-[1.5px] md:border-foreground bg-background overflow-hidden focus-within:ring-[3px] focus-within:ring-primary/25">
+                                <button
+                                    type="button"
+                                    onClick={() => handleStepCodAmount("down")}
+                                    aria-label={tc("decreaseCod")}
+                                    className="tap flex h-full w-full items-center justify-center border-r border-border bg-card text-foreground hover:bg-muted"
+                                >
+                                    <Minus className="w-4 h-4" strokeWidth={2.5} aria-hidden="true" />
+                                </button>
+
+                                <label
+                                    htmlFor={codAmountId}
+                                    className="flex items-center justify-center gap-1 h-full cursor-text px-2"
+                                >
+                                    <span
+                                        className="pointer-events-none font-mono text-xs md:text-sm font-bold text-muted-foreground"
+                                        aria-hidden="true"
+                                    >
+                                        Rs.
+                                    </span>
+                                    <input
+                                        id={codAmountId}
+                                        name="codAmount"
+                                        type="text"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        enterKeyHint="done"
+                                        autoComplete="off"
+                                        value={codAmount}
+                                        onChange={(e) => setCodAmount(sanitizeDigits(e.target.value))}
+                                        placeholder="2500"
+                                        style={{ width: `${Math.max(4, (codAmount || "2500").length + 0.5)}ch` }}
+                                        className="h-full bg-transparent text-center font-mono text-base md:text-lg font-black text-foreground focus:outline-none tabular-nums"
+                                    />
+                                </label>
+
+                                <button
+                                    type="button"
+                                    onClick={() => handleStepCodAmount("up")}
+                                    aria-label={tc("increaseCod")}
+                                    className="tap flex h-full w-full items-center justify-center border-l border-border bg-card text-foreground hover:bg-muted"
+                                >
+                                    <Plus className="w-4 h-4" strokeWidth={2.5} aria-hidden="true" />
+                                </button>
+                            </div>
+
+                            <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide pb-0.5">
+                                {COD_AMOUNT_PRESETS.map((amt) => {
+                                    const active = collectAmountNum === amt;
+                                    return (
+                                        <button
+                                            key={amt}
+                                            type="button"
+                                            onClick={() => {
+                                                triggerHaptic("selection");
+                                                setCodAmount(String(amt));
+                                            }}
+                                            aria-pressed={active}
+                                            className={cn(
+                                                "tap shrink-0 rounded-lg border px-2 py-1 font-mono text-[10.5px] md:text-xs font-extrabold transition-colors min-h-[28px]",
+                                                active
+                                                    ? "border-foreground bg-foreground text-background"
+                                                    : "border-border bg-background text-foreground hover:border-foreground"
+                                            )}
+                                        >
+                                            Rs. {formatCompactAmount(amt)}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Directly Editable Weight Bar (g / kg) + Single-Row Presets */}
+                    <div className="space-y-1.5">
+                        <div className="grid grid-cols-[42px_1fr_42px] h-[42px] items-center rounded-xl border border-border md:border-[1.5px] md:border-foreground bg-background overflow-hidden focus-within:ring-[3px] focus-within:ring-primary/25">
+                            <button
+                                type="button"
+                                onClick={() => handleStepWeight("down")}
+                                aria-label={tc("decreaseWeight")}
+                                className="tap flex h-full w-full items-center justify-center border-r border-border bg-card text-foreground hover:bg-muted"
+                            >
+                                <Minus className="w-4 h-4" strokeWidth={2.5} aria-hidden="true" />
+                            </button>
+
+                            <div className="flex items-center justify-center gap-1.5 px-2 h-full min-w-0">
+                                <label htmlFor={weightInputId} className="sr-only">
+                                    {tc("step1Title")}
+                                </label>
+                                <Scale
+                                    className="w-3.5 h-3.5 text-muted-foreground shrink-0 pointer-events-none"
+                                    aria-hidden="true"
+                                />
+                                <input
+                                    id={weightInputId}
+                                    name="weight"
+                                    type="text"
+                                    inputMode={weightUnit === "kg" ? "decimal" : "numeric"}
+                                    pattern={weightUnit === "kg" ? "[0-9.]*" : "[0-9]*"}
+                                    enterKeyHint="done"
+                                    autoComplete="off"
+                                    value={weightInputText}
+                                    onChange={(e) => handleWeightTextChange(e.target.value)}
+                                    placeholder={weightUnit === "kg" ? "1" : "20"}
+                                    style={{ width: `${Math.max(3, (weightInputText || "20").length + 0.5)}ch` }}
+                                    className="h-full bg-transparent text-center font-mono text-[15px] md:text-base font-black text-foreground focus:outline-none tabular-nums"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleToggleWeightUnit}
+                                    aria-label={tc("switchWeightUnitAria")}
+                                    className="tap rounded-md border border-border bg-card px-2 py-0.5 font-mono text-[11px] font-extrabold text-foreground hover:bg-muted shrink-0"
+                                >
+                                    {weightUnit}
+                                </button>
+                                {weightGrams > 0 &&
+                                    ((weightUnit === "g" && weightGrams >= 1000) ||
+                                        (weightUnit === "kg" && weightGrams < 1000)) && (
+                                        <span className="font-mono text-[10px] font-bold text-muted-foreground truncate">
+                                            ({formatWeightLabel(weightGrams)})
+                                        </span>
+                                    )}
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => handleStepWeight("up")}
+                                aria-label={tc("increaseWeight")}
+                                className="tap flex h-full w-full items-center justify-center border-l border-border bg-card text-foreground hover:bg-muted"
+                            >
+                                <Plus className="w-4 h-4" strokeWidth={2.5} aria-hidden="true" />
+                            </button>
+                        </div>
+
+                        {/* Mobile: single crisp 5-button row */}
+                        <div className="grid grid-cols-5 gap-1 md:hidden">
+                            {mobileWeightPresets.map((preset) => {
+                                const active = weightGrams === preset;
+                                return (
+                                    <button
+                                        key={preset}
+                                        type="button"
+                                        onClick={() => {
+                                            triggerHaptic("selection");
+                                            applyGramsWeight(String(preset));
+                                        }}
+                                        aria-pressed={active}
+                                        className={cn(
+                                            "tap flex h-[30px] items-center justify-center rounded-lg border font-mono text-[11px] font-extrabold transition-colors",
+                                            active
+                                                ? "border-foreground bg-foreground text-background"
+                                                : "border-border bg-background text-foreground hover:border-foreground"
+                                        )}
+                                    >
+                                        {formatWeightLabel(preset)}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* Desktop: full 8-button row */}
+                        <div className="hidden md:grid md:grid-cols-8 gap-1">
+                            {desktopWeightPresets.map((preset) => {
+                                const active = weightGrams === preset;
+                                return (
+                                    <button
+                                        key={preset}
+                                        type="button"
+                                        onClick={() => {
+                                            triggerHaptic("selection");
+                                            applyGramsWeight(String(preset));
+                                        }}
+                                        aria-pressed={active}
+                                        className={cn(
+                                            "tap flex min-h-[28px] items-center justify-center rounded-lg border py-0.5 font-mono text-xs font-bold transition-colors",
+                                            active
+                                                ? "border-foreground bg-foreground text-background"
+                                                : "border-border bg-background text-foreground hover:border-foreground"
+                                        )}
+                                    >
+                                        {formatWeightLabel(preset)}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Right Workbench Column on Desktop: Parcel Type Header (with Air | Sea Toggle!) + Color-Coded Service Tiles */}
+            <div className="contents lg:flex lg:flex-col lg:col-span-7 lg:gap-4">
+                {/* 4A. Domestic Mode: Service Grid + Add-ons */}
+                {destination === "domestic" && (
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between w-full px-0.5">
+                            <span
+                                className={cn(
+                                    "font-mono font-bold uppercase tracking-wider text-muted-foreground",
+                                    isIndic ? "text-[10.5px] md:text-xs" : "text-[10.5px] md:text-xs"
+                                )}
+                            >
+                                {tc("step2LocalTitle")}
+                            </span>
+                        </div>
+                        <fieldset className="contents">
+                            <legend className="sr-only">{tc("step2LocalTitle")}</legend>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                {domesticQuotes.map(({ service, result }, i) => {
+                                    const isOver = Boolean(result.exceedsMaxWeight);
+                                    const svcTagline = getServiceTagline(service.id, locale);
+                                    return (
+                                        <ServiceCard
+                                            key={service.id}
+                                            serviceId={service.id}
+                                            name={svcTagline.shortName || service.shortName || service.name}
+                                            selected={selectedService?.id === service.id}
+                                            dimmed={isOver}
+                                            cheapest={i === domesticCheapest}
+                                            cheapestLabel={tHome("cheapest")}
+                                            locale={locale}
+                                            currency={currency}
+                                            lkrPerUsd={lkrPerUsd}
+                                            onSelect={() => {
+                                                triggerHaptic("selection");
+                                                setServiceId(service.id);
+                                            }}
+                                            price={isOver || result.error ? null : result.totalCost}
+                                            status={
+                                                isOver && result.maxWeight
+                                                    ? { text: tc("maxWeight", { weight: formatWeightLabel(result.maxWeight) }), tone: "error" }
+                                                    : { text: "—", tone: "muted" }
+                                            }
+                                            note={service.flatRate && !isOver ? tc("flatRate") : undefined}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </fieldset>
+
+                        {/* Compact Add-ons Bar */}
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                            <div
+                                className={cn(
+                                    "flex items-center gap-2 rounded-xl border px-2.5 py-2 transition-colors min-h-[44px]",
+                                    !canRegister
+                                        ? "border-border/60 bg-muted/40 opacity-60"
+                                        : registered
+                                            ? "border-foreground bg-card shadow-[var(--shadow-elev-1)]"
+                                            : "border-border bg-card"
+                                )}
+                            >
+                                <input
+                                    type="checkbox"
+                                    id={regCheckboxId}
+                                    name="registered"
+                                    checked={registered && canRegister}
+                                    disabled={!canRegister}
+                                    onChange={(e) => {
+                                        triggerHaptic("selection");
+                                        setRegistered(e.target.checked);
+                                    }}
+                                    className="h-4 w-4 shrink-0 rounded-sm border-foreground accent-[#1E40AF] dark:accent-[#60A5FA] cursor-pointer disabled:cursor-not-allowed"
+                                />
+                                <label
+                                    htmlFor={regCheckboxId}
+                                    className={cn(
+                                        "flex-1 font-semibold leading-tight select-none",
+                                        isIndic ? "text-[11px] md:text-xs" : "text-xs md:text-sm",
+                                        canRegister ? "cursor-pointer text-foreground" : "cursor-not-allowed text-muted-foreground"
+                                    )}
+                                >
+                                    <span className="block">{tc("registeredPost")}</span>
+                                    <span className="block font-mono text-[10px] text-muted-foreground">
+                                        {canRegister
+                                            ? formatCurrencyAmount(config.extraFees.registeredPost, currency, lkrPerUsd, { plus: true })
+                                            : tc("naForService")}
+                                    </span>
+                                </label>
+                            </div>
+
+                            <div
+                                className={cn(
+                                    "flex items-center gap-2 rounded-xl border px-2.5 py-2 transition-colors min-h-[44px]",
+                                    !canAr
+                                        ? "border-border/60 bg-muted/40 opacity-60"
+                                        : arReceipt
+                                            ? "border-foreground bg-card shadow-[var(--shadow-elev-1)]"
+                                            : "border-border bg-card"
+                                )}
+                            >
+                                <input
+                                    type="checkbox"
+                                    id={arCheckboxId}
+                                    name="arReceipt"
+                                    checked={arReceipt && canAr}
+                                    disabled={!canAr}
+                                    onChange={(e) => {
+                                        triggerHaptic("selection");
+                                        setArReceipt(e.target.checked);
+                                    }}
+                                    className="h-4 w-4 shrink-0 rounded-sm border-foreground accent-primary cursor-pointer disabled:cursor-not-allowed"
+                                />
+                                <label
+                                    htmlFor={arCheckboxId}
+                                    className={cn(
+                                        "flex-1 font-semibold leading-tight select-none",
+                                        isIndic ? "text-[11px] md:text-xs" : "text-xs md:text-sm",
+                                        canAr ? "cursor-pointer text-foreground" : "cursor-not-allowed text-muted-foreground"
+                                    )}
+                                >
+                                    <span className="block">{tc("arReceipt")}</span>
+                                    <span className="block font-mono text-[10px] text-muted-foreground">
+                                        {canAr
+                                            ? formatCurrencyAmount(config.extraFees.arReceipt, currency, lkrPerUsd, { plus: true })
+                                            : tc("naForService")}
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* 4B. COD Mode: Money-Green Breakdown Card */}
+                {destination === "cod" && (
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between px-0.5">
+                            <span className="font-mono text-[10.5px] md:text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                {tc("step3CodTitle")}
+                            </span>
+                        </div>
+
+                        <div className="rounded-[18px] bg-[#15803D] p-3.5 text-white shadow-[0_3px_0_0_#0D5327] ring-2 ring-foreground ring-offset-2 ring-offset-background">
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20">
+                                        <Banknote className="h-4.5 w-4.5" strokeWidth={2.2} aria-hidden="true" />
+                                    </span>
+                                    <div className="min-w-0">
+                                        <div className="text-sm font-black leading-tight truncate">{tc("codTitle")}</div>
+                                        <div className="text-[11px] text-white/85 truncate">{activeTagline.cardHint}</div>
+                                    </div>
+                                </div>
+                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-[#15803D]">
+                                    <Check className="h-3 w-3" strokeWidth={3.2} aria-hidden="true" />
+                                </span>
+                            </div>
+
+                            <div className="mt-3 pt-2.5 border-t border-white/25 grid grid-cols-3 gap-2 text-center">
+                                <div className="rounded-xl bg-black/15 px-2 py-1.5">
+                                    <span className="block font-mono text-[9.5px] uppercase tracking-wider text-white/75 truncate">
+                                        {tc("slpCourier")}
+                                    </span>
+                                    <span className="block font-mono text-xs sm:text-sm font-extrabold mt-0.5 tabular-nums">
+                                        {codResult.error ? "—" : formatCurrencyAmount(codResult.courierFee, currency, lkrPerUsd)}
+                                    </span>
+                                </div>
+                                <div className="rounded-xl bg-black/15 px-2 py-1.5">
+                                    <span className="block font-mono text-[9.5px] uppercase tracking-wider text-white/75 truncate">
+                                        {tc("pmtMoFee")} + {tc("codService")}
+                                    </span>
+                                    <span className="block font-mono text-xs sm:text-sm font-extrabold mt-0.5 tabular-nums">
+                                        {codResult.error
+                                            ? "—"
+                                            : formatCurrencyAmount(codResult.moneyOrderFee + codResult.codServiceFee, currency, lkrPerUsd)}
+                                    </span>
+                                </div>
+                                <div className="rounded-xl bg-white/20 px-2 py-1.5">
+                                    <span className="block font-mono text-[9.5px] uppercase tracking-wider text-white/90 truncate">
+                                        {tc("netPayoutShort")}
+                                    </span>
+                                    <span className="block font-mono text-xs sm:text-sm font-black mt-0.5 tabular-nums">
+                                        {codResult.error ? "—" : formatCurrencyAmount(codResult.netRemittance, currency, lkrPerUsd)}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {codResult.subPostOfficeWarning && !codResult.error && (
+                            <p className="flex items-start gap-1.5 rounded-xl border border-secondary bg-secondary/20 px-3 py-2 text-[11px] md:text-xs text-foreground leading-snug">
+                                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary" aria-hidden="true" />
+                                <span>{tc("subPoWarning")}</span>
+                            </p>
+                        )}
+                    </div>
+                )}
+
+                {/* 4C. International Mail Mode: Parcel Type Header (with Air | Sea Toggle) + Muscle-Memory Service Grid */}
+                {destination === "ems" && (
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between w-full gap-2 px-0.5">
+                            <span
+                                className={cn(
+                                    "font-mono font-bold uppercase tracking-wider text-muted-foreground truncate",
+                                    isIndic ? "text-[10px] md:text-xs" : "text-[10.5px] md:text-xs"
+                                )}
+                            >
+                                {intlTransport === "air" ? tc("step3AirTitle") : tc("step3SeaTitle")}
+                            </span>
 
                             <div
                                 role="group"
                                 aria-label={tc("transportLabel")}
-                                className="grid grid-cols-2 h-8 md:h-10 rounded-md border-[1.5px] border-foreground bg-background p-0.5 shrink-0"
+                                className="inline-grid grid-cols-2 h-8 rounded-xl border border-border bg-card p-0.5 shrink-0 shadow-[var(--shadow-elev-1)]"
                             >
                                 <button
                                     type="button"
                                     onClick={() => handleIntlTransportChange("air")}
                                     aria-pressed={intlTransport === "air"}
                                     className={cn(
-                                        "tap flex items-center justify-center gap-1 rounded-[4px] px-1.5 md:px-2 font-bold transition-colors",
-                                        isIndic ? "text-[10.5px] md:text-xs" : "text-xs md:text-sm",
+                                        "tap flex items-center justify-center gap-1 rounded-[9px] px-2.5 font-extrabold transition-colors",
+                                        isIndic ? "text-[10.5px] md:text-xs" : "text-[11px] md:text-xs",
                                         intlTransport === "air"
                                             ? "bg-[#1D4E9E] text-white"
                                             : "text-muted-foreground hover:text-foreground"
                                     )}
                                 >
-                                    <Plane className="w-3 h-3 md:w-3.5 md:h-3.5 shrink-0" aria-hidden="true" />
+                                    <Plane className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                                     <span>{tc("air")}</span>
                                 </button>
                                 <button
@@ -1177,430 +1675,150 @@ export default function PostageCalculator({
                                     onClick={() => handleIntlTransportChange("sea")}
                                     aria-pressed={intlTransport === "sea"}
                                     className={cn(
-                                        "tap flex items-center justify-center gap-1 rounded-[4px] px-1.5 md:px-2 font-bold transition-colors",
-                                        isIndic ? "text-[10.5px] md:text-xs" : "text-xs md:text-sm",
+                                        "tap flex items-center justify-center gap-1 rounded-[9px] px-2.5 font-extrabold transition-colors",
+                                        isIndic ? "text-[10.5px] md:text-xs" : "text-[11px] md:text-xs",
                                         intlTransport === "sea"
                                             ? "bg-[#0E4A6B] text-white"
                                             : "text-muted-foreground hover:text-foreground"
                                     )}
                                 >
-                                    <Ship className="w-3 h-3 md:w-3.5 md:h-3.5 shrink-0" aria-hidden="true" />
+                                    <Ship className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                                     <span>{tc("sea")}</span>
                                 </button>
                             </div>
                         </div>
 
-                        <AnimatePresence initial={false}>
-                            {showCountryWhyNote && (
-                                <m.div
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: "auto" }}
-                                    exit={{ opacity: 0, height: 0 }}
-                                    transition={{ duration: 0.2, ease: "easeOut" }}
-                                    className="overflow-hidden"
-                                >
-                                    <div className="rounded-md border border-foreground/30 bg-muted/40 px-2.5 py-1.5 text-[11px] leading-snug text-foreground space-y-0.5">
-                                        <p className="font-semibold">{tc("whyTitle")}</p>
-                                        <p className="text-muted-foreground">{tc("whyBody")}</p>
-                                    </div>
-                                </m.div>
-                            )}
-                        </AnimatePresence>
+                        <fieldset className="contents">
+                            <legend className="sr-only">
+                                {intlTransport === "air" ? tc("step3AirTitle") : tc("step3SeaTitle")}
+                            </legend>
 
-                        {(activeEmsCountry?.restrictionNote ||
-                            (intlTransport === "sea" && activeEmsCountry?.seaMailAvailable === false)) && (
-                            <p
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                {filteredIntlQuotes.map((quote, i) => {
+                                    const isOver = quote.available && Boolean(quote.result.exceedsMaxWeight);
+                                    const hasPrice = quote.available && !isOver && !quote.result.error;
+                                    const svcTagline = getServiceTagline(quote.service.id, locale);
+                                    return (
+                                        <ServiceCard
+                                            key={quote.service.id}
+                                            serviceId={quote.service.id}
+                                            name={svcTagline.shortName || quote.service.shortName}
+                                            selected={activeIntlQuote.service.id === quote.service.id}
+                                            dimmed={!quote.available || isOver}
+                                            cheapest={i === intlCheapest}
+                                            cheapestLabel={tHome("cheapest")}
+                                            locale={locale}
+                                            currency={currency}
+                                            lkrPerUsd={lkrPerUsd}
+                                            onSelect={() => {
+                                                triggerHaptic("selection");
+                                                setIntlServiceId(quote.service.id);
+                                            }}
+                                            price={hasPrice ? quote.result.totalCost : null}
+                                            status={
+                                                !quote.available
+                                                    ? { text: quote.shortUnavailableTag ?? "Unavailable", tone: "error" }
+                                                    : isOver && quote.result.maxWeight
+                                                        ? { text: tc("maxWeight", { weight: formatWeightLabel(quote.result.maxWeight) }), tone: "error" }
+                                                        : { text: "—", tone: "muted" }
+                                            }
+                                            note={hasPrice && quote.service.supportsRegistration && intlRegistered ? tc("itemReg") : undefined}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </fieldset>
+
+                        {/* Foreign Registered Mail (+Rs. 870) + Zone-Free Service Weight Limit Card */}
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                            <div
                                 className={cn(
-                                    "flex items-start gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] md:text-xs leading-snug",
-                                    activeEmsCountry?.suspensionStatus === "suspended"
-                                        ? "border-destructive/60 bg-destructive/10 text-destructive"
-                                        : "border-secondary bg-secondary/20 text-foreground"
+                                    "flex items-center gap-2 rounded-xl border px-2.5 py-2 transition-colors min-h-[44px]",
+                                    !canIntlRegister
+                                        ? "border-border/60 bg-muted/40 opacity-60"
+                                        : intlRegistered
+                                            ? "border-foreground bg-card shadow-[var(--shadow-elev-1)]"
+                                            : "border-border bg-card"
                                 )}
                             >
-                                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
-                                <span>
-                                    {intlTransport === "sea" && activeEmsCountry?.seaMailAvailable === false && activeEmsCountry.seaMailNote
-                                        ? activeEmsCountry.seaMailNote
-                                        : activeEmsCountry?.restrictionNote}
-                                </span>
-                            </p>
-                        )}
-                    </div>
-                )}
-
-                {/* Step 2 (COD): Collection Amount inside the unified card */}
-                {destination === "cod" && (
-                    <div className="border-t border-border/80 pt-1.5">
-                        <div className="flex items-center justify-between mb-1">
-                            <label
-                                htmlFor={codAmountId}
-                                className={cn(
-                                    "flex items-center gap-1.5 font-heading font-extrabold uppercase tracking-wide text-foreground cursor-pointer",
-                                    isIndic ? "text-[11px] md:text-xs" : "text-xs md:text-sm"
-                                )}
-                            >
-                                <StepBadge step={2} />
-                                <span>{tc("step2CodTitle")}</span>
-                            </label>
-                            <span className="font-mono text-[10.5px] font-semibold text-muted-foreground">
-                                {tc("maxCodAmount")}
-                            </span>
-                        </div>
-
-                        <div className="grid grid-cols-[40px_1fr_40px] items-center rounded-md border-[1.5px] border-foreground bg-background overflow-hidden focus-within:ring-[3px] focus-within:ring-primary/25">
-                            <button
-                                type="button"
-                                onClick={() => handleStepCodAmount("down")}
-                                aria-label={tc("decreaseCod")}
-                                className="tap flex h-9 md:h-10 w-full items-center justify-center border-r border-foreground/30 bg-card text-foreground hover:bg-muted"
-                            >
-                                <Minus className="w-4 h-4" strokeWidth={2.5} aria-hidden="true" />
-                            </button>
-
-                            <label
-                                htmlFor={codAmountId}
-                                className="flex items-center justify-center gap-1 h-9 md:h-10 cursor-text px-2"
-                            >
-                                <span
-                                    className="pointer-events-none font-mono text-xs md:text-sm font-bold text-muted-foreground"
-                                    aria-hidden="true"
-                                >
-                                    Rs.
-                                </span>
                                 <input
-                                    id={codAmountId}
-                                    name="codAmount"
-                                    type="text"
-                                    inputMode="numeric"
-                                    pattern="[0-9]*"
-                                    enterKeyHint="done"
-                                    autoComplete="off"
-                                    value={codAmount}
-                                    onChange={(e) => setCodAmount(sanitizeDigits(e.target.value))}
-                                    placeholder="2500"
-                                    style={{ width: `${Math.max(4, (codAmount || "2500").length + 0.5)}ch` }}
-                                    className="h-full bg-transparent text-center font-mono text-base md:text-lg font-bold text-foreground focus:outline-none tabular-nums"
+                                    type="checkbox"
+                                    id={intlRegCheckboxId}
+                                    name="intlRegistered"
+                                    checked={intlRegistered && canIntlRegister}
+                                    disabled={!canIntlRegister}
+                                    onChange={(e) => {
+                                        triggerHaptic("selection");
+                                        setIntlRegistered(e.target.checked);
+                                    }}
+                                    className="h-4 w-4 shrink-0 rounded-sm border-foreground accent-[#1E40AF] dark:accent-[#60A5FA] cursor-pointer disabled:cursor-not-allowed"
                                 />
-                            </label>
+                                <label
+                                    htmlFor={intlRegCheckboxId}
+                                    className={cn(
+                                        "flex-1 font-semibold leading-tight select-none",
+                                        isIndic ? "text-[11px] md:text-xs" : "text-xs md:text-sm",
+                                        canIntlRegister ? "cursor-pointer text-foreground" : "cursor-not-allowed text-muted-foreground"
+                                    )}
+                                >
+                                    <span className="block">{tc("registeredShort")}</span>
+                                    <span className="block font-mono text-[10px] text-muted-foreground">
+                                        {canIntlRegister
+                                            ? formatCurrencyAmount(foreignRegFeeAmount, currency, lkrPerUsd, { plus: true })
+                                            : tc("trackedNa")}
+                                    </span>
+                                </label>
+                            </div>
 
-                            <button
-                                type="button"
-                                onClick={() => handleStepCodAmount("up")}
-                                aria-label={tc("increaseCod")}
-                                className="tap flex h-9 md:h-10 w-full items-center justify-center border-l border-foreground/30 bg-card text-foreground hover:bg-muted"
-                            >
-                                <Plus className="w-4 h-4" strokeWidth={2.5} aria-hidden="true" />
-                            </button>
+                            <div className="rounded-xl border border-border bg-card px-2.5 py-2 flex flex-col justify-center min-h-[44px] shadow-[var(--shadow-elev-1)]">
+                                <span className="font-mono text-[9.5px] md:text-[10px] uppercase tracking-wider text-muted-foreground leading-none truncate">
+                                    {tc("weightLimitLabel")}
+                                </span>
+                                <span className="font-mono text-[11.5px] md:text-xs font-extrabold text-foreground mt-1 truncate">
+                                    {tc("maxWeight", {
+                                        weight: formatWeightLabel(
+                                            activeIntlQuote.result.maxWeight ?? activeIntlQuote.service.maxWeight
+                                        ),
+                                    })}
+                                </span>
+                            </div>
                         </div>
 
-                        <div className="mt-1 flex items-center gap-1 overflow-x-auto scrollbar-hide pb-0.5">
-                            {COD_AMOUNT_PRESETS.map((amt) => {
-                                const active = collectAmountNum === amt;
-                                return (
-                                    <button
-                                        key={amt}
-                                        type="button"
-                                        onClick={() => setCodAmount(String(amt))}
-                                        aria-pressed={active}
-                                        className={cn(
-                                            "tap shrink-0 rounded-full border px-2 py-0.5 font-mono text-[10.5px] md:text-xs font-bold transition-colors min-h-[24px]",
-                                            active
-                                                ? "border-foreground bg-foreground text-background"
-                                                : "border-foreground/35 bg-background text-foreground hover:border-foreground"
-                                        )}
+                        {/* Missing Country Explanatory Note cleanly tucked below Intl services */}
+                        <div className="pt-0.5">
+                            <button
+                                type="button"
+                                onClick={() => setShowCountryWhyNote((prev) => !prev)}
+                                aria-expanded={showCountryWhyNote}
+                                className="inline-flex items-center gap-1 font-mono text-[11px] font-semibold text-primary hover:underline"
+                            >
+                                <Info className="w-3 h-3 shrink-0" aria-hidden="true" />
+                                <span>{showCountryWhyNote ? tc("hideNote") : tc("missingWhy")}</span>
+                            </button>
+
+                            <AnimatePresence initial={false}>
+                                {showCountryWhyNote && (
+                                    <m.div
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: "auto" }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        transition={{ duration: 0.2, ease: "easeOut" }}
+                                        className="overflow-hidden mt-1.5"
                                     >
-                                        Rs. {formatCompactAmount(amt)}
-                                    </button>
-                                );
-                            })}
+                                        <div className="rounded-xl border border-border bg-card px-3 py-2 text-xs leading-snug text-foreground space-y-0.5 shadow-[var(--shadow-elev-1)]">
+                                            <p className="font-semibold">{tc("whyTitle")}</p>
+                                            <p className="text-muted-foreground">{tc("whyBody")}</p>
+                                        </div>
+                                    </m.div>
+                                )}
+                            </AnimatePresence>
                         </div>
                     </div>
                 )}
-            </div>
-            </div>
-
-            {/* Right Workbench Column on Desktop (Step 3 Service Comparison Grid / Local Services / COD Breakdown) */}
-            <div className="contents lg:flex lg:flex-col lg:col-span-7 lg:gap-4">
-            {/* 4A. Domestic Mode: Step 2 Service Grid + Add-ons */}
-            {destination === "domestic" && (
-                <div className="rounded-lg border-[1.5px] border-foreground bg-card p-2 md:p-3.5 shadow-[2px_2px_0_0_hsl(var(--foreground))] flex flex-col gap-2">
-                    <fieldset className="contents">
-                        <legend className="flex items-center justify-between w-full mb-0.5">
-                            <span
-                                className={cn(
-                                    "flex items-center gap-1.5 font-heading font-extrabold uppercase tracking-wide text-foreground",
-                                    isIndic ? "text-[11px] md:text-xs" : "text-xs md:text-sm"
-                                )}
-                            >
-                                <StepBadge step={2} />
-                                <span>{tc("step2LocalTitle")}</span>
-                            </span>
-                        </legend>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 md:gap-2">
-                            {domesticQuotes.map(({ service, result }, i) => {
-                                const isOver = Boolean(result.exceedsMaxWeight);
-                                const svcTagline = getServiceTagline(service.id, locale);
-                                return (
-                                    <ServiceCard
-                                        key={service.id}
-                                        serviceId={service.id}
-                                        name={svcTagline.shortName || service.shortName || service.name}
-                                        selected={selectedService?.id === service.id}
-                                        dimmed={isOver}
-                                        cheapest={i === domesticCheapest}
-                                        cheapestLabel={tHome("cheapest")}
-                                        selectedCardHeader={tc("selectedCardHeader", { tag: svcTagline.shortTag })}
-                                        locale={locale}
-                                        currency={currency}
-                                        lkrPerUsd={lkrPerUsd}
-                                        onSelect={() => setServiceId(service.id)}
-                                        price={isOver || result.error ? null : result.totalCost}
-                                        status={
-                                            isOver && result.maxWeight
-                                                ? { text: tc("maxWeight", { weight: formatWeightLabel(result.maxWeight) }), tone: "error" }
-                                                : { text: "—", tone: "muted" }
-                                        }
-                                        note={service.flatRate && !isOver ? tc("flatRate") : undefined}
-                                    />
-                                );
-                            })}
-                        </div>
-                    </fieldset>
-
-                    {/* Compact Add-ons Bar */}
-                    <div className="grid grid-cols-2 gap-1.5 md:gap-2 pt-1 border-t border-border">
-                        <div
-                            className={cn(
-                                "flex items-center gap-2 rounded-md border-[1.5px] px-2 py-1.5 transition-colors min-h-[40px]",
-                                !canRegister
-                                    ? "border-border/60 bg-muted/40 opacity-60"
-                                    : registered
-                                        ? "border-foreground bg-background"
-                                        : "border-border bg-background"
-                            )}
-                        >
-                            <input
-                                type="checkbox"
-                                id={regCheckboxId}
-                                name="registered"
-                                checked={registered && canRegister}
-                                disabled={!canRegister}
-                                onChange={(e) => setRegistered(e.target.checked)}
-                                className="h-4 w-4 shrink-0 rounded-sm border-foreground accent-[#1E40AF] dark:accent-[#60A5FA] cursor-pointer disabled:cursor-not-allowed"
-                            />
-                            <label
-                                htmlFor={regCheckboxId}
-                                className={cn(
-                                    "flex-1 font-semibold leading-tight select-none",
-                                    isIndic ? "text-[11px] md:text-xs" : "text-xs md:text-sm",
-                                    canRegister ? "cursor-pointer text-foreground" : "cursor-not-allowed text-muted-foreground"
-                                )}
-                            >
-                                <span className="block">{tc("registeredPost")}</span>
-                                <span className="block font-mono text-[10px] text-muted-foreground">
-                                    {canRegister
-                                        ? formatCurrencyAmount(config.extraFees.registeredPost, currency, lkrPerUsd, { plus: true })
-                                        : tc("naForService")}
-                                </span>
-                            </label>
-                        </div>
-
-                        <div
-                            className={cn(
-                                "flex items-center gap-2 rounded-md border-[1.5px] px-2 py-1.5 transition-colors min-h-[40px]",
-                                !canAr
-                                    ? "border-border/60 bg-muted/40 opacity-60"
-                                    : arReceipt
-                                        ? "border-foreground bg-background"
-                                        : "border-border bg-background"
-                            )}
-                        >
-                            <input
-                                type="checkbox"
-                                id={arCheckboxId}
-                                name="arReceipt"
-                                checked={arReceipt && canAr}
-                                disabled={!canAr}
-                                onChange={(e) => setArReceipt(e.target.checked)}
-                                className="h-4 w-4 shrink-0 rounded-sm border-foreground accent-primary cursor-pointer disabled:cursor-not-allowed"
-                            />
-                            <label
-                                htmlFor={arCheckboxId}
-                                className={cn(
-                                    "flex-1 font-semibold leading-tight select-none",
-                                    isIndic ? "text-[11px] md:text-xs" : "text-xs md:text-sm",
-                                    canAr ? "cursor-pointer text-foreground" : "cursor-not-allowed text-muted-foreground"
-                                )}
-                            >
-                                <span className="block">{tc("arReceipt")}</span>
-                                <span className="block font-mono text-[10px] text-muted-foreground">
-                                    {canAr
-                                        ? formatCurrencyAmount(config.extraFees.arReceipt, currency, lkrPerUsd, { plus: true })
-                                        : tc("naForService")}
-                                </span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* 4B. COD Mode: Step 3 Formula Breakdown */}
-            {destination === "cod" && (
-                <div className="rounded-lg border-[1.5px] border-foreground bg-card p-2 md:p-3.5 shadow-[2px_2px_0_0_hsl(var(--foreground))] flex flex-col gap-1.5">
-                    <div
-                        className={cn(
-                            "flex items-center gap-1.5 font-heading font-extrabold uppercase tracking-wide text-foreground",
-                            isIndic ? "text-[11px] md:text-xs" : "text-xs md:text-sm"
-                        )}
-                    >
-                        <StepBadge step={3} />
-                        <span>{tc("step3CodTitle")}</span>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-1.5 md:gap-2">
-                        <div className="rounded-md border-[1.5px] border-border bg-background px-2 py-1.5">
-                            <span className="block font-mono text-[9.5px] uppercase tracking-wider text-muted-foreground truncate">
-                                {tc("slpCourier")}
-                            </span>
-                            <span className="block font-mono text-xs sm:text-sm md:text-base font-bold text-foreground mt-0.5 tabular-nums">
-                                {formatCurrencyAmount(codResult.courierFee, currency, lkrPerUsd)}
-                            </span>
-                        </div>
-                        <div className="rounded-md border-[1.5px] border-border bg-background px-2 py-1.5">
-                            <span className="block font-mono text-[9.5px] uppercase tracking-wider text-muted-foreground truncate">
-                                {tc("pmtMoFee")}
-                            </span>
-                            <span className="block font-mono text-xs sm:text-sm md:text-base font-bold text-foreground mt-0.5 tabular-nums">
-                                {formatCurrencyAmount(codResult.moneyOrderFee, currency, lkrPerUsd)}
-                            </span>
-                        </div>
-                        <div className="rounded-md border-[1.5px] border-border bg-background px-2 py-1.5">
-                            <span className="block font-mono text-[9.5px] uppercase tracking-wider text-muted-foreground truncate">
-                                {tc("codService")}
-                            </span>
-                            <span className="block font-mono text-xs sm:text-sm md:text-base font-bold text-foreground mt-0.5 tabular-nums">
-                                {formatCurrencyAmount(codResult.codServiceFee, currency, lkrPerUsd)}
-                            </span>
-                        </div>
-                    </div>
-
-                    {codResult.subPostOfficeWarning && !codResult.error && (
-                        <p className="flex items-start gap-1.5 rounded-md border border-secondary bg-secondary/20 px-2.5 py-1.5 text-[10.5px] md:text-xs text-foreground leading-snug">
-                            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary" aria-hidden="true" />
-                            <span>{tc("subPoWarning")}</span>
-                        </p>
-                    )}
-                </div>
-            )}
-
-            {/* 4C. International Mail Mode: Step 3 Service Selection Grid (High Above the Fold) */}
-            {destination === "ems" && (
-                <div className="rounded-lg border-[1.5px] border-foreground bg-card p-1.5 md:p-3.5 shadow-[2px_2px_0_0_hsl(var(--foreground))] flex flex-col gap-1.5">
-                    <fieldset className="contents">
-                        <legend className="flex items-center justify-between w-full mb-0.5">
-                            <span
-                                className={cn(
-                                    "flex items-center gap-1.5 font-heading font-extrabold uppercase tracking-wide text-foreground",
-                                    isIndic ? "text-[10.5px] md:text-xs" : "text-xs md:text-sm"
-                                )}
-                            >
-                                <StepBadge step={3} />
-                                <span>
-                                    {intlTransport === "air"
-                                        ? tc("step3AirTitle")
-                                        : tc("step3SeaTitle")}
-                                </span>
-                            </span>
-                        </legend>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 md:gap-2">
-                            {filteredIntlQuotes.map((quote, i) => {
-                                const isOver = quote.available && Boolean(quote.result.exceedsMaxWeight);
-                                const hasPrice = quote.available && !isOver && !quote.result.error;
-                                const svcTagline = getServiceTagline(quote.service.id, locale);
-                                return (
-                                    <ServiceCard
-                                        key={quote.service.id}
-                                        serviceId={quote.service.id}
-                                        name={svcTagline.shortName || quote.service.shortName}
-                                        selected={activeIntlQuote.service.id === quote.service.id}
-                                        dimmed={!quote.available || isOver}
-                                        cheapest={i === intlCheapest}
-                                        cheapestLabel={tHome("cheapest")}
-                                        selectedCardHeader={tc("selectedCardHeader", { tag: svcTagline.shortName || svcTagline.shortTag })}
-                                        locale={locale}
-                                        currency={currency}
-                                        lkrPerUsd={lkrPerUsd}
-                                        onSelect={() => setIntlServiceId(quote.service.id)}
-                                        price={hasPrice ? quote.result.totalCost : null}
-                                        status={
-                                            !quote.available
-                                                ? { text: quote.shortUnavailableTag ?? "Unavailable", tone: "error" }
-                                                : isOver && quote.result.maxWeight
-                                                    ? { text: tc("maxWeight", { weight: formatWeightLabel(quote.result.maxWeight) }), tone: "error" }
-                                                    : { text: "—", tone: "muted" }
-                                        }
-                                        note={hasPrice && quote.service.supportsRegistration && intlRegistered ? tc("itemReg") : undefined}
-                                    />
-                                );
-                            })}
-                        </div>
-                    </fieldset>
-
-                    {/* Foreign Registered Mail (+Rs. 870) + Group / Limit Info */}
-                    <div className="grid grid-cols-2 gap-1.5 md:gap-2 pt-1 border-t border-border">
-                        <div
-                            className={cn(
-                                "flex items-center gap-2 rounded-md border-[1.5px] px-2 py-1 transition-colors min-h-[38px]",
-                                !canIntlRegister
-                                    ? "border-border/60 bg-muted/40 opacity-60"
-                                    : intlRegistered
-                                        ? "border-foreground bg-background"
-                                        : "border-border bg-background"
-                            )}
-                        >
-                            <input
-                                type="checkbox"
-                                id={intlRegCheckboxId}
-                                name="intlRegistered"
-                                checked={intlRegistered && canIntlRegister}
-                                disabled={!canIntlRegister}
-                                onChange={(e) => setIntlRegistered(e.target.checked)}
-                                className="h-4 w-4 shrink-0 rounded-sm border-foreground accent-[#1E40AF] dark:accent-[#60A5FA] cursor-pointer disabled:cursor-not-allowed"
-                            />
-                            <label
-                                htmlFor={intlRegCheckboxId}
-                                className={cn(
-                                    "flex-1 font-semibold leading-tight select-none",
-                                    isIndic ? "text-[11px] md:text-xs" : "text-xs md:text-sm",
-                                    canIntlRegister ? "cursor-pointer text-foreground" : "cursor-not-allowed text-muted-foreground"
-                                )}
-                            >
-                                <span className="block">{tc("registeredShort")}</span>
-                                <span className="block font-mono text-[9.5px] md:text-[10.5px] text-muted-foreground">
-                                    {canIntlRegister
-                                        ? formatCurrencyAmount(foreignRegFeeAmount, currency, lkrPerUsd, { plus: true })
-                                        : tc("trackedNa")}
-                                </span>
-                            </label>
-                        </div>
-
-                        <div className="rounded-md border-[1.5px] border-border bg-background px-2 py-1 lg:px-3 lg:py-2 flex flex-col justify-center min-h-[38px] lg:min-h-[48px]">
-                            <span className="font-mono text-[9px] md:text-[10px] uppercase tracking-wider text-muted-foreground leading-none truncate">
-                                {activeIntlQuote.service.id === "ems" ? tc("emsTariffZone") : tc("countryGroup")}
-                            </span>
-                            <span className="font-mono text-[11px] md:text-xs lg:text-sm font-bold text-foreground mt-0.5 truncate">
-                                {activeIntlQuote.service.id === "ems"
-                                    ? `${localizedZone.short} · ${tc("maxWeight", { weight: formatWeightLabel(activeIntlQuote.result.maxWeight ?? activeIntlQuote.service.maxWeight) })}`
-                                    : `${tc("groupLabel", { group: activeEmsCountry?.group ?? "—" })} · ${tc("maxWeight", { weight: formatWeightLabel(activeIntlQuote.result.maxWeight ?? activeIntlQuote.service.maxWeight) })}`}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            )}
             </div>
 
             {/* 5. Compact 1-line Mobile Reference Footer */}
-            <p className="md:hidden text-center font-mono text-[10px] text-muted-foreground pt-0.5">
+            <p className="md:hidden text-center font-mono text-[10px] text-muted-foreground pt-1">
                 {tc("mobileFooter")}
             </p>
         </form>

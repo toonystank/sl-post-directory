@@ -297,7 +297,14 @@
     "popularCountries": "பிரபலமானவை",
     "allCountriesCount": "அனைத்து நாடுகள் ({count})",
     "matchingCountriesCount": "{count} பொருத்தம்",
-    "noCountriesFound": "\"{query}\" க்கு நாடுகள் இல்லை"
+    "noCountriesFound": "\"{query}\" க்கு நாடுகள் இல்லை",
+    "tapBreakdown": "கட்டண விவரத்திற்குத் தட்டவும்",
+    "hideBreakdown": "விவரத்தை மறை",
+    "chooseCountry": "செல்லும் நாட்டைத் தேர்ந்தெடு",
+    "changeCountryAria": "செல்லும் நாட்டை மாற்று",
+    "switchWeightUnitAria": "எடை அலகை கிராம் / கிலோகிராம் இடையே மாற்று",
+    "weightLimitLabel": "சேவை எடை வரம்பு",
+    "netPayoutShort": "நிகர தொகை"
   },
   "Blog": {
     "kicker": "குறிப்புகள் & வழிகாட்டிகள்",

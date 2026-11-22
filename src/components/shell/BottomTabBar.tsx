@@ -13,6 +13,31 @@ import { triggerHaptic } from "@/lib/haptics";
 import MoreSheet from "./MoreSheet";
 
 const HIDDEN_ON = ["/login", "/register", "/dashboard"];
+const TRACKING_HISTORY_KEY = "lpd_tracking_history_v1";
+const TERMINAL_TRACK_STATUSES = new Set([
+    "delivered",
+    "settled",
+    "returned",
+    "not_found",
+    "error",
+]);
+
+function checkHasActiveTrackedParcel(): boolean {
+    if (typeof window === "undefined") return false;
+    try {
+        const raw = window.localStorage.getItem(TRACKING_HISTORY_KEY);
+        if (!raw) return false;
+        const parsed = JSON.parse(raw) as Array<{ statusCategory?: string }>;
+        if (!Array.isArray(parsed)) return false;
+        return parsed.some(
+            (entry) =>
+                Boolean(entry?.statusCategory) &&
+                !TERMINAL_TRACK_STATUSES.has(String(entry.statusCategory))
+        );
+    } catch {
+        return false;
+    }
+}
 
 /**
  * App-style bottom navigation for phones (hidden from md up).
@@ -25,10 +50,29 @@ export default function BottomTabBar() {
     const { isOfflineFallbackPage } = usePWA();
     const [moreOpen, setMoreOpen] = React.useState(false);
     const [hasMounted, setHasMounted] = React.useState(false);
+    const [hasActiveParcel, setHasActiveParcel] = React.useState(false);
 
     React.useEffect(() => {
         setHasMounted(true);
-    }, []);
+
+        const refreshActiveParcel = () => {
+            setHasActiveParcel(checkHasActiveTrackedParcel());
+        };
+        const handleOpenMore = () => {
+            setMoreOpen(true);
+        };
+
+        refreshActiveParcel();
+        window.addEventListener("lpd:open-more-sheet", handleOpenMore);
+        window.addEventListener("storage", refreshActiveParcel);
+        window.addEventListener("focus", refreshActiveParcel);
+
+        return () => {
+            window.removeEventListener("lpd:open-more-sheet", handleOpenMore);
+            window.removeEventListener("storage", refreshActiveParcel);
+            window.removeEventListener("focus", refreshActiveParcel);
+        };
+    }, [pathname]);
 
     const isOfflineFallback =
         pathname.startsWith("/offline") ||
@@ -58,47 +102,67 @@ export default function BottomTabBar() {
     return (
         <>
             <nav
+                data-mobile-tabbar=""
                 aria-label={t("mainNav")}
-                className="md:hidden fixed inset-x-0 bottom-0 z-[80] border-t-2 border-foreground bg-background pb-safe select-none"
+                className="md:hidden fixed inset-x-0 bottom-0 z-[80] border-t border-border/80 bg-background/88 backdrop-blur-xl shadow-[0_-4px_20px_rgba(26,23,20,0.06)] dark:shadow-[0_-4px_20px_rgba(0,0,0,0.35)] pb-safe select-none transition-transform duration-200 ease-out"
             >
                 <ul className="grid h-[var(--tabbar-h)] grid-cols-5">
-                    {tabs.map(({ href, label, icon: Icon, active }) => (
-                        <li key={href}>
-                            <Link
-                                href={href}
-                                onClick={() => triggerHaptic("light")}
-                                onTouchStart={() => prefetchTab(href)}
-                                onPointerEnter={() => prefetchTab(href)}
-                                aria-current={active ? "page" : undefined}
-                                className={cn(
-                                    "tap flex h-full flex-col items-center justify-center gap-1 text-[0.68rem] font-semibold",
-                                    active ? "text-primary" : "text-muted-foreground"
-                                )}
-                            >
-                                <span className="relative flex h-7 w-12 items-center justify-center rounded-full">
-                                    {active && !moreOpen && (
-                                        <m.span
-                                            layoutId="mobile-tab-pill"
-                                            transition={{ type: "spring", stiffness: 480, damping: 34 }}
-                                            className="absolute inset-0 rounded-full bg-secondary"
-                                            aria-hidden="true"
-                                        />
+                    {tabs.map(({ href, label, icon: Icon, active }) => {
+                        const isTrackTab = href === "/track";
+                        const isExactCurrentRoute = pathname === href && !moreOpen;
+                        return (
+                            <li key={href}>
+                                <Link
+                                    href={href}
+                                    onClick={(e) => {
+                                        triggerHaptic("light");
+                                        if (isExactCurrentRoute) {
+                                            e.preventDefault();
+                                            window.scrollTo({ top: 0, behavior: "smooth" });
+                                        }
+                                    }}
+                                    onTouchStart={() => prefetchTab(href)}
+                                    onPointerEnter={() => prefetchTab(href)}
+                                    aria-current={active ? "page" : undefined}
+                                    className={cn(
+                                        "tap flex h-full flex-col items-center justify-center gap-1 text-[0.68rem] font-semibold",
+                                        active ? "text-primary" : "text-muted-foreground"
                                     )}
-                                    <Icon
-                                        className={cn(
-                                            "relative z-10 h-[1.15rem] w-[1.15rem] transition-colors",
-                                            active && !moreOpen && "text-secondary-foreground"
+                                >
+                                    <span className="relative flex h-7 w-12 items-center justify-center rounded-full">
+                                        {active && !moreOpen && (
+                                            <m.span
+                                                layoutId="mobile-tab-pill"
+                                                transition={{ type: "spring", stiffness: 480, damping: 34 }}
+                                                className="absolute inset-0 rounded-full bg-secondary"
+                                                aria-hidden="true"
+                                            />
                                         )}
-                                        strokeWidth={active ? 2.4 : 2}
-                                    />
-                                </span>
-                                <span className="leading-none">{label}</span>
-                            </Link>
-                        </li>
-                    ))}
+                                        <Icon
+                                            className={cn(
+                                                "relative z-10 h-[1.15rem] w-[1.15rem] transition-colors",
+                                                active && !moreOpen && "text-secondary-foreground"
+                                            )}
+                                            strokeWidth={active ? 2.4 : 2}
+                                        />
+                                        {isTrackTab && hasActiveParcel && (
+                                            <span
+                                                aria-hidden="true"
+                                                className="absolute right-2.5 top-0.5 z-20 h-2 w-2 rounded-full bg-primary ring-2 ring-background"
+                                            />
+                                        )}
+                                    </span>
+                                    <span className="leading-none">{label}</span>
+                                </Link>
+                            </li>
+                        );
+                    })}
                     <li>
                         <button
-                            onClick={() => setMoreOpen(true)}
+                            onClick={() => {
+                                triggerHaptic("light");
+                                setMoreOpen(true);
+                            }}
                             aria-haspopup="dialog"
                             aria-expanded={moreOpen}
                             className={cn(
