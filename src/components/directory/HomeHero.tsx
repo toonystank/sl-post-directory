@@ -219,7 +219,7 @@ export default function HomeHero({ search, searchMode: controlledMode, total = 4
                 </div>
 
                 {/* Quick tools — calculator first (International + COD + Local, then Directory & Guides) */}
-                <div className="pt-2.5 pb-4 md:pt-2 md:pb-10">
+                <div className="pt-2.5 pb-4 md:pt-2 md:pb-10 [contain:layout_style]">
                     <h2
                         className={cn(
                             "font-heading font-extrabold [font-stretch:82%] mb-2 md:mb-3",

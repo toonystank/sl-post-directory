@@ -5,8 +5,6 @@ import { cn } from "@/lib/utils";
 
 interface NuwaraEliyaPostOfficeProps {
     className?: string;
-    /** Whether the parent search bar is expanded (adjusts veil balance for input legibility). */
-    expanded?: boolean;
 }
 
 /**
@@ -318,8 +316,9 @@ const NuwaraEliyaPostOffice = React.memo(function NuwaraEliyaPostOffice({
     const tileFill = `url(#${tileId})`;
     const hillsRef = useRef<SVGGElement>(null);
 
-    // Subtle vertical parallax on the distant misty ridges only (building stays centered)
+    // Subtle vertical parallax on the distant misty ridges only (desktop only — skip mobile for 60fps expand/scroll)
     useEffect(() => {
+        if (typeof window === "undefined" || window.innerWidth < 768) return;
         let rafId: number | null = null;
         const apply = () => {
             const y = Math.min(Math.max(window.scrollY || 0, 0), 600) * 0.025;
@@ -348,11 +347,11 @@ const NuwaraEliyaPostOffice = React.memo(function NuwaraEliyaPostOffice({
                 className
             )}
         >
-            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 w-full aspect-[6/1] min-h-full transform-gpu [contain:layout_paint]">
+            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 w-full h-[200px] sm:h-[220px] min-h-full transform-gpu will-change-transform [contain:layout_style_paint]">
             <svg
                 viewBox="0 0 1200 200"
                 preserveAspectRatio="xMidYMid slice"
-                className="h-full w-full dark:brightness-[0.65] dark:saturate-[0.78]"
+                className="h-full w-full dark:opacity-75"
             >
                 <defs>
                     {/* Authentic red-brick with fine white Nuwara Eliya mortar pointing */}
@@ -690,6 +689,7 @@ const NuwaraEliyaPostOffice = React.memo(function NuwaraEliyaPostOffice({
                 <rect width="1200" height="200" fill={`url(#${veilId})`} />
             </svg>
             </div>
+            <div className="hidden dark:block pointer-events-none absolute inset-0 bg-[#14110E]/30" />
         </div>
     );
 });

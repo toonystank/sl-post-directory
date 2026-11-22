@@ -368,7 +368,7 @@
   scroll-snap-align: start;
 }
 
-html[data-keyboard-open="true"] [data-mobile-tabbar] {
+[data-mobile-tabbar][data-keyboard-open="true"] {
   transform: translateY(115%);
   pointer-events: none;
 }
