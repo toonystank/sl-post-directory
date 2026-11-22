@@ -342,12 +342,8 @@ const NuwaraEliyaPostOffice = React.memo(function NuwaraEliyaPostOffice({
         <div
             aria-hidden="true"
             data-testid="nuwara-eliya-search-illustration"
-            className={cn(
-                "pointer-events-none absolute inset-0 overflow-hidden select-none z-0",
-                className
-            )}
+            className={cn("h-full w-full select-none", className)}
         >
-            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 w-full h-[200px] sm:h-[220px] min-h-full transform-gpu will-change-transform [contain:layout_style_paint]">
             <svg
                 viewBox="0 0 1200 200"
                 preserveAspectRatio="xMidYMid slice"
@@ -688,8 +684,6 @@ const NuwaraEliyaPostOffice = React.memo(function NuwaraEliyaPostOffice({
                 {/* Smooth card-coloured veil so search text & chips always stay crisp */}
                 <rect width="1200" height="200" fill={`url(#${veilId})`} />
             </svg>
-            </div>
-            <div className="hidden dark:block pointer-events-none absolute inset-0 bg-[#14110E]/30" />
         </div>
     );
 });

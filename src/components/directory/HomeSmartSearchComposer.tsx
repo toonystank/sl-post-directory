@@ -437,12 +437,22 @@ export default function HomeSmartSearchComposer({
                         : "border-border md:border-foreground shadow-[var(--shadow-elev-1)] focus-within:border-foreground/45 focus-within:shadow-[var(--shadow-elev-2)] md:focus-within:shadow-[3px_3px_0_0_hsl(var(--foreground))]"
                 )}
             >
-                {/* Centered Nuwara Eliya Post Office backdrop — static memoized GPU layer */}
+                {/* Centered Nuwara Eliya Post Office backdrop — full panoramic on collapse (like main), smooth GPU zoom on open */}
                 <div
-                    className="pointer-events-none absolute inset-0 opacity-95 dark:opacity-85"
+                    className="pointer-events-none absolute inset-0 overflow-hidden opacity-95 dark:opacity-85"
                     aria-hidden="true"
                 >
-                    <NuwaraEliyaPostOffice />
+                    <div
+                        className={cn(
+                            "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[200px] sm:h-[220px] min-h-full w-auto aspect-[6/1] origin-center transform-gpu will-change-transform [contain:layout_style_paint] motion-safe:transition-transform motion-safe:duration-[260ms] motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)]",
+                            isExpanded
+                                ? "scale-100"
+                                : "scale-[0.29] min-[380px]:scale-[0.32] min-[415px]:scale-[0.36] min-[465px]:scale-[0.45] min-[550px]:scale-[0.52] sm:scale-[0.52]"
+                        )}
+                    >
+                        <NuwaraEliyaPostOffice />
+                    </div>
+                    <div className="hidden dark:block pointer-events-none absolute inset-0 bg-[#14110E]/30" />
                 </div>
 
                 {/* Inner Shell: fixed top input row + CSS grid-rows collapsible bottom tray */}
