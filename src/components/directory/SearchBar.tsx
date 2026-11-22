@@ -104,6 +104,10 @@ export default function SearchBar({
     const savedScrollYRef = useRef<number | null>(null);
     const skipScrollRestoreRef = useRef(false);
     const scrollRafRef = useRef<number | null>(null);
+    const restoreTimerRef = useRef<number | null>(null);
+    const enterIndexTimerRef = useRef<number | null>(null);
+    const isActiveRef = useRef(isActive);
+    isActiveRef.current = isActive;
     const actualContainerRef = containerRef || localContainerRef;
     const listId = `suggestions-${id}`;
 
@@ -112,22 +116,47 @@ export default function SearchBar({
             if (scrollRafRef.current !== null && typeof window !== "undefined") {
                 window.cancelAnimationFrame(scrollRafRef.current);
             }
+            if (restoreTimerRef.current !== null && typeof window !== "undefined") {
+                window.clearTimeout(restoreTimerRef.current);
+            }
+            if (enterIndexTimerRef.current !== null && typeof window !== "undefined") {
+                window.clearTimeout(enterIndexTimerRef.current);
+            }
         };
     }, []);
+
+    // Preload offline office index during browser idle time so opening search never stalls on IDB
+    useEffect(() => {
+        if (!enableSmartHomeSearch || typeof window === "undefined") return;
+        const win = window as Window & {
+            requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+            cancelIdleCallback?: (id: number) => void;
+        };
+        if (typeof win.requestIdleCallback === "function") {
+            const idleId = win.requestIdleCallback(() => {
+                void ensureLocalOfficeIndex();
+            }, { timeout: 2500 });
+            return () => win.cancelIdleCallback?.(idleId);
+        }
+        const timer = window.setTimeout(() => {
+            void ensureLocalOfficeIndex();
+        }, 1500);
+        return () => window.clearTimeout(timer);
+    }, [enableSmartHomeSearch]);
 
     const cyclingExamples = useMemo(
         () => getSearchCyclingExamples(locale),
         [locale]
     );
 
-    // Cycle example placeholder texts smoothly when on Home search and input is empty
+    // Cycle example placeholder texts cleanly while resting; pause immediately when active or typing
     useEffect(() => {
-        if (!enableSmartHomeSearch || query.trim().length > 0) return;
+        if (!enableSmartHomeSearch || isActive || query.trim().length > 0) return;
         const timer = setInterval(() => {
             setExampleIndex((prev) => (prev + 1) % cyclingExamples.length);
         }, 2800);
         return () => clearInterval(timer);
-    }, [enableSmartHomeSearch, query, cyclingExamples.length]);
+    }, [enableSmartHomeSearch, isActive, query, cyclingExamples.length]);
 
     // Reset manual weight chip override whenever the user edits the query text
     useEffect(() => {
@@ -258,6 +287,11 @@ export default function SearchBar({
         const formEl = searchFormRef.current;
         if (!formEl) return;
 
+        if (restoreTimerRef.current !== null) {
+            window.clearTimeout(restoreTimerRef.current);
+            restoreTimerRef.current = null;
+        }
+
         // Preserve exact pre-search scroll offset only on initial transition into search mode
         if (savedScrollYRef.current === null) {
             savedScrollYRef.current = window.scrollY;
@@ -273,20 +307,12 @@ export default function SearchBar({
             if (!currentFormEl) return;
 
             const headerEl = document.querySelector<HTMLElement>("header.sticky");
-            const headerRect = headerEl?.getBoundingClientRect();
-            const headerStyle = headerEl ? window.getComputedStyle(headerEl) : null;
-            const isStickyVisible = Boolean(
-                headerEl &&
-                headerRect &&
-                headerRect.height > 0 &&
-                (headerStyle?.position === "sticky" || headerStyle?.position === "fixed")
-            );
-            const stickyHeight = isStickyVisible && headerRect ? headerRect.height : 0;
+            const stickyHeight = headerEl?.offsetHeight || 52;
             const targetTop = stickyHeight + 10;
 
             const formRect = currentFormEl.getBoundingClientRect();
             const delta = formRect.top - targetTop;
-            if (Math.abs(delta) > 4) {
+            if (Math.abs(delta) > 8) {
                 const prefersReducedMotion =
                     typeof window.matchMedia === "function" &&
                     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -305,6 +331,10 @@ export default function SearchBar({
             window.cancelAnimationFrame(scrollRafRef.current);
             scrollRafRef.current = null;
         }
+        if (restoreTimerRef.current !== null) {
+            window.clearTimeout(restoreTimerRef.current);
+            restoreTimerRef.current = null;
+        }
         if (skipScrollRestoreRef.current) {
             skipScrollRestoreRef.current = false;
             savedScrollYRef.current = null;
@@ -317,10 +347,13 @@ export default function SearchBar({
                 const prefersReducedMotion =
                     typeof window.matchMedia === "function" &&
                     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-                window.scrollTo({
-                    top: targetY,
-                    behavior: prefersReducedMotion ? "auto" : "smooth",
-                });
+                restoreTimerRef.current = window.setTimeout(() => {
+                    restoreTimerRef.current = null;
+                    window.scrollTo({
+                        top: targetY,
+                        behavior: prefersReducedMotion ? "auto" : "smooth",
+                    });
+                }, 60);
             }
         }
     }, [enableSmartHomeSearch]);
@@ -329,6 +362,7 @@ export default function SearchBar({
         if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
         skipScrollRestoreRef.current = true;
         savedScrollYRef.current = null;
+        isActiveRef.current = false;
         setShowDropdown(false);
         setIsActive(false);
     }, []);
@@ -343,7 +377,8 @@ export default function SearchBar({
                 setShowDropdown(false);
                 return;
             }
-            if (!isActive) {
+            if (!isActiveRef.current) {
+                isActiveRef.current = true;
                 scrollSearchBarToTop();
             }
             setIsActive(true);
@@ -422,6 +457,7 @@ export default function SearchBar({
 
     const handleCloseDropdownOnly = useCallback(() => {
         if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
+        isActiveRef.current = false;
         setShowDropdown(false);
         setIsActive(false);
         if (!query.trim()) {
@@ -431,6 +467,7 @@ export default function SearchBar({
 
     const handleClearAndClose = () => {
         if (suggestDebounce.current) clearTimeout(suggestDebounce.current);
+        isActiveRef.current = false;
         setSuggestions([]);
         setShowDropdown(false);
         setIsActive(false);
@@ -464,11 +501,12 @@ export default function SearchBar({
     };
 
     useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
+        const handleClickOutside = (event: PointerEvent) => {
             const target = event.target as Node;
             const inThis = actualContainerRef.current?.contains(target);
             const inSidebar = sidebarRef?.current?.contains(target);
-            if (!inThis && !inSidebar && isActive) {
+            if (!inThis && !inSidebar && isActiveRef.current) {
+                isActiveRef.current = false;
                 setShowDropdown(false);
                 setIsActive(false);
                 if (!query.trim()) {
@@ -476,9 +514,9 @@ export default function SearchBar({
                 }
             }
         };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [actualContainerRef, sidebarRef, isActive, query, restorePreviousScroll]);
+        document.addEventListener("pointerdown", handleClickOutside, { passive: true });
+        return () => document.removeEventListener("pointerdown", handleClickOutside);
+    }, [actualContainerRef, sidebarRef, query, restorePreviousScroll]);
 
     useEffect(() => {
         if (!enableSmartHomeSearch) {
@@ -488,13 +526,22 @@ export default function SearchBar({
     }, [searchMode, enableSmartHomeSearch]);
 
     const handleEnterTypeMode = useCallback(() => {
-        if (!isActive) {
+        if (!isActiveRef.current) {
+            isActiveRef.current = true;
             scrollSearchBarToTop();
+            setIsActive(true);
+            if (!getLoadedOfficeIndexSync()) {
+                if (enterIndexTimerRef.current !== null) {
+                    window.clearTimeout(enterIndexTimerRef.current);
+                }
+                enterIndexTimerRef.current = window.setTimeout(() => {
+                    enterIndexTimerRef.current = null;
+                    void ensureLocalOfficeIndex();
+                }, 320);
+            }
         }
-        setIsActive(true);
-        void ensureLocalOfficeIndex();
         if (query.trim()) setShowDropdown(true);
-    }, [isActive, query, scrollSearchBarToTop]);
+    }, [query, scrollSearchBarToTop]);
 
     const handleComposerSubmit = () => {
         if (open && highlight >= 0 && visibleSuggestions[highlight]) {

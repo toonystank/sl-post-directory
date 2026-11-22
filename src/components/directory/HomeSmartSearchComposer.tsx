@@ -431,42 +431,35 @@ export default function HomeSmartSearchComposer({
                     onSubmit();
                 }}
                 className={cn(
-                    "relative overflow-hidden rounded-2xl border md:border-2 bg-card motion-safe:transition-[box-shadow,border-color] motion-safe:duration-200",
+                    "relative overflow-hidden rounded-2xl border md:border-2 bg-card motion-safe:transition-colors motion-safe:duration-200",
                     isExpanded
                         ? "border-foreground/45 md:border-foreground shadow-[var(--shadow-elev-2)] md:shadow-[3px_3px_0_0_hsl(var(--foreground))]"
                         : "border-border md:border-foreground shadow-[var(--shadow-elev-1)] focus-within:border-foreground/45 focus-within:shadow-[var(--shadow-elev-2)] md:focus-within:shadow-[3px_3px_0_0_hsl(var(--foreground))]"
                 )}
             >
-                {/* Centered Nuwara Eliya Post Office backdrop — veiled so text always stays legible */}
+                {/* Centered Nuwara Eliya Post Office backdrop — static memoized GPU layer */}
                 <div
-                    className={cn(
-                        "pointer-events-none absolute inset-0 motion-safe:transition-opacity motion-safe:duration-200 ease-out",
-                        isExpanded ? "opacity-90 dark:opacity-80" : "opacity-95 dark:opacity-85"
-                    )}
+                    className="pointer-events-none absolute inset-0 opacity-95 dark:opacity-85"
                     aria-hidden="true"
                 >
-                    <NuwaraEliyaPostOffice expanded={isExpanded} />
+                    <NuwaraEliyaPostOffice />
                 </div>
 
                 {/* Inner Shell: fixed top input row + CSS grid-rows collapsible bottom tray */}
                 <div className="relative z-10 flex flex-col">
-                    {/* Top / Main Input Surface */}
-                    <div
-                        className={cn(
-                            "flex items-stretch",
-                            !isExpanded && "min-h-[50px] sm:min-h-[58px]"
-                        )}
-                    >
+                    {/* Top / Main Input Surface (constant min-height to eliminate frame-0 jump) */}
+                    <div className="flex items-stretch min-h-[52px] sm:min-h-[58px]">
                         <div
                             onClick={() => {
-                                onEnterTypeMode();
-                                textareaRef.current?.focus();
+                                if (document.activeElement !== textareaRef.current) {
+                                    textareaRef.current?.focus();
+                                } else {
+                                    onEnterTypeMode();
+                                }
                             }}
                             className={cn(
-                                "relative flex flex-1 min-w-0 cursor-text",
-                                isExpanded
-                                    ? "items-start gap-2 px-3 pt-3 pb-2.5 min-h-[60px] sm:min-h-[68px]"
-                                    : "items-center gap-2 pl-2.5 sm:pl-3.5 pr-2 py-2"
+                                "relative flex flex-1 min-w-0 cursor-text gap-2 pl-2.5 sm:pl-3.5 pr-2",
+                                isExpanded ? "items-start py-2.5" : "items-center py-2"
                             )}
                         >
                         {/* Leading Context Icon */}
@@ -703,7 +696,7 @@ export default function HomeSmartSearchComposer({
                         inert={!isExpanded || undefined}
                         aria-hidden={!isExpanded}
                         className={cn(
-                            "grid motion-safe:transition-[grid-template-rows,opacity] motion-safe:duration-200 motion-safe:ease-out",
+                            "grid will-change-[grid-template-rows,opacity] motion-safe:transition-[grid-template-rows,opacity] motion-safe:duration-[260ms] motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)]",
                             isExpanded
                                 ? "grid-rows-[1fr] opacity-100"
                                 : "grid-rows-[0fr] opacity-0 pointer-events-none"
@@ -712,8 +705,8 @@ export default function HomeSmartSearchComposer({
                         <div className="min-h-0 overflow-hidden">
                             <div
                                 className={cn(
-                                    "motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out",
-                                    isExpanded ? "translate-y-0" : "-translate-y-1.5"
+                                    "transform-gpu motion-safe:transition-[transform,opacity] motion-safe:duration-[260ms] motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)]",
+                                    isExpanded ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"
                                 )}
                             >
                                 {/* Recent Search History Chip Strip (only when input is empty and user has searched before) */}
@@ -797,7 +790,7 @@ export default function HomeSmartSearchComposer({
                                 {hasValue && smartPreview && (
                                     <div
                                         data-testid="search-inline-smart-preview"
-                                        className="border-t border-border/75 bg-card/85 backdrop-blur-[1px] px-2.5 sm:px-3 py-2"
+                                        className="border-t border-border/75 bg-card/92 px-2.5 sm:px-3 py-2"
                                     >
                                         {smartPreview}
                                     </div>

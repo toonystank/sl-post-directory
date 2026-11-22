@@ -42,23 +42,31 @@ export default function NativeAppBridge() {
 
         baseHeightRef.current = Math.max(window.innerHeight, vv.height);
 
+        const setTabbarKeyboardOpen = (open: boolean) => {
+            const tabbar = document.querySelector<HTMLElement>("[data-mobile-tabbar]");
+            if (!tabbar) return;
+            if (open) {
+                if (tabbar.dataset.keyboardOpen !== "true") {
+                    tabbar.dataset.keyboardOpen = "true";
+                }
+            } else if ("keyboardOpen" in tabbar.dataset) {
+                delete tabbar.dataset.keyboardOpen;
+            }
+        };
+
         const syncKeyboardState = () => {
             if (window.innerWidth >= 768) {
-                delete document.documentElement.dataset.keyboardOpen;
+                setTabbarKeyboardOpen(false);
                 return;
             }
             const focusedEditable = isEditableElement(document.activeElement);
             if (!focusedEditable) {
                 baseHeightRef.current = Math.max(window.innerHeight, vv.height);
-                delete document.documentElement.dataset.keyboardOpen;
+                setTabbarKeyboardOpen(false);
                 return;
             }
             const baseline = Math.max(window.innerHeight, baseHeightRef.current);
-            if (baseline - vv.height > 140) {
-                document.documentElement.dataset.keyboardOpen = "true";
-            } else {
-                delete document.documentElement.dataset.keyboardOpen;
-            }
+            setTabbarKeyboardOpen(baseline - vv.height > 140);
         };
 
         const handleOrientationChange = () => {
@@ -78,7 +86,7 @@ export default function NativeAppBridge() {
             document.removeEventListener("focusin", syncKeyboardState);
             document.removeEventListener("focusout", syncKeyboardState);
             window.removeEventListener("orientationchange", handleOrientationChange);
-            delete document.documentElement.dataset.keyboardOpen;
+            setTabbarKeyboardOpen(false);
         };
     }, []);
 
