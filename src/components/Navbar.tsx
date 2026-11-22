@@ -5,15 +5,19 @@ import { Link, usePathname, useRouter } from "@/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { ThemeToggle } from "./theme-toggle";
-import { ArrowLeft, Download, LogOut, User } from "lucide-react";
+import { ArrowLeft, Download, LogOut, SlidersHorizontal, User } from "lucide-react";
 import { m } from "motion/react";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import LanguageSwitcher from "./LanguageSwitcher";
 import CurrencySwitcher from "./CurrencySwitcher";
 import StampLogo from "./brand/StampLogo";
+import { useInstantLocale, type AppLocale } from "@/context/InstantLocaleContext";
 import { usePWA } from "@/context/PWAContext";
+import { triggerHaptic } from "@/lib/haptics";
 import { stripLocalePrefix } from "@/lib/locale";
+
+const LOCALE_CYCLE: AppLocale[] = ["en", "si", "ta"];
 
 /**
  * Global header.
@@ -28,9 +32,13 @@ export default function Navbar() {
     const t = useTranslations("Nav");
     const tApp = useTranslations("App");
     const tInstall = useTranslations("Install");
+    const { locale, setLocale, prefetchLocale } = useInstantLocale();
     const { isInstalled, canNativePrompt, isIOS, triggerInstall, isOfflineFallbackPage } = usePWA();
     const [scrolled, setScrolled] = React.useState(false);
     const [hasMounted, setHasMounted] = React.useState(false);
+
+    const localeShort = locale === "si" ? "සිං" : locale === "ta" ? "த" : "EN";
+    const nextLocale = LOCALE_CYCLE[(LOCALE_CYCLE.indexOf(locale) + 1) % LOCALE_CYCLE.length];
 
     React.useEffect(() => {
         setHasMounted(true);
@@ -94,32 +102,65 @@ export default function Navbar() {
 
             <header
                 className={cn(
-                    "sticky top-0 z-50 w-full bg-background pt-safe transition-colors duration-150 border-b-2",
-                    scrolled ? "border-foreground" : "border-transparent"
+                    "sticky top-0 z-50 w-full pt-safe transition-colors duration-150 bg-background/85 backdrop-blur-xl md:bg-background md:backdrop-blur-none border-b md:border-b-2",
+                    scrolled ? "border-border/80 md:border-foreground" : "border-transparent"
                 )}
             >
                 {/* ===== Mobile app bar ===== */}
-                <div className="md:hidden flex h-[50px] items-center gap-2 px-3">
+                <div className="md:hidden flex h-[52px] items-center gap-2 px-3.5">
                     {isTabRoot && isHome ? (
                         <Link href="/" aria-label={tApp("home")} className="tap">
-                            <StampLogo size={32} />
+                            <StampLogo size={30} />
                         </Link>
                     ) : (
                         <>
                             {!isTabRoot && (
-                                <button onClick={goBack} aria-label={tApp("back")} className="tap -ml-1 rounded-full p-2 hover:bg-muted">
-                                    <ArrowLeft className="h-5 w-5" />
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        triggerHaptic("light");
+                                        goBack();
+                                    }}
+                                    aria-label={tApp("back")}
+                                    className="tap -ml-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/70 text-foreground hover:bg-muted"
+                                >
+                                    <ArrowLeft className="h-[18px] w-[18px]" strokeWidth={2.2} />
                                 </button>
                             )}
-                            <span className={cn("font-heading text-lg font-extrabold [font-stretch:82%] truncate", isTabRoot && "pl-1")}>
+                            <span className={cn("font-heading text-[17px] font-extrabold [font-stretch:84%] truncate", isTabRoot && "pl-0.5")}>
                                 {mobileTitle}
                             </span>
                         </>
                     )}
-                    <div className="ml-auto flex items-center gap-1.5">
-                        {isRatesPage && <CurrencySwitcher />}
-                        <LanguageSwitcher />
-                        <ThemeToggle />
+                    <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                        {isRatesPage && <CurrencySwitcher compact />}
+                        <button
+                            type="button"
+                            lang={locale}
+                            data-testid="mobile-lang-cycle"
+                            aria-label={`Switch language (current ${locale.toUpperCase()})`}
+                            onPointerEnter={() => prefetchLocale(nextLocale)}
+                            onTouchStart={() => prefetchLocale(nextLocale)}
+                            onFocus={() => prefetchLocale(nextLocale)}
+                            onClick={() => {
+                                triggerHaptic("selection");
+                                setLocale(nextLocale);
+                            }}
+                            className="tap inline-flex h-8 min-w-[36px] items-center justify-center rounded-full border border-border bg-card px-2.5 text-[11px] font-extrabold leading-none text-foreground shadow-[var(--shadow-elev-1)] hover:bg-muted/60"
+                        >
+                            <span>{localeShort}</span>
+                        </button>
+                        <button
+                            type="button"
+                            aria-label={tApp("tabMore")}
+                            onClick={() => {
+                                triggerHaptic("light");
+                                window.dispatchEvent(new CustomEvent("lpd:open-more-sheet"));
+                            }}
+                            className="tap inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-[var(--shadow-elev-1)] hover:bg-muted/60"
+                        >
+                            <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+                        </button>
                     </div>
                 </div>
 

@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import PillarBox from "@/components/brand/PillarBox";
 import Postmark from "@/components/brand/Postmark";
 import SearchBar from "./SearchBar";
+import { triggerHaptic } from "@/lib/haptics";
 import { SearchMode } from "./types";
 
 interface HomeHeroProps {
@@ -79,7 +80,7 @@ export default function HomeHero({ search, searchMode: controlledMode, total = 4
     };
 
     return (
-        <section className="relative border-b-2 border-foreground md:paper-grain">
+        <section className="relative border-b border-border/80 md:border-b-2 md:border-foreground md:paper-grain">
             <div className="container mx-auto px-4">
                 <div className="grid items-start md:items-center gap-3 md:gap-8 md:grid-cols-[minmax(0,1fr)_auto] pt-2 pb-2 md:pt-8 md:pb-6 lg:pt-10 lg:pb-8">
                     {/* Copy + search */}
@@ -103,7 +104,8 @@ export default function HomeHero({ search, searchMode: controlledMode, total = 4
                                             : "display text-[1.28rem] sm:text-[1.5rem] leading-[1.08] md:text-4xl lg:text-5xl"
                                     )}
                                 >
-                                    {t("headlineDesktop")}
+                                    <span className="md:hidden">{t("headlineMobile")}</span>
+                                    <span className="hidden md:inline">{t("headlineDesktop")}</span>
                                 </h1>
                                 <p
                                     className={cn(
@@ -232,9 +234,10 @@ export default function HomeHero({ search, searchMode: controlledMode, total = 4
                         <div>
                             <Link
                                 href={{ pathname: "/calculator", query: { mode: "intl" } }}
-                                className="tap block h-full rounded-xl border-2 border-foreground par-avion-stripe p-[4px] md:p-[6px] shadow-[0_3px_0_0_hsl(var(--foreground))] md:hover:-translate-y-0.5 transition-transform"
+                                onClick={() => triggerHaptic("light")}
+                                className="tap block h-full rounded-[18px] par-avion-stripe p-[4px] md:p-[6px] shadow-[0_4px_0_0_#102E63] md:border-2 md:border-foreground md:shadow-[0_3px_0_0_hsl(var(--foreground))] md:hover:-translate-y-0.5 transition-transform"
                             >
-                                <span className="flex h-full min-h-[112px] md:min-h-[146px] flex-col items-center justify-center gap-1 md:gap-2 rounded-lg bg-[#1D4E9E] px-2 py-2.5 md:py-4 text-center text-white">
+                                <span className="flex h-full min-h-[108px] md:min-h-[146px] flex-col items-center justify-center gap-1 md:gap-2 rounded-[14px] md:rounded-lg bg-[#1D4E9E] px-2 py-2.5 md:py-4 text-center text-white">
                                     <span className="flex h-10 w-10 md:h-14 md:w-14 items-center justify-center rounded-full bg-white/15">
                                         <Plane className="h-6 w-6 md:h-9 md:w-9" strokeWidth={2.2} aria-hidden="true" />
                                     </span>
@@ -262,9 +265,10 @@ export default function HomeHero({ search, searchMode: controlledMode, total = 4
                         <div>
                             <Link
                                 href={{ pathname: "/calculator", query: { mode: "cod" } }}
-                                className="tap block h-full rounded-xl border-2 border-foreground bg-[#15803D] shadow-[0_3px_0_0_hsl(var(--foreground))] md:hover:-translate-y-0.5 transition-transform"
+                                onClick={() => triggerHaptic("light")}
+                                className="tap block h-full rounded-[18px] bg-[#15803D] shadow-[0_4px_0_0_#0D5327] md:border-2 md:border-foreground md:shadow-[0_3px_0_0_hsl(var(--foreground))] md:hover:-translate-y-0.5 transition-transform"
                             >
-                                <span className="flex h-full min-h-[112px] md:min-h-[146px] flex-col items-center justify-center gap-1 md:gap-2 px-2 py-2.5 md:py-4 text-center text-white">
+                                <span className="flex h-full min-h-[116px] md:min-h-[146px] flex-col items-center justify-center gap-1 md:gap-2 px-2 py-2.5 md:py-4 text-center text-white">
                                     <span className="flex h-10 w-10 md:h-14 md:w-14 items-center justify-center rounded-full bg-white/15">
                                         <Banknote className="h-6 w-6 md:h-9 md:w-9" strokeWidth={2.2} aria-hidden="true" />
                                     </span>
@@ -292,7 +296,8 @@ export default function HomeHero({ search, searchMode: controlledMode, total = 4
                         <div className="col-span-2 md:col-span-1">
                             <Link
                                 href={{ pathname: "/calculator", query: { mode: "local" } }}
-                                className="tap flex h-full items-center gap-2.5 rounded-xl border-2 border-foreground bg-primary px-3 py-2 text-white shadow-[0_3px_0_0_hsl(var(--foreground))] md:min-h-[146px] md:flex-col md:justify-center md:gap-2 md:px-2 md:py-4 md:text-center md:hover:-translate-y-0.5 transition-transform"
+                                onClick={() => triggerHaptic("light")}
+                                className="tap flex h-full items-center gap-2.5 rounded-[18px] bg-primary px-3 py-2.5 text-white shadow-[0_4px_0_0_#7E0E12] md:min-h-[146px] md:flex-col md:justify-center md:gap-2 md:px-2 md:py-4 md:text-center md:border-2 md:border-foreground md:shadow-[0_3px_0_0_hsl(var(--foreground))] md:hover:-translate-y-0.5 transition-transform"
                             >
                                 <span className="flex h-9 w-9 md:h-14 md:w-14 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
                                     <Mail className="h-5 w-5 md:h-9 md:w-9" strokeWidth={2.2} aria-hidden="true" />
@@ -325,8 +330,9 @@ export default function HomeHero({ search, searchMode: controlledMode, total = 4
                         <div>
                             <Link
                                 href="/browse"
+                                onClick={() => triggerHaptic("light")}
                                 className={cn(
-                                    "tap flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-foreground bg-card px-2.5 py-2 font-bold shadow-[0_2px_0_0_hsl(var(--foreground))] hover:bg-secondary/30 md:hover:-translate-y-0.5 transition-all",
+                                    "tap flex w-full items-center justify-center gap-1.5 rounded-[14px] border border-border bg-card py-2.5 px-3 font-bold shadow-[var(--shadow-elev-1)] hover:bg-secondary/30 md:rounded-xl md:border-2 md:border-foreground md:shadow-[0_2px_0_0_hsl(var(--foreground))] md:hover:-translate-y-0.5 transition-all",
                                     isIndic ? "text-xs md:text-sm" : "text-sm"
                                 )}
                             >
@@ -337,8 +343,9 @@ export default function HomeHero({ search, searchMode: controlledMode, total = 4
                         <div>
                             <Link
                                 href="/blog"
+                                onClick={() => triggerHaptic("light")}
                                 className={cn(
-                                    "tap flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-foreground bg-card px-2.5 py-2 font-bold shadow-[0_2px_0_0_hsl(var(--foreground))] hover:bg-secondary/30 md:hover:-translate-y-0.5 transition-all",
+                                    "tap flex w-full items-center justify-center gap-1.5 rounded-[14px] border border-border bg-card py-2.5 px-3 font-bold shadow-[var(--shadow-elev-1)] hover:bg-secondary/30 md:rounded-xl md:border-2 md:border-foreground md:shadow-[0_2px_0_0_hsl(var(--foreground))] md:hover:-translate-y-0.5 transition-all",
                                     isIndic ? "text-xs md:text-sm" : "text-sm"
                                 )}
                             >

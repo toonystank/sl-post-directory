@@ -103,6 +103,10 @@
     --tabbar-h: 60px;
     --appbar-h: 56px;
 
+    --surface-hairline: 37 28% 82%;
+    --shadow-elev-1: 0 1px 2px rgba(26, 23, 20, 0.05), 0 4px 12px -4px rgba(26, 23, 20, 0.08);
+    --shadow-elev-2: 0 6px 20px -4px rgba(26, 23, 20, 0.14);
+
     color-scheme: light dark;
     accent-color: hsl(var(--primary));
     scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
@@ -158,6 +162,10 @@
     --stripe-gap: 28 14% 17%;          /* #312A24 — warm dark gap in Par Avion / EMS stripes */
     --scrollbar-track: #1C1713;
     --scrollbar-thumb: #6E5F50;
+
+    --surface-hairline: 30 14% 24%;
+    --shadow-elev-1: 0 1px 2px rgba(0, 0, 0, 0.25), 0 4px 14px -4px rgba(0, 0, 0, 0.45);
+    --shadow-elev-2: 0 8px 24px -4px rgba(0, 0, 0, 0.6);
 
     color-scheme: dark;
   }
@@ -296,6 +304,7 @@
 @utility svc {
   --c: var(--svc);
   --ca: var(--svc-accent);
+  --cl: var(--svc-lip, var(--svc));
   &:is(.dark *) {
     --c: var(--svc-dark);
   }
@@ -344,6 +353,24 @@
   @media (min-width: 768px) {
     bottom: 0;
   }
+}
+
+@utility touch-target {
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+}
+
+.snap-carousel {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+.snap-carousel > * {
+  scroll-snap-align: start;
+}
+
+html[data-keyboard-open="true"] [data-mobile-tabbar] {
+  transform: translateY(115%);
+  pointer-events: none;
 }
 
 /* Legacy class names still used by older pages/dashboard — now flat */

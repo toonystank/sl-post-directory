@@ -431,10 +431,10 @@ export default function HomeSmartSearchComposer({
                     onSubmit();
                 }}
                 className={cn(
-                    "relative overflow-hidden rounded-lg border-2 border-foreground bg-card motion-safe:transition-[box-shadow,border-color] motion-safe:duration-200",
+                    "relative overflow-hidden rounded-2xl border md:border-2 bg-card motion-safe:transition-[box-shadow,border-color] motion-safe:duration-200",
                     isExpanded
-                        ? "shadow-[3px_3px_0_0_hsl(var(--foreground))]"
-                        : "focus-within:shadow-[3px_3px_0_0_hsl(var(--foreground))]"
+                        ? "border-foreground/45 md:border-foreground shadow-[var(--shadow-elev-2)] md:shadow-[3px_3px_0_0_hsl(var(--foreground))]"
+                        : "border-border md:border-foreground shadow-[var(--shadow-elev-1)] focus-within:border-foreground/45 focus-within:shadow-[var(--shadow-elev-2)] md:focus-within:shadow-[3px_3px_0_0_hsl(var(--foreground))]"
                 )}
             >
                 {/* Centered Nuwara Eliya Post Office backdrop — veiled so text always stays legible */}
@@ -658,16 +658,43 @@ export default function HomeSmartSearchComposer({
                         )}
                     </div>
 
-                    {/* Resting State Right Submit Button (hides when Expanded because CTA moves to the action footer) */}
+                    {/* Resting State Right Actions: 1-Tap Camera Scan + Primary Search CTA */}
                     {!isExpanded && (
-                        <button
-                            type="submit"
-                            className="tap relative z-10 flex w-12 sm:w-14 md:w-auto md:px-6 shrink-0 items-center justify-center gap-2 border-l-2 border-foreground bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
-                            aria-label={submitLabel}
-                        >
-                            <Search className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.4} />
-                            <span className="hidden md:inline">{submitLabel}</span>
-                        </button>
+                        <div className="relative z-10 flex shrink-0 items-center gap-1.5 pr-1.5 md:items-stretch md:gap-0 md:pr-0">
+                            <button
+                                type="button"
+                                onPointerDown={() =>
+                                    void import("@/lib/tracking/ocr-worker").then((m) =>
+                                        m.prewarmOcr(
+                                            locale === "si"
+                                                ? "eng+sin"
+                                                : locale === "ta"
+                                                  ? "eng+tam"
+                                                  : "eng"
+                                        )
+                                    )
+                                }
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    textareaRef.current?.blur();
+                                    triggerHaptic("light");
+                                    setScannerOpen(true);
+                                }}
+                                data-testid="home-search-resting-scan-btn"
+                                aria-label="Scan barcode or address"
+                                className="tap flex h-9 w-9 md:h-auto md:w-12 items-center justify-center rounded-xl md:rounded-none border border-border md:border-0 md:border-l md:border-border bg-card/95 text-foreground hover:bg-muted transition-colors"
+                            >
+                                <Camera className="h-4 w-4" strokeWidth={2.3} aria-hidden="true" />
+                            </button>
+                            <button
+                                type="submit"
+                                className="tap flex h-9 w-9 md:h-auto md:w-auto md:px-6 items-center justify-center gap-2 rounded-xl md:rounded-none md:border-l-2 md:border-foreground bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
+                                aria-label={submitLabel}
+                            >
+                                <Search className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.4} />
+                                <span className="hidden md:inline">{submitLabel}</span>
+                            </button>
+                        </div>
                     )}
                     </div>
 
