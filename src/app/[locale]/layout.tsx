@@ -22,7 +22,7 @@ import { routing } from "@/i18n/routing";
 import { notFound } from "next/navigation";
 import { hasLocale } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
-import { getSiteUrl } from "@/lib/site";
+import { getAdSenseClientId, getSiteUrl } from "@/lib/site";
 
 // Display: Archivo with the width axis so headlines can be condensed (signage feel)
 const archivo = Archivo({
@@ -173,7 +173,7 @@ export async function generateMetadata({
                 "NRSZmmfWoQ_951WXlbBILyHQXkVHfjr5jFeMXSWW2vA",
         },
         other: {
-            "google-adsense-account": "ca-pub-2503310431210239",
+            "google-adsense-account": getAdSenseClientId(),
         },
     };
 }

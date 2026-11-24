@@ -5,16 +5,25 @@ import { NextResponse } from "next/server";
 import { generateSecret, generateURI } from "otplib";
 import qrcode from "qrcode";
 import crypto from "node:crypto";
+import { checkRateLimit, rateLimiters, rateLimitHeaders } from "@/lib/rate-limiter";
 
 export async function POST(req: Request) {
     try {
+        const rateLimit = await checkRateLimit(req, rateLimiters.twoFactor);
+        if (rateLimit.isRateLimited) {
+            return NextResponse.json(
+                { error: "Too many attempts. Please try again later." },
+                { status: 429, headers: rateLimitHeaders(rateLimit) }
+            );
+        }
+
         const session = await getServerSession(authOptions);
         if (!session?.user?.email) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email }
+            where: { email: session.user.email },
         });
 
         if (!user) {
@@ -30,7 +39,7 @@ export async function POST(req: Request) {
         const otpauth = generateURI({
             issuer: "SL Post Directory",
             label: session.user.email,
-            secret
+            secret,
         });
         const qrCodeUrl = await qrcode.toDataURL(otpauth);
 
@@ -45,16 +54,18 @@ export async function POST(req: Request) {
             where: { id: user.id },
             data: {
                 twoFactorSecret: secret,
-                backupCodes: backupCodes
-            }
+                backupCodes,
+            },
         });
 
-        return NextResponse.json({
-            qrCodeUrl,
-            backupCodes
-            // NOTE: secret is intentionally NOT returned to the client
-        });
-
+        return NextResponse.json(
+            {
+                qrCodeUrl,
+                backupCodes,
+                // NOTE: secret is intentionally NOT returned to the client
+            },
+            { headers: rateLimitHeaders(rateLimit) }
+        );
     } catch (error) {
         console.error("2FA Setup Error:", error);
         return NextResponse.json({ error: "Failed to generate 2FA setup" }, { status: 500 });

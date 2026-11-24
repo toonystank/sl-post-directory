@@ -172,7 +172,12 @@ export default async function DistrictOfficesPage({
         <article className="container mx-auto max-w-5xl px-4 py-5 md:py-10 space-y-6">
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify(breadcrumbJsonLd)
+                        .replace(/</g, "\\u003c")
+                        .replace(/>/g, "\\u003e")
+                        .replace(/&/g, "\\u0026"),
+                }}
             />
 
             <header className="rounded-xl border-2 border-foreground bg-card p-5 sm:p-7 shadow-[4px_4px_0_0_hsl(var(--foreground))]">

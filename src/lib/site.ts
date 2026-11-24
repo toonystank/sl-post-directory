@@ -16,6 +16,32 @@ export function getSiteUrl(): string {
 }
 
 /**
+ * Hostname portion of the configured canonical origin (e.g., `lankapost.lk`),
+ * falling back cleanly if `NEXT_PUBLIC_SITE_URL` is unset or invalid.
+ */
+export function getSiteHostname(): string {
+    try {
+        return new URL(getSiteUrl()).hostname;
+    } catch {
+        return "lankapost.vercel.app";
+    }
+}
+
+/**
+ * Centralized Google AdSense publisher ID (`ca-pub-...`).
+ */
+export function getAdSenseClientId(): string {
+    return process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID?.trim() || "ca-pub-2503310431210239";
+}
+
+/**
+ * Public support / data-deletion contact email displayed on compliance pages when configured.
+ */
+export function getContactEmail(): string {
+    return process.env.NEXT_PUBLIC_CONTACT_EMAIL?.trim() || "";
+}
+
+/**
  * Builds a fully-qualified localized URL respecting `localePrefix: "as-needed"`.
  */
 export function buildLocalizedUrl(pathname: string, locale: string = "en"): string {

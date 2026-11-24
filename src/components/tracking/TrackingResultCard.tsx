@@ -14,7 +14,6 @@ import {
     AlertTriangle,
     CalendarClock,
     Building2,
-    ArrowRight,
     Banknote,
     ChevronDown,
     ChevronRight,

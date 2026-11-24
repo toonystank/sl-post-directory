@@ -1,6 +1,6 @@
 /**
  * Shared pure security utilities for input sanitization, URL validation,
- * and pagination bounds clamping.
+ * JSON-LD script-safe serialization, and pagination bounds clamping.
  */
 
 const BLOCKED_HOSTS = new Set([
@@ -11,6 +11,23 @@ const BLOCKED_HOSTS = new Set([
     "169.254.169.254",
     "metadata.google.internal",
 ]);
+
+const ALLOWED_UPLOADCARE_HOSTS = new Set([
+    "ucarecdn.com",
+    "3q5fhu0dw8.ucarecd.net",
+]);
+
+const UPLOADCARE_UUID_PATH_RE = /^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i;
+
+function getConfiguredUploadcareHost(): string | null {
+    const raw = process.env.NEXT_PUBLIC_UPLOADCARE_CDN?.trim();
+    if (!raw) return null;
+    try {
+        return new URL(raw).hostname.toLowerCase();
+    } catch {
+        return null;
+    }
+}
 
 function isPrivateIpv4(hostname: string): boolean {
     const match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
@@ -47,6 +64,38 @@ export function isSafePublicImageUrl(raw: string): boolean {
 }
 
 /**
+ * Validates that a community photo URL points strictly to an allowed Uploadcare CDN host
+ * and carries a canonical UUID path so `next/image` never crashes on unconfigured hosts.
+ */
+export function isUploadcareImageUrl(raw: string): boolean {
+    if (!isSafePublicImageUrl(raw)) return false;
+    try {
+        const parsed = new URL(raw.trim());
+        const host = parsed.hostname.toLowerCase();
+        const customHost = getConfiguredUploadcareHost();
+        const isAllowedHost = ALLOWED_UPLOADCARE_HOSTS.has(host) || (customHost !== null && host === customHost);
+        if (!isAllowedHost) return false;
+        if (parsed.search || parsed.hash) return false;
+        return UPLOADCARE_UUID_PATH_RE.test(parsed.pathname);
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Normalizes a validated Uploadcare image URL so it always ends with `/`
+ * (required before appending `-/preview/...` image transformation directives).
+ */
+export function normalizeUploadcareImageUrl(raw: string): string {
+    const parsed = new URL(raw.trim());
+    const match = UPLOADCARE_UUID_PATH_RE.exec(parsed.pathname);
+    if (!match) {
+        return raw.trim().endsWith("/") ? raw.trim() : `${raw.trim()}/`;
+    }
+    return `https://${parsed.hostname.toLowerCase()}/${match[1].toLowerCase()}/`;
+}
+
+/**
  * HTML-encodes user-supplied values before interpolating into HTML email templates or markup.
  */
 export function escapeHtml(str: string): string {
@@ -56,6 +105,17 @@ export function escapeHtml(str: string): string {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+}
+
+/**
+ * Serializes structured data for `<script type="application/ld+json">` while escaping
+ * `<`, `>`, and `&` so user-supplied strings containing `</script>` cannot break out.
+ */
+export function safeJsonLd(data: unknown): string {
+    return JSON.stringify(data)
+        .replace(/</g, "\\u003c")
+        .replace(/>/g, "\\u003e")
+        .replace(/&/g, "\\u0026");
 }
 
 /**

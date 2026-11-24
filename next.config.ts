@@ -33,6 +33,7 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
     poweredByHeader: false,
     compress: true,
+    serverExternalPackages: ["bcrypt"],
     images: {
         formats: ["image/avif", "image/webp"],
         remotePatterns: [

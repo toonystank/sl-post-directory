@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import { useLocale, useTranslations } from "next-intl";
 import {
     AlertCircle,
@@ -31,7 +32,6 @@ import PillarBox from "@/components/brand/PillarBox";
 import { cn } from "@/lib/utils";
 import { triggerHaptic } from "@/lib/haptics";
 import {
-    MAX_BATCH_BARCODES,
     classifyBarcode,
     getBarcodeCountrySuffix,
     getBarcodePrefixLabel,
@@ -48,7 +48,10 @@ import type {
 } from "@/lib/tracking/types";
 import TrackingResultCard from "./TrackingResultCard";
 import SlpCaptchaPrompt from "./SlpCaptchaPrompt";
-import BarcodeScannerSheet from "./BarcodeScannerSheet";
+
+const BarcodeScannerSheet = dynamic(() => import("./BarcodeScannerSheet"), {
+    ssr: false,
+});
 
 const HISTORY_STORAGE_KEY = "lpd_tracking_history_v1";
 const MAX_HISTORY_ITEMS = 10;

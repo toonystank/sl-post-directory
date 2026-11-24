@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
+import { invalidateOfficeIndexCache } from "@/lib/server-caches";
 import { createOfficeSchema } from "@/lib/validations";
 import { generateSlug } from "@/lib/utils";
 
@@ -26,32 +28,39 @@ export async function POST(req: Request) {
 
         const { name, postalCode, ...fields } = validation.data;
 
-        // Build the dynamic fields array
         const dynamicFields: { name: string; value: string; type: string }[] = [];
         for (const [key, value] of Object.entries(fields)) {
-            if (key.startsWith("field_") && typeof value === 'string' && value.trim() !== '') {
+            if (key.startsWith("field_") && typeof value === "string" && value.trim() !== "") {
                 const fieldName = key.replace("field_", "");
                 dynamicFields.push({ name: fieldName, value: value.trim(), type: "TEXT" });
             }
         }
 
+        const baseSlug = generateSlug(name);
+        const existingSlug = await prisma.postOffice.findUnique({ where: { slug: baseSlug }, select: { id: true } });
+        const finalSlug = existingSlug ? `${baseSlug}-${postalCode.trim().toLowerCase()}` : baseSlug;
+
         const newOffice = await prisma.postOffice.create({
             data: {
                 name,
-                slug: generateSlug(name),
+                slug: finalSlug,
                 postalCode,
                 fields: {
-                    create: dynamicFields
-                }
+                    create: dynamicFields,
+                },
             },
             include: {
-                fields: true
-            }
+                fields: true,
+            },
         });
 
-        return NextResponse.json({ success: true, office: newOffice });
+        invalidateOfficeIndexCache();
+        revalidatePath("/");
+        revalidatePath("/browse");
+        revalidatePath(`/office/${newOffice.slug}`);
 
-    } catch (error: any) {
+        return NextResponse.json({ success: true, office: newOffice });
+    } catch (error: unknown) {
         console.error("Admin Create Office Error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }

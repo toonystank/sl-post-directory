@@ -3,12 +3,21 @@ import crypto from "crypto";
 const TOKEN_TTL_MS = 15 * 60 * 1000; // 15 minutes
 const VALID_PHPSESSID_REGEX = /^PHPSESSID=[a-zA-Z0-9,-]{10,128}$/;
 
-function getSigningSecret(): string {
-    return (
-        process.env.TRACKING_SESSION_SECRET ||
-        process.env.NEXTAUTH_SECRET ||
-        "sl-post-directory-tracking-ephemeral-secret"
-    );
+// Random per-process fallback secret used ONLY in non-production environments
+const devFallbackSecret = crypto.randomBytes(32).toString("hex");
+
+function getSigningSecret(): string | null {
+    const configured =
+        process.env.TRACKING_SESSION_SECRET?.trim() ||
+        process.env.NEXTAUTH_SECRET?.trim();
+    if (configured) {
+        return configured;
+    }
+    if (process.env.NODE_ENV === "production") {
+        console.error("CRITICAL: Neither TRACKING_SESSION_SECRET nor NEXTAUTH_SECRET is configured in production.");
+        return null;
+    }
+    return devFallbackSecret;
 }
 
 /**
@@ -16,6 +25,9 @@ function getSigningSecret(): string {
  * with an expiration timestamp so clients cannot tamper with or forge upstream cookies.
  */
 export function signUpstreamSessionCookie(rawSetCookie: string): string | null {
+    const secret = getSigningSecret();
+    if (!secret) return null;
+
     const pair = rawSetCookie.split(";")[0]?.trim() || "";
     if (!VALID_PHPSESSID_REGEX.test(pair)) {
         return null;
@@ -27,7 +39,7 @@ export function signUpstreamSessionCookie(rawSetCookie: string): string | null {
     });
     const encoded = Buffer.from(payload, "utf8").toString("base64url");
     const sig = crypto
-        .createHmac("sha256", getSigningSecret())
+        .createHmac("sha256", secret)
         .update(encoded)
         .digest("base64url");
 
@@ -39,6 +51,9 @@ export function signUpstreamSessionCookie(rawSetCookie: string): string | null {
  * or null if invalid/expired.
  */
 export function verifyUpstreamSessionCookie(token: string): string | null {
+    const secret = getSigningSecret();
+    if (!secret) return null;
+
     if (!token || typeof token !== "string") return null;
     const parts = token.split(".");
     if (parts.length !== 2) return null;
@@ -47,7 +62,7 @@ export function verifyUpstreamSessionCookie(token: string): string | null {
     if (!encoded || !sig) return null;
 
     const expectedSig = crypto
-        .createHmac("sha256", getSigningSecret())
+        .createHmac("sha256", secret)
         .update(encoded)
         .digest("base64url");
 

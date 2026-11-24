@@ -1,8 +1,25 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
+import { invalidateOfficeIndexCache } from "@/lib/server-caches";
 import { updateOfficeSchema } from "@/lib/validations";
+
+function revalidateOfficeDirectory(slug?: string) {
+    invalidateOfficeIndexCache();
+    revalidatePath("/");
+    revalidatePath("/si");
+    revalidatePath("/ta");
+    revalidatePath("/browse");
+    revalidatePath("/si/browse");
+    revalidatePath("/ta/browse");
+    if (slug) {
+        revalidatePath(`/office/${slug}`);
+        revalidatePath(`/si/office/${slug}`);
+        revalidatePath(`/ta/office/${slug}`);
+    }
+}
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -55,9 +72,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
         const { name, postalCode, newFieldName, newFieldValue, controllingOfficeId, controlledOfficesIds, ...fields } = parsed.data;
 
-        // Start a transaction to safely update fields
         const result = await prisma.$transaction(async (tx) => {
-            // Unlink all current sub-offices first if controlledOfficesIds is provided
             if (controlledOfficesIds !== undefined) {
                 await tx.postOffice.updateMany({
                     where: { controllingOfficeId: id },
@@ -65,7 +80,6 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
                 });
             }
 
-            // Update the core office data and relations
             const updatedOffice = await tx.postOffice.update({
                 where: { id },
                 data: {
@@ -80,21 +94,19 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
                 },
             });
 
-            // Delete all existing fields
             await tx.postOfficeField.deleteMany({
-                where: { postOfficeId: id }
+                where: { postOfficeId: id },
             });
 
-            // Re-insert dynamic fields
             const newFields: { name: string; value: string; type: string; postOfficeId: string }[] = [];
             for (const [key, value] of Object.entries(fields)) {
-                if (key.startsWith("field_") && typeof value === 'string' && value.trim() !== '') {
+                if (key.startsWith("field_") && typeof value === "string" && value.trim() !== "") {
                     const fieldName = key.replace("field_", "");
                     newFields.push({
                         name: fieldName,
                         value: value.trim(),
                         type: "TEXT",
-                        postOfficeId: id
+                        postOfficeId: id,
                     });
                 }
             }
@@ -103,25 +115,31 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
                 await tx.postOfficeField.createMany({ data: newFields });
             }
 
-            // Handle a potential new field addition
-            if (newFieldName && typeof newFieldName === 'string' && newFieldName.trim() &&
-                newFieldValue && typeof newFieldValue === 'string' && newFieldValue.trim()) {
+            if (
+                newFieldName &&
+                typeof newFieldName === "string" &&
+                newFieldName.trim() &&
+                newFieldValue &&
+                typeof newFieldValue === "string" &&
+                newFieldValue.trim()
+            ) {
                 await tx.postOfficeField.create({
                     data: {
                         name: newFieldName.trim(),
                         value: newFieldValue.trim(),
                         type: "TEXT",
-                        postOfficeId: id
-                    }
+                        postOfficeId: id,
+                    },
                 });
             }
 
             return updatedOffice;
         });
 
-        return NextResponse.json({ success: true, office: result });
+        revalidateOfficeDirectory(result.slug);
 
-    } catch (error: any) {
+        return NextResponse.json({ success: true, office: result });
+    } catch (error: unknown) {
         console.error("Admin Edit Office Error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
@@ -137,20 +155,36 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        // Prisma schema uses `onDelete: Cascade` for fields, but edit requests might need cleanup too
-        // or also use cascade. Let's delete it directly.
+        const deletedSlug = await prisma.$transaction(async (tx) => {
+            const existing = await tx.postOffice.findUnique({ where: { id }, select: { slug: true } });
+            if (!existing) return null;
 
-        await prisma.editRequest.deleteMany({
-            where: { postOfficeId: id }
+            await tx.postOffice.updateMany({
+                where: { controllingOfficeId: id },
+                data: { controllingOfficeId: null },
+            });
+            await tx.user.updateMany({
+                where: { postOfficeId: id },
+                data: { postOfficeId: null },
+            });
+            await tx.editRequest.deleteMany({
+                where: { postOfficeId: id },
+            });
+            await tx.postOffice.delete({
+                where: { id },
+            });
+
+            return existing.slug;
         });
 
-        await prisma.postOffice.delete({
-            where: { id }
-        });
+        if (!deletedSlug) {
+            return NextResponse.json({ error: "Post office not found" }, { status: 404 });
+        }
+
+        revalidateOfficeDirectory(deletedSlug);
 
         return NextResponse.json({ success: true });
-
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Admin Delete Office Error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }

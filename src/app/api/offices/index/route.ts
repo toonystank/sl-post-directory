@@ -5,15 +5,10 @@ import {
     type CompactOfficeIndex,
     encodeOfficeIndex,
 } from "@/lib/office-index";
+import { getOfficeIndexCache, setOfficeIndexCache } from "@/lib/server-caches";
 
 const INDEX_CACHE_TTL_MS = 1000 * 60 * 30; // 30 min in-memory server cache
 const INDEX_CACHE_CONTROL = "public, max-age=300, s-maxage=86400, stale-while-revalidate=604800";
-
-let serverCachedPayload: {
-    json: string;
-    etag: string;
-    builtAt: number;
-} | null = null;
 
 async function buildCompactIndex(): Promise<CompactOfficeIndex> {
     if (!hasDatabaseUrl) {
@@ -51,6 +46,7 @@ async function buildCompactIndex(): Promise<CompactOfficeIndex> {
 }
 
 async function getSerializedIndex() {
+    const serverCachedPayload = getOfficeIndexCache();
     if (serverCachedPayload && Date.now() - serverCachedPayload.builtAt < INDEX_CACHE_TTL_MS) {
         return serverCachedPayload;
     }
@@ -65,7 +61,7 @@ async function getSerializedIndex() {
         builtAt: Date.now(),
     };
     if (encoded.count > 0) {
-        serverCachedPayload = payload;
+        setOfficeIndexCache(payload);
     }
     return payload;
 }

@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/navigation";
-import { buildLocalizedAlternates } from "@/lib/site";
+import { buildLocalizedAlternates, getContactEmail } from "@/lib/site";
+
+export const revalidate = 86400;
 
 export async function generateMetadata({
     params,
@@ -12,13 +14,20 @@ export async function generateMetadata({
     return {
         title: "Privacy Policy",
         description:
-            "Privacy Policy for Lanka Post Directory web and Android app, covering contributor submissions, offline storage, analytics, cookies, and Google Ads.",
+            "Privacy Policy for Lanka Post Directory web and Android app, covering contributor submissions, camera/OCR scanning, offline storage, analytics, cookies, data deletion, and Google Ads.",
         alternates: buildLocalizedAlternates("/privacy", locale),
     };
 }
 
-export default async function PrivacyPolicyPage() {
+export default async function PrivacyPolicyPage({
+    params,
+}: {
+    params: Promise<{ locale: string }>;
+}) {
+    const { locale } = await params;
+    setRequestLocale(locale);
     const t = await getTranslations("Privacy");
+    const contactEmail = getContactEmail();
 
     return (
         <div className="container mx-auto max-w-3xl px-4 py-6 md:py-12 min-h-[calc(100vh-4rem)]">
@@ -97,7 +106,48 @@ export default async function PrivacyPolicyPage() {
                         Mobile App &amp; Offline Storage (Google Play / PWA)
                     </h2>
                     <p className="text-muted-foreground">
-                        When installed on Android via Google Play (Trusted Web Activity) or as a Progressive Web App, Lanka Post Directory stores a compact copy of the public Sri Lanka Post office directory and postage tariff tables locally on your device (IndexedDB and Cache Storage) so search and rate calculations work offline. We do not collect background location data, contacts, or device identifiers. You may request deletion of any contributor account, review, or uploaded photo at any time via the support link below.
+                        When installed on Android via Google Play (Trusted Web Activity) or as a Progressive Web App, Lanka Post Directory stores a compact copy of the public Sri Lanka Post office directory and postage tariff tables locally on your device (IndexedDB and Cache Storage) so search and rate calculations work offline. We do not collect background location data, contacts, or device identifiers.
+                    </p>
+                </section>
+
+                <section className="space-y-3">
+                    <h2 className="font-heading text-xl font-extrabold [font-stretch:82%] text-foreground">
+                        Camera, Barcode Scanner &amp; Optional AI OCR
+                    </h2>
+                    <p className="text-muted-foreground">
+                        Camera access is requested only when you explicitly open the barcode or parcel label scanner. Standard barcode detection and Tesseract text recognition run locally inside your browser on your device. When optional AI-assisted scanning is triggered for handwritten addresses or receipts, only the cropped image is transmitted transiently to our <code className="font-mono text-xs">/api/ocr/extract</code> endpoint powered by Google Gemini (<code className="font-mono text-xs">store: false</code>) to extract the tracking number or destination town and is never stored in our database.
+                    </p>
+                </section>
+
+                <section className="space-y-3">
+                    <h2 className="font-heading text-xl font-extrabold [font-stretch:82%] text-foreground">
+                        Account &amp; Data Deletion (Google Play Requirement)
+                    </h2>
+                    <p className="text-muted-foreground">
+                        You can request permanent deletion of your contributor account, edit history, submitted reviews, or uploaded post office photos at any time{" "}
+                        {contactEmail ? (
+                            <>
+                                by emailing{" "}
+                                <a
+                                    href={`mailto:${contactEmail}?subject=${encodeURIComponent("Lanka Post Directory — Data Deletion Request")}`}
+                                    className="text-primary font-medium underline underline-offset-4 hover:text-primary/80"
+                                >
+                                    {contactEmail}
+                                </a>{" "}
+                                or opening a request on our{" "}
+                            </>
+                        ) : (
+                            <>via our </>
+                        )}
+                        <a
+                            href="https://github.com/toonystank/sl-post-directory/issues"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary font-medium underline underline-offset-4 hover:text-primary/80"
+                        >
+                            GitHub support tracker
+                        </a>
+                        . Verified deletion requests are processed within 7 days.
                     </p>
                 </section>
 
@@ -106,6 +156,18 @@ export default async function PrivacyPolicyPage() {
                         {t("s5Title")}
                     </h2>
                     <p className="text-muted-foreground">
+                        {contactEmail && (
+                            <>
+                                You can contact us directly at{" "}
+                                <a
+                                    href={`mailto:${contactEmail}`}
+                                    className="text-primary font-medium underline underline-offset-4 hover:text-primary/80"
+                                >
+                                    {contactEmail}
+                                </a>
+                                .{" "}
+                            </>
+                        )}
                         {t("s5Prefix")}{" "}
                         <a
                             href="https://github.com/toonystank/sl-post-directory/issues"
@@ -119,12 +181,24 @@ export default async function PrivacyPolicyPage() {
                     </p>
                 </section>
 
-                <div className="pt-4 border-t border-border">
+                <div className="pt-4 border-t border-border flex flex-wrap gap-6">
                     <Link
                         href="/"
                         className="text-sm font-semibold text-primary underline underline-offset-4 hover:text-primary/80"
                     >
                         &larr; {t("backToDirectory")}
+                    </Link>
+                    <Link
+                        href="/about"
+                        className="text-sm font-semibold text-muted-foreground underline underline-offset-4 hover:text-foreground"
+                    >
+                        About &amp; Contact
+                    </Link>
+                    <Link
+                        href="/terms"
+                        className="text-sm font-semibold text-muted-foreground underline underline-offset-4 hover:text-foreground"
+                    >
+                        Terms of Use
                     </Link>
                 </div>
             </div>

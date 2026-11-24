@@ -35,7 +35,9 @@ export default function SiteFooter() {
                             </a>
                         </li>
                         <li><Link href="/login" className="hover:text-primary">{t("contribute")}</Link></li>
+                        <li><Link href="/about" className="hover:text-primary">{t("about")}</Link></li>
                         <li><Link href="/privacy" className="hover:text-primary">{t("privacy")}</Link></li>
+                        <li><Link href="/terms" className="hover:text-primary">{t("terms")}</Link></li>
                     </ul>
                 </div>
             </div>

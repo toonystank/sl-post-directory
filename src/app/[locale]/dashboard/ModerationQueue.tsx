@@ -73,11 +73,11 @@ export default function ModerationQueue({ initialPendingEdits, initialPendingEdi
         setExpandedId(expandedId === id ? null : id);
     };
 
-    const renderChanges = (edit: any) => {
+    const renderChanges = (edit: ModerationQueueProps["initialPendingEditItems"][number]) => {
         const changesJson = edit.changes;
         const type = edit.type || "EDIT";
         const reason = edit.reason;
-        const currentOffice: { name?: string, postalCode?: string, fields: Array<{ name: string, value: string }> } = edit.postOffice || { fields: [] };
+        const currentOffice: { name?: string; postalCode?: string; fields: Array<{ name: string; value: string }> } = edit.postOffice || { fields: [] };
 
         if (type === "REMOVAL") {
             return (
@@ -91,7 +91,11 @@ export default function ModerationQueue({ initialPendingEdits, initialPendingEdi
         }
 
         try {
-            const changes = JSON.parse(changesJson || "{}");
+            const changes = JSON.parse(changesJson || "{}") as {
+                name?: string;
+                postalCode?: string;
+                fields?: Array<{ name: string; value: string }>;
+            };
 
             if (type === "ADD") {
                 return (
@@ -109,7 +113,7 @@ export default function ModerationQueue({ initialPendingEdits, initialPendingEdi
                             <span className="font-medium text-muted-foreground w-28 shrink-0">Postal Code</span>
                             <span className="text-emerald-500 font-medium">+ {changes.postalCode}</span>
                         </div>
-                        {changes.fields && changes.fields.map((f: any, i: number) => (
+                        {changes.fields && changes.fields.map((f, i: number) => (
                             <div key={i} className="flex items-center gap-3 py-2 px-3 bg-emerald-500/5 border-l-2 border-emerald-500 rounded-r-lg">
                                 <span className="font-medium text-muted-foreground w-28 shrink-0">{f.name}</span>
                                 <span className="text-emerald-500 font-medium">+ {f.value}</span>
@@ -120,7 +124,7 @@ export default function ModerationQueue({ initialPendingEdits, initialPendingEdi
             }
 
             // EDIT logic
-            const currentFieldMap = new Map(currentOffice.fields.map((f: any) => [f.name, f.value]));
+            const currentFieldMap = new Map(currentOffice.fields.map((f) => [f.name, f.value]));
 
             return (
                 <div className="space-y-3 text-sm">

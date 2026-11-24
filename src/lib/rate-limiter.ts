@@ -129,7 +129,7 @@ export const rateLimiters = {
 export type AppRateLimiter = (typeof rateLimiters)[keyof typeof rateLimiters];
 
 /**
- * Extract the client IP from Vercel / Cloudflare / standard proxy headers.
+ * Extract the client IP from Vercel / Cloudflare / Netlify / standard proxy headers.
  */
 export function getClientIp(req: NextRequest | Request): string {
     const headers = req.headers;
@@ -138,6 +138,9 @@ export function getClientIp(req: NextRequest | Request): string {
 
     const cfConnecting = headers.get("cf-connecting-ip")?.trim();
     if (cfConnecting) return cfConnecting;
+
+    const netlifyIp = headers.get("x-nf-client-connection-ip")?.trim();
+    if (netlifyIp) return netlifyIp;
 
     const forwarded = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
     if (forwarded) return forwarded;

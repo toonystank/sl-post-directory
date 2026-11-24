@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Edit3, Trash2, Search, PlusCircle, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { Edit3, Trash2, Search, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,7 @@ interface Office {
 export default function AdminOfficeManager({ isContributor = false }: { isContributor?: boolean }) {
     const [offices, setOffices] = useState<Office[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
-    const [loading, setLoading] = useState(false);
+    const [, setLoading] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [bulkAction, setBulkAction] = useState<string>("add_service");
@@ -52,7 +52,7 @@ export default function AdminOfficeManager({ isContributor = false }: { isContri
             fetchOffices(searchQuery);
         }, 300);
         return () => clearTimeout(timer);
-    }, [searchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [searchQuery]);
 
     const handleDelete = async (id: string, name: string) => {
         if (!confirm(`Are you sure you want to completely delete the ${name} Post Office? This cannot be undone.`)) {
@@ -208,7 +208,7 @@ export default function AdminOfficeManager({ isContributor = false }: { isContri
                 {offices.length === 0 ? (
                     <div className="text-center py-12 text-muted-foreground">
                         <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                        <p>No post offices found matching "{searchQuery}"</p>
+                        <p>No post offices found matching &ldquo;{searchQuery}&rdquo;</p>
                     </div>
                 ) : (
                     <div className="overflow-y-auto overflow-x-hidden max-h-[500px]">

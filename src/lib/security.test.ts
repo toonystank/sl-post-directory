@@ -1,6 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { clampPagination, escapeHtml, isSafePublicImageUrl } from "./security";
+import {
+    clampPagination,
+    escapeHtml,
+    isSafePublicImageUrl,
+    isUploadcareImageUrl,
+    normalizeUploadcareImageUrl,
+    safeJsonLd,
+} from "./security";
+import { sanitizeRichHtml } from "./sanitize-html";
 
 test("isSafePublicImageUrl accepts public HTTPS asset URLs and rejects XSS/SSRF inputs", () => {
     assert.equal(isSafePublicImageUrl("https://ucarecdn.com/8f4c1a2e-9b2d-4c4b-9e6d-1234567890ab/photo.jpg"), true);
@@ -19,6 +27,51 @@ test("isSafePublicImageUrl accepts public HTTPS asset URLs and rejects XSS/SSRF 
     assert.equal(isSafePublicImageUrl("https://service.internal/img.png"), false);
     assert.equal(isSafePublicImageUrl("not-a-url"), false);
     assert.equal(isSafePublicImageUrl(""), false);
+});
+
+test("isUploadcareImageUrl strictly validates Uploadcare UUID URLs and normalizes trailing slashes", () => {
+    const uuid = "8f4c1a2e-9b2d-4c4b-9e6d-1234567890ab";
+    assert.equal(isUploadcareImageUrl(`https://ucarecdn.com/${uuid}/`), true);
+    assert.equal(isUploadcareImageUrl(`https://3q5fhu0dw8.ucarecd.net/${uuid}`), true);
+    assert.equal(
+        normalizeUploadcareImageUrl(`https://3q5fhu0dw8.ucarecd.net/${uuid}`),
+        `https://3q5fhu0dw8.ucarecd.net/${uuid}/`
+    );
+
+    // Rejects arbitrary external domains that would crash next/image
+    assert.equal(isUploadcareImageUrl("https://images.unsplash.com/photo-123"), false);
+    assert.equal(isUploadcareImageUrl("https://ucarecdn.com/not-a-uuid/"), false);
+    assert.equal(isUploadcareImageUrl(`https://ucarecdn.com/${uuid}/?evil=1`), false);
+});
+
+test("sanitizeRichHtml strips scripts, event handlers, and javascript: URLs while preserving rich formatting", () => {
+    const dirty = `
+        <h2>Postal Guide</h2>
+        <p onclick="alert(1)" style="background:url(javascript:alert(1))">Send <strong>registered</strong> mail.</p>
+        <script>fetch('/api/admin/backup')</script>
+        <svg onload="alert(2)"><circle /></svg>
+        <a href="javascript:alert(3)">Bad Link</a>
+        <a href="https://slpost.gov.lk" target="_blank">Official Site</a>
+        <img src="data:image/svg+xml,<svg onload=alert(1)>" alt="bad" />
+        <img src="https://ucarecdn.com/8f4c1a2e-9b2d-4c4b-9e6d-1234567890ab/" alt="good" onerror="alert(4)" />
+    `;
+    const clean = sanitizeRichHtml(dirty);
+    assert.equal(clean.includes("<script"), false);
+    assert.equal(clean.includes("<svg"), false);
+    assert.equal(clean.includes("onclick"), false);
+    assert.equal(clean.includes("onerror"), false);
+    assert.equal(clean.includes("javascript:"), false);
+    assert.equal(clean.includes("data:image"), false);
+    assert.equal(clean.includes("<strong>registered</strong>"), true);
+    assert.equal(clean.includes('rel="noopener noreferrer"'), true);
+    assert.equal(clean.includes('alt="good"'), true);
+});
+
+test("safeJsonLd escapes closing script tags and HTML angle brackets", () => {
+    const payload = { name: `</script><script>alert("xss")</script>` };
+    const serialized = safeJsonLd(payload);
+    assert.equal(serialized.includes("</script>"), false);
+    assert.deepEqual(JSON.parse(serialized), payload);
 });
 
 test("escapeHtml encodes dangerous HTML characters", () => {

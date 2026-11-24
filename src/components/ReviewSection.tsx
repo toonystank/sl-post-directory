@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Star, Send, Loader2 } from "lucide-react";
+import { Turnstile } from "@marsidev/react-turnstile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -64,19 +65,28 @@ function formatDate(dateStr: string): string {
 
 export default function ReviewSection({ reviews: initialReviews, officeId }: ReviewSectionProps) {
     const t = useTranslations("Reviews");
-    const [reviews, setReviews] = useState<Review[]>(initialReviews);
+    const [reviews] = useState<Review[]>(initialReviews);
     const [rating, setRating] = useState(0);
     const [authorName, setAuthorName] = useState("");
     const [content, setContent] = useState("");
+    const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
     const [error, setError] = useState(false);
+
+    const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (rating === 0) {
             setError(true);
             setMessage(t("selectRatingError"));
+            return;
+        }
+
+        if (turnstileSiteKey && !turnstileToken) {
+            setError(true);
+            setMessage("Please complete the Captcha to verify you are human.");
             return;
         }
 
@@ -88,19 +98,17 @@ export default function ReviewSection({ reviews: initialReviews, officeId }: Rev
             const res = await fetch("/api/reviews", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ rating, content, authorName, postOfficeId: officeId }),
+                body: JSON.stringify({ rating, content, authorName, postOfficeId: officeId, turnstileToken }),
             });
 
             if (res.ok) {
-                const newReview = await res.json();
-                setReviews((prev) => [newReview, ...prev]);
                 setRating(0);
                 setAuthorName("");
                 setContent("");
                 setMessage(t("thankYou"));
                 setError(false);
             } else {
-                const errData = await res.json();
+                const errData = (await res.json().catch(() => ({}))) as { error?: string };
                 setError(true);
                 setMessage(errData.error || "Failed to submit review.");
             }
@@ -190,6 +198,19 @@ export default function ReviewSection({ reviews: initialReviews, officeId }: Rev
                             className="w-full rounded-md border-[1.5px] border-input bg-card px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-[3px] focus-visible:ring-primary/25 resize-none"
                         />
                     </div>
+                    {turnstileSiteKey && (
+                        <div>
+                            <Turnstile
+                                siteKey={turnstileSiteKey}
+                                onSuccess={(token) => setTurnstileToken(token)}
+                                onExpire={() => setTurnstileToken(null)}
+                                onError={() => {
+                                    setError(true);
+                                    setMessage("Captcha error. Please try again.");
+                                }}
+                            />
+                        </div>
+                    )}
                     {message && (
                         <div className={`p-3 rounded-md text-sm font-medium ${error ? "bg-destructive/10 border border-destructive/30 text-destructive" : "bg-status-open/10 border border-status-open/40 text-status-open"}`}>
                             {message}

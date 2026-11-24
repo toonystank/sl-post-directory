@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
+import { invalidatePublicConfigCache } from "@/lib/server-caches";
 
 const SETTINGS_CACHE_CONTROL = "public, max-age=60, s-maxage=1800, stale-while-revalidate=86400";
 
@@ -19,7 +21,7 @@ export async function GET() {
         });
         return NextResponse.json({ adsEnabled: settings.adsEnabled }, { headers: { "Cache-Control": SETTINGS_CACHE_CONTROL } });
     } catch {
-        return NextResponse.json({ adsEnabled: true }, { headers: { "Cache-Control": "public, max-age=30, s-maxage=60" } }); // Default to true on error
+        return NextResponse.json({ adsEnabled: true }, { headers: { "Cache-Control": "public, max-age=30, s-maxage=60" } });
     }
 }
 
@@ -33,7 +35,7 @@ export async function PUT(req: Request) {
     }
 
     try {
-        const { adsEnabled } = await req.json();
+        const { adsEnabled } = (await req.json()) as { adsEnabled?: unknown };
 
         if (typeof adsEnabled !== "boolean") {
             return NextResponse.json({ error: "adsEnabled must be a boolean" }, { status: 400 });
@@ -45,7 +47,6 @@ export async function PUT(req: Request) {
             create: { id: "default", adsEnabled },
         });
 
-        // Log the action
         await prisma.actionLog.create({
             data: {
                 userId: user.id!,
@@ -53,6 +54,9 @@ export async function PUT(req: Request) {
                 details: JSON.stringify({ adsEnabled }),
             },
         });
+
+        invalidatePublicConfigCache();
+        revalidatePath("/", "layout");
 
         return NextResponse.json({ adsEnabled: settings.adsEnabled });
     } catch {

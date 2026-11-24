@@ -63,7 +63,12 @@ export default async function RatesHubPage({
         <div className="container mx-auto max-w-5xl px-4 py-6 md:py-10 space-y-8">
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify(breadcrumbJsonLd)
+                        .replace(/</g, "\\u003c")
+                        .replace(/>/g, "\\u003e")
+                        .replace(/&/g, "\\u0026"),
+                }}
             />
 
             {/* Header */}

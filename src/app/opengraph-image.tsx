@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { getSiteHostname } from "@/lib/site";
 
 export const alt = "Lanka Post Directory — Sri Lanka Post Offices, Postal Codes, 2026 Rates & Tracking";
 export const size = {
@@ -49,7 +50,7 @@ export default function OpenGraphImage() {
                                 Lanka Post Directory
                             </span>
                             <span style={{ fontSize: "18px", color: "#6B5E53", fontWeight: 600 }}>
-                                lankapost.vercel.app
+                                {getSiteHostname()}
                             </span>
                         </div>
                     </div>

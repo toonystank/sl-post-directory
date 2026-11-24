@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
-import { ShieldCheck, Clock, CheckCircle2, XCircle, AlertCircle, ArrowLeft } from "lucide-react";
+import { Clock, CheckCircle2, XCircle, AlertCircle, ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { prisma } from "@/lib/prisma";
@@ -66,8 +66,12 @@ export default async function ActivityLogPage() {
                             </div>
                         ) : (
                             logs.map(log => {
-                                let parsedDetails: any = {};
-                                try { parsedDetails = JSON.parse(log.details); } catch (e) { }
+                                let parsedDetails: { postOfficeName?: string; type?: string } = {};
+                                try {
+                                    parsedDetails = JSON.parse(log.details) as { postOfficeName?: string; type?: string };
+                                } catch {
+                                    // Ignore malformed JSON details
+                                }
 
                                 return (
                                     <div key={log.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-background/50 rounded-xl border border-border/50 gap-4">

@@ -1,7 +1,57 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
+
+function revalidateOfficePages(slug: string) {
+    revalidatePath(`/office/${slug}`);
+    revalidatePath(`/si/office/${slug}`);
+    revalidatePath(`/ta/office/${slug}`);
+}
+
+export async function PATCH(req: Request) {
+    try {
+        const session = await getServerSession(authOptions);
+        const user = session?.user as { id?: string; role?: string } | undefined;
+
+        if (!session || !user?.id || !["ADMIN", "SUPER_ADMIN", "MODERATOR"].includes(user.role || "")) {
+            return NextResponse.json({ error: "Unauthorized. Admin privileges required." }, { status: 401 });
+        }
+
+        const body = (await req.json()) as { id?: string; status?: string };
+        const photoId = body?.id?.trim();
+        if (!photoId) {
+            return NextResponse.json({ error: "Photo ID is required" }, { status: 400 });
+        }
+
+        const photo = await prisma.communityPhoto.update({
+            where: { id: photoId },
+            data: { status: "APPROVED" },
+            include: { postOffice: { select: { name: true, slug: true } } },
+        });
+
+        await prisma.actionLog.create({
+            data: {
+                userId: user.id,
+                action: "APPROVED_COMMUNITY_PHOTO",
+                details: JSON.stringify({
+                    photoId,
+                    url: photo.url,
+                    postOfficeId: photo.postOfficeId,
+                    postOfficeName: photo.postOffice.name,
+                }),
+            },
+        });
+
+        revalidateOfficePages(photo.postOffice.slug);
+
+        return NextResponse.json({ success: true, photo });
+    } catch (error) {
+        console.error("Photo Approval API Error:", error);
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    }
+}
 
 export async function DELETE(req: Request) {
     try {
@@ -41,15 +91,15 @@ export async function DELETE(req: Request) {
         if (uploadcareSecretKey) {
             try {
                 // Extract UUID from CDN URL (e.g. https://3q5fhu0dw8.ucarecd.net/UUID/ or https://ucarecdn.com/UUID/)
-                const urlParts = photo.url.replace(/\/$/, '').split('/');
+                const urlParts = photo.url.replace(/\/$/, "").split("/");
                 const fileUuid = urlParts[urlParts.length - 1];
 
                 if (fileUuid) {
                     const ucRes = await fetch(`https://api.uploadcare.com/files/${fileUuid}/storage/`, {
-                        method: 'DELETE',
+                        method: "DELETE",
                         headers: {
-                            'Authorization': `Uploadcare.Simple ${uploadcarePubKey}:${uploadcareSecretKey}`,
-                            'Accept': 'application/vnd.uploadcare-v0.7+json',
+                            Authorization: `Uploadcare.Simple ${uploadcarePubKey}:${uploadcareSecretKey}`,
+                            Accept: "application/vnd.uploadcare-v0.7+json",
                         },
                     });
 
@@ -68,17 +118,18 @@ export async function DELETE(req: Request) {
             data: {
                 userId: user.id,
                 action: "DELETED_COMMUNITY_PHOTO",
-                details: JSON.stringify({ 
-                    photoId, 
-                    url: photo.url, 
+                details: JSON.stringify({
+                    photoId,
+                    url: photo.url,
                     postOfficeId: photo.postOfficeId,
-                    postOfficeName: photo.postOffice.name 
-                })
-            }
+                    postOfficeName: photo.postOffice.name,
+                }),
+            },
         });
 
-        return NextResponse.json({ success: true, message: "Photo deleted successfully" });
+        revalidateOfficePages(photo.postOffice.slug);
 
+        return NextResponse.json({ success: true, message: "Photo deleted successfully" });
     } catch (error) {
         console.error("Photo Moderation API Error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

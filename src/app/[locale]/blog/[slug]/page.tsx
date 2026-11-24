@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { getPostBySlug } from "@/lib/blog";
+import { sanitizeRichHtml } from "@/lib/sanitize-html";
+import { safeJsonLd } from "@/lib/security";
 import { getVariablesMap, replacePlaceholders } from "@/lib/variables";
 import {
     buildLocalizedAlternates,
@@ -51,15 +53,17 @@ export default async function BlogArticlePage({
 }) {
     const { locale, slug } = await params;
     setRequestLocale(locale);
-    const post = await getPostBySlug(slug);
+    const [post, t, variables] = await Promise.all([
+        getPostBySlug(slug),
+        getTranslations("Blog"),
+        getVariablesMap(),
+    ]);
 
     if (!post) {
         notFound();
     }
 
-    const t = await getTranslations("Blog");
-    const variables = await getVariablesMap();
-    const htmlContent = replacePlaceholders(post.contentHtml, variables);
+    const htmlContent = sanitizeRichHtml(replacePlaceholders(post.contentHtml, variables));
 
     const formattedDate = new Date(post.date).toLocaleDateString("en-US", {
         year: "numeric",
@@ -90,7 +94,7 @@ export default async function BlogArticlePage({
         <div className="container mx-auto px-4 py-6 md:py-12 max-w-3xl min-h-[calc(100vh-4rem)]">
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+                dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
             />
 
             <Link

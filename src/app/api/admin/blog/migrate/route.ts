@@ -5,12 +5,13 @@ import { prisma } from "@/lib/prisma";
 import fs from "fs";
 import path from "path";
 import { parseFrontmatter, markdownToHtml, calculateReadingTime } from "@/lib/blog";
+import { sanitizeRichHtml } from "@/lib/sanitize-html";
 
 export async function POST() {
     const session = await getServerSession(authOptions);
-    const userRole = (session?.user as any)?.role;
+    const userRole = (session?.user as { role?: string } | undefined)?.role;
 
-    if (!session || !["SUPER_ADMIN", "ADMIN"].includes(userRole)) {
+    if (!session || !userRole || !["SUPER_ADMIN", "ADMIN"].includes(userRole)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -29,7 +30,7 @@ export async function POST() {
             const slug = filename.replace(/\.md$/, "");
 
             const { data, content } = parseFrontmatter(fileContent);
-            const htmlContent = markdownToHtml(content);
+            const htmlContent = sanitizeRichHtml(markdownToHtml(content));
 
             const existing = await prisma.blogPost.findUnique({ where: { slug } });
             

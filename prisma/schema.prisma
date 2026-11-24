@@ -2,7 +2,8 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
@@ -22,7 +23,7 @@ model PostOffice {
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
   controllingOfficeId String?
-  controllingOffice   PostOffice?       @relation("ControllingOffice", fields: [controllingOfficeId], references: [id])
+  controllingOffice   PostOffice?       @relation("ControllingOffice", fields: [controllingOfficeId], references: [id], onDelete: SetNull)
   controlledOffices   PostOffice[]      @relation("ControllingOffice")
   rmsc                String?
   fields              PostOfficeField[]
@@ -39,7 +40,7 @@ model CommunityPhoto {
   id           String     @id @default(cuid())
   url          String
   caption      String?
-  status       String     @default("APPROVED") // APPROVED by default for now
+  status       String     @default("PENDING")
   postOfficeId String
   postOffice   PostOffice @relation(fields: [postOfficeId], references: [id], onDelete: Cascade)
   createdAt    DateTime   @default(now())
@@ -83,7 +84,7 @@ model User {
   twoFactorEnabled  Boolean       @default(false)
   backupCodes       String[]      @default([])
   postOfficeId      String?
-  postOffice        PostOffice?   @relation(fields: [postOfficeId], references: [id])
+  postOffice        PostOffice?   @relation(fields: [postOfficeId], references: [id], onDelete: SetNull)
   edits             EditRequest[]
   actionLogs        ActionLog[]
 }
@@ -109,7 +110,7 @@ model EditRequest {
   status        String     @default("PENDING")
   createdAt     DateTime   @default(now())
   
-  postOffice    PostOffice? @relation(fields: [postOfficeId], references: [id])
+  postOffice    PostOffice? @relation(fields: [postOfficeId], references: [id], onDelete: SetNull)
   requestedBy   User       @relation(fields: [requestedById], references: [id])
 }
 

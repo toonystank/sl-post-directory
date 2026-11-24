@@ -35,9 +35,9 @@ export default function AddOfficeForm() {
         setError(false);
 
         const formData = new FormData(e.currentTarget);
-        const data: Record<string, any> = {
+        const data: Record<string, FormDataEntryValue | null | string> = {
             name: formData.get("name"),
-            postalCode: formData.get("postalCode")
+            postalCode: formData.get("postalCode"),
         };
 
         // Append visual dynamic fields into the data structure expected by the API
@@ -66,7 +66,7 @@ export default function AddOfficeForm() {
                 setError(true);
                 setMessage(errData.error || "An error occurred while saving.");
             }
-        } catch (err) {
+        } catch {
             setError(true);
             setMessage("A network error occurred.");
         } finally {
@@ -79,7 +79,7 @@ export default function AddOfficeForm() {
             <div className="mb-4 p-4 bg-primary/5 border border-primary/10 rounded-xl flex gap-3 text-sm text-muted-foreground">
                 <Info className="w-5 h-5 flex-shrink-0 text-primary mt-0.5" />
                 <p>
-                    Enter the details for the new post office. Dynamic fields like "Phone" or "Type" can be added below.
+                    Enter the details for the new post office. Dynamic fields like &ldquo;Phone&rdquo; or &ldquo;Type&rdquo; can be added below.
                 </p>
             </div>
 

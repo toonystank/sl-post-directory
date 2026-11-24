@@ -301,11 +301,25 @@ export default function MoreSheet({ open, onOpenChange }: MoreSheetProps) {
                             <Github className="h-4 w-4" /> {t("openSource")}
                         </a>
                         <Link
+                            href="/about"
+                            onClick={close}
+                            className="inline-flex items-center gap-1.5 font-semibold underline underline-offset-4"
+                        >
+                            {t("about")}
+                        </Link>
+                        <Link
                             href="/privacy"
                             onClick={close}
                             className="inline-flex items-center gap-1.5 font-semibold underline underline-offset-4"
                         >
                             {t("privacy")}
+                        </Link>
+                        <Link
+                            href="/terms"
+                            onClick={close}
+                            className="inline-flex items-center gap-1.5 font-semibold underline underline-offset-4"
+                        >
+                            {t("terms")}
                         </Link>
                     </div>
                 </section>

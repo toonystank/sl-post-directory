@@ -2,8 +2,8 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
-import { ShieldCheck, User, Edit3, Building2, TrendingUp, Check, X, PlusCircle, Users, Clock, Download } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { ShieldCheck, User, Edit3, Building2, TrendingUp, PlusCircle, Users, Clock, Download } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import AdminOfficeManager from "./AdminOfficeManager";
@@ -20,7 +20,6 @@ interface SessionUser {
     role?: string;
 }
 
-import { Badge } from "@/components/ui/badge";
 import ContributorDashboard from "./ContributorDashboard";
 import BlogManager from "./BlogManager";
 import VariableManager from "./VariableManager";
@@ -170,8 +169,12 @@ export default async function AdminDashboard() {
                 {["SUPER_ADMIN", "ADMIN", "MODERATOR"].includes(user?.role || "") && (
                     <div className="space-y-8">
                         <BlogManager />
-                        <PostageRateManager />
-                        <VariableManager />
+                        {["SUPER_ADMIN", "ADMIN"].includes(user?.role || "") && (
+                            <>
+                                <PostageRateManager />
+                                <VariableManager />
+                            </>
+                        )}
                     </div>
                 )}
 

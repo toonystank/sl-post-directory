@@ -71,7 +71,7 @@ export async function POST(req: Request) {
         const verificationToken = crypto.randomBytes(32).toString("hex");
 
         // Create the user
-        const user = await prisma.user.create({
+        await prisma.user.create({
             data: {
                 name,
                 email,
@@ -88,7 +88,7 @@ export async function POST(req: Request) {
             success: true,
             message: "Account created successfully. Please check your email to verify your account.",
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Registration Error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }

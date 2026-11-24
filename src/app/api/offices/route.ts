@@ -148,7 +148,7 @@ export async function GET(request: NextRequest) {
 
             if (division) {
                 whereClauses.push(
-                    `EXISTS (SELECT 1 FROM "PostOfficeField" f WHERE f."officeId" = p.id AND f.name = 'Division' AND LOWER(f.value) = LOWER($${paramIndex}))`
+                    `EXISTS (SELECT 1 FROM "PostOfficeField" f WHERE f."postOfficeId" = p.id AND f.name = 'Division' AND LOWER(f.value) = LOWER($${paramIndex}))`
                 );
                 extraParams.push(division);
                 paramIndex++;
@@ -156,7 +156,7 @@ export async function GET(request: NextRequest) {
 
             if (officeType) {
                 whereClauses.push(
-                    `EXISTS (SELECT 1 FROM "PostOfficeField" f WHERE f."officeId" = p.id AND f.name = 'Type' AND LOWER(f.value) = LOWER($${paramIndex}))`
+                    `EXISTS (SELECT 1 FROM "PostOfficeField" f WHERE f."postOfficeId" = p.id AND f.name = 'Type' AND LOWER(f.value) = LOWER($${paramIndex}))`
                 );
                 extraParams.push(officeType);
                 paramIndex++;
@@ -164,7 +164,7 @@ export async function GET(request: NextRequest) {
 
             if (is24Hour) {
                 whereClauses.push(
-                    `EXISTS (SELECT 1 FROM "PostOfficeField" f WHERE f."officeId" = p.id AND f.name = 'Is24Hour' AND f.value = 'true')`
+                    `EXISTS (SELECT 1 FROM "PostOfficeField" f WHERE f."postOfficeId" = p.id AND f.name = 'Is24Hour' AND f.value = 'true')`
                 );
             }
 
@@ -182,12 +182,6 @@ export async function GET(request: NextRequest) {
                 WHERE ${whereSQL}
                 ORDER BY rank ASC, sim DESC, p.name ASC
                 LIMIT $2 OFFSET $3
-            `;
-
-            const countQuery = `
-                SELECT COUNT(*)::int as total
-                FROM "PostOffice" p
-                WHERE ${whereSQL}
             `;
 
             try {

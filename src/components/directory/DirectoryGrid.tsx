@@ -4,7 +4,6 @@ import React from "react";
 import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import PillarBox from "@/components/brand/PillarBox";
 import { PostOffice, SearchMode } from "./types";
 import type { DirectoryExtraFilters } from "./useDirectoryState";

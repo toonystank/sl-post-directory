@@ -270,7 +270,6 @@ export function predictSearchCompletion({
     draftText,
     committedCodes,
     officeSuggestions = [],
-    locale = "en",
 }: {
     draftText: string;
     committedCodes: string[];

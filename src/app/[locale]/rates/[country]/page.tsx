@@ -80,15 +80,30 @@ export default async function CountryRatesPage({
         <article className="container mx-auto max-w-5xl px-4 py-5 md:py-10 space-y-8">
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify(breadcrumbJsonLd)
+                        .replace(/</g, "\\u003c")
+                        .replace(/>/g, "\\u003e")
+                        .replace(/&/g, "\\u0026"),
+                }}
             />
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(seo1kg.faqJsonLd) }}
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify(seo1kg.faqJsonLd)
+                        .replace(/</g, "\\u003c")
+                        .replace(/>/g, "\\u003e")
+                        .replace(/&/g, "\\u0026"),
+                }}
             />
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(seo1kg.serviceJsonLd) }}
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify(seo1kg.serviceJsonLd)
+                        .replace(/</g, "\\u003c")
+                        .replace(/>/g, "\\u003e")
+                        .replace(/&/g, "\\u0026"),
+                }}
             />
 
             {/* Breadcrumbs */}

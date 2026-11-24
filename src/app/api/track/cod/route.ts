@@ -33,6 +33,26 @@ const codRequestSchema = z.object({
         .max(MAX_BATCH_BARCODES, `Maximum ${MAX_BATCH_BARCODES} barcodes per request`),
 });
 
+async function mapWithConcurrency<T, R>(
+    items: readonly T[],
+    concurrency: number,
+    worker: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+    const results = new Array<R>(items.length);
+    let nextIndex = 0;
+
+    async function runWorker(): Promise<void> {
+        while (nextIndex < items.length) {
+            const current = nextIndex++;
+            results[current] = await worker(items[current], current);
+        }
+    }
+
+    const poolSize = Math.min(Math.max(1, concurrency), items.length);
+    await Promise.all(Array.from({ length: poolSize }, () => runWorker()));
+    return results;
+}
+
 function extractCookieHeader(headers: Headers): string {
     const setCookies =
         typeof headers.getSetCookie === "function"
@@ -227,9 +247,11 @@ export async function POST(req: NextRequest): Promise<NextResponse<CodBatchApiRe
 
         const summaryByBarcode = new Map(summary.rows.map((r) => [r.barcode, r]));
 
-        // Fetch full details for found items in parallel batches of 4 using fresh sessions
-        const items: CodLookupItemResponse[] = await Promise.all(
-            barcodes.map(async (barcode): Promise<CodLookupItemResponse> => {
+        // Fetch full details for found items with max concurrency of 4 using fresh sessions
+        const items: CodLookupItemResponse[] = await mapWithConcurrency(
+            barcodes,
+            4,
+            async (barcode): Promise<CodLookupItemResponse> => {
                 const classification = classifyBarcode(barcode);
                 const eligibleForSlp = classification !== "cod_only" && classification !== "international";
                 const row = summaryByBarcode.get(barcode);
@@ -274,7 +296,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<CodBatchApiRe
                         checkedAt: new Date().toISOString(),
                     },
                 };
-            })
+            }
         );
 
         return NextResponse.json({ success: true, items }, { status: 200, headers });

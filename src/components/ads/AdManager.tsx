@@ -4,8 +4,9 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { usePathname } from "@/navigation";
 import { stripLocalePrefix } from "@/lib/locale";
 import { isTwaRuntime } from "@/lib/pwa";
+import { getAdSenseClientId } from "@/lib/site";
 
-const NON_CONTENT_PREFIXES = ["/login", "/register", "/dashboard", "/suggest"];
+const NON_CONTENT_PREFIXES = ["/login", "/register", "/dashboard", "/suggest", "/offline"];
 const ADS_CONFIG_STORAGE_KEY = "sl-post-ads-config-v1";
 const ADS_CONFIG_TTL_MS = 1000 * 60 * 30; // 30 minutes
 let cachedAdsEnabled: boolean | null = null;
@@ -175,7 +176,7 @@ export default function AdManager({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (!paintReady || !effectiveAdsEnabled || isNative) return;
         const scriptSrc =
-            "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2503310431210239";
+            `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(getAdSenseClientId())}`;
         if (document.querySelector(`script[src="${scriptSrc}"]`)) return;
 
         const script = document.createElement("script");
