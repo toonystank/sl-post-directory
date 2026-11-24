@@ -37,7 +37,7 @@ test("InMemorySlidingWindow bounds bucket map size via oldest-bucket eviction", 
     assert.equal(limiter.size, 3);
 });
 
-test("getClientIp prefers Vercel/Cloudflare proxy headers cleanly", () => {
+test("getClientIp prefers Vercel/Cloudflare/Netlify proxy headers cleanly", () => {
     const reqVercel = new Request("https://example.com", {
         headers: {
             "x-vercel-forwarded-for": "203.0.113.9, 10.0.0.1",
@@ -52,6 +52,14 @@ test("getClientIp prefers Vercel/Cloudflare proxy headers cleanly", () => {
         },
     });
     assert.equal(getClientIp(reqCf), "198.51.100.42");
+
+    const reqNetlify = new Request("https://example.com", {
+        headers: {
+            "x-nf-client-connection-ip": "203.0.113.77",
+            "x-forwarded-for": "198.51.100.99",
+        },
+    });
+    assert.equal(getClientIp(reqNetlify), "203.0.113.77");
 
     const reqFallback = new Request("https://example.com");
     assert.equal(getClientIp(reqFallback), "unknown");

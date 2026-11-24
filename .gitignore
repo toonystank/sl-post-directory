@@ -30,13 +30,15 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files (never commit .env; commit .env.example template only)
 .env*
-!.env
 !.env.example
 
 # vercel
 .vercel
+
+# netlify
+.netlify
 
 # typescript
 *.tsbuildinfo
@@ -44,10 +46,11 @@ next-env.d.ts
 
 /src/generated/prisma
 
-# Utility scripts with credentials
+# Utility scripts with credentials & local audit dumps
 update_admin.js
 check_users.js
-.vercel
+security_audit_report.md
+test_out.txt
 
 # Database files
 *.db

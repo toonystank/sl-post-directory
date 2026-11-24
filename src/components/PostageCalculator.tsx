@@ -70,45 +70,39 @@ let cachedRateConfig: RateConfig | null = null;
 let cachedRateConfigTimestamp = 0;
 const RATE_CACHE_TTL_MS = 10 * 60_000;
 
+const SERVICE_ICON_MAP: Record<string, typeof Mail> = {
+    ems: Zap,
+    air_parcel: Package,
+    parcel: Package,
+    air_letter: Plane,
+    air_printed: BookOpen,
+    u_packet: Tag,
+    tds: ShieldCheck,
+    sea_parcel: Ship,
+    sea_letter: Mail,
+    letter: Mail,
+    sea_printed: Book,
+    open_article: FileText,
+    courier: Truck,
+    speed_post: Truck,
+    state: Landmark,
+    newspaper: Newspaper,
+    postcard: Stamp,
+    cod: Banknote,
+};
+
 /** Distinct icon per service so users build immediate colour + icon muscle memory. */
-function getServiceIcon(serviceId: string): typeof Mail {
-    switch (serviceId) {
-        case "ems":
-            return Zap;
-        case "air_parcel":
-        case "parcel":
-            return Package;
-        case "air_letter":
-            return Plane;
-        case "air_printed":
-            return BookOpen;
-        case "u_packet":
-            return Tag;
-        case "tds":
-            return ShieldCheck;
-        case "sea_parcel":
-            return Ship;
-        case "sea_letter":
-        case "letter":
-            return Mail;
-        case "sea_printed":
-            return Book;
-        case "open_article":
-            return FileText;
-        case "courier":
-        case "speed_post":
-            return Truck;
-        case "state":
-            return Landmark;
-        case "newspaper":
-            return Newspaper;
-        case "postcard":
-            return Stamp;
-        case "cod":
-            return Banknote;
-        default:
-            return Mail;
-    }
+function ServiceIcon({
+    serviceId,
+    className,
+    strokeWidth,
+}: {
+    serviceId: string;
+    className?: string;
+    strokeWidth?: number;
+}) {
+    const IconComponent = SERVICE_ICON_MAP[serviceId] ?? Mail;
+    return <IconComponent className={className} strokeWidth={strokeWidth} aria-hidden="true" />;
 }
 
 /** Index of the cheapest valid quote (only when 2+ are valid), else -1. */
@@ -182,7 +176,6 @@ function ServiceCard({
     const tagline = getServiceTagline(serviceId, locale);
     const isIndic = locale === "si" || locale === "ta";
     const priceParts = price !== null ? splitCurrencyPrice(price, currency, lkrPerUsd) : null;
-    const Icon = getServiceIcon(serviceId);
 
     const topStripe =
         serviceId === "ems"
@@ -209,7 +202,7 @@ function ServiceCard({
             >
                 <div className="flex w-full items-center justify-between gap-1.5">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-foreground/10 text-muted-foreground">
-                        <Icon className="h-3.5 w-3.5" strokeWidth={2.3} aria-hidden="true" />
+                        <ServiceIcon serviceId={serviceId} className="h-3.5 w-3.5" strokeWidth={2.3} />
                     </span>
                     <span
                         className={cn(
@@ -281,7 +274,7 @@ function ServiceCard({
                             }}
                             className="flex h-6 w-6 md:h-7 md:w-7 shrink-0 items-center justify-center rounded-full"
                         >
-                            <Icon className="h-3.5 w-3.5 md:h-4 md:w-4" strokeWidth={2.4} aria-hidden="true" />
+                            <ServiceIcon serviceId={serviceId} className="h-3.5 w-3.5 md:h-4 md:w-4" strokeWidth={2.4} />
                         </span>
                         <span
                             className={cn(
@@ -383,7 +376,11 @@ export default function PostageCalculator({
                     ? "20"
                     : "30";
 
-    const [config, setConfig] = useState<RateConfig>(DEFAULT_RATE_CONFIG);
+    const [config, setConfig] = useState<RateConfig>(() =>
+        cachedRateConfig && Date.now() - cachedRateConfigTimestamp < RATE_CACHE_TTL_MS
+            ? cachedRateConfig
+            : DEFAULT_RATE_CONFIG
+    );
     const [destination, setDestination] = useState<Destination>(initialMode);
     const [serviceId, setServiceId] = useState<string>(
         initialMode === "domestic" && initialService ? initialService : "letter"
@@ -434,47 +431,54 @@ export default function PostageCalculator({
 
     useEffect(() => {
         if (typeof window === "undefined" || !window.location.search) return;
-        const sp = new URLSearchParams(window.location.search);
-        const m = sp.get("mode");
-        const mode: Destination =
-            m === "cod" ? "cod" : m === "local" ? "domestic" : m === "intl" || m === "ems" ? "ems" : initialMode;
-        if (m) setDestination(mode);
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (cancelled) return;
+            const sp = new URLSearchParams(window.location.search);
+            const m = sp.get("mode");
+            const mode: Destination =
+                m === "cod" ? "cod" : m === "local" ? "domestic" : m === "intl" || m === "ems" ? "ems" : initialMode;
+            if (m) setDestination(mode);
 
-        const c = sp.get("country")?.toUpperCase();
-        if (c && DEFAULT_RATE_CONFIG.emsCountries.some((item) => item.code === c)) {
-            setEmsCountryCode(c);
-        }
+            const c = sp.get("country")?.toUpperCase();
+            if (c && DEFAULT_RATE_CONFIG.emsCountries.some((item) => item.code === c)) {
+                setEmsCountryCode(c);
+            }
 
-        const w = sp.get("weight");
-        if (w && /^\d+$/.test(w) && Number(w) > 0) {
-            setWeight(w);
-            setWeightUnit("g");
-            setWeightInputText(w);
-        }
+            const w = sp.get("weight");
+            if (w && /^\d+$/.test(w) && Number(w) > 0) {
+                setWeight(w);
+                setWeightUnit("g");
+                setWeightInputText(w);
+            }
 
-        const cod = sp.get("codAmount");
-        if (cod && /^\d+$/.test(cod) && Number(cod) > 0) {
-            setCodAmount(cod);
-        }
+            const cod = sp.get("codAmount");
+            if (cod && /^\d+$/.test(cod) && Number(cod) > 0) {
+                setCodAmount(cod);
+            }
 
-        const tr = sp.get("transport");
-        if (tr === "sea" || tr === "air") {
-            setIntlTransport(tr);
-        }
+            const tr = sp.get("transport");
+            if (tr === "sea" || tr === "air") {
+                setIntlTransport(tr);
+            }
 
-        const svc = sp.get("service");
-        if (svc) {
-            if (mode === "domestic") setServiceId(svc);
-            else if (mode === "ems") setIntlServiceId(svc as InternationalServiceId);
-        } else if (tr === "sea" && mode === "ems") {
-            setIntlServiceId("sea_letter");
-        }
+            const svc = sp.get("service");
+            if (svc) {
+                if (mode === "domestic") setServiceId(svc);
+                else if (mode === "ems") setIntlServiceId(svc as InternationalServiceId);
+            } else if (tr === "sea" && mode === "ems") {
+                setIntlServiceId("sea_letter");
+            }
 
-        const reg = sp.get("registered");
-        if (reg === "1" || reg === "true") {
-            if (mode === "domestic") setRegistered(true);
-            else if (mode === "ems") setIntlRegistered(true);
-        }
+            const reg = sp.get("registered");
+            if (reg === "1" || reg === "true") {
+                if (mode === "domestic") setRegistered(true);
+                else if (mode === "ems") setIntlRegistered(true);
+            }
+        });
+        return () => {
+            cancelled = true;
+        };
     }, [initialMode]);
 
     useEffect(() => {
@@ -512,7 +516,6 @@ export default function PostageCalculator({
         };
 
         if (cachedRateConfig && Date.now() - cachedRateConfigTimestamp < RATE_CACHE_TTL_MS) {
-            setConfig(cachedRateConfig);
             return;
         }
 
@@ -522,7 +525,8 @@ export default function PostageCalculator({
             if (raw) {
                 const parsed = JSON.parse(raw) as { vars?: { key: string; value: string }[]; savedAt?: number };
                 if (Array.isArray(parsed.vars)) {
-                    applyVariables(parsed.vars);
+                    const vars = parsed.vars;
+                    queueMicrotask(() => applyVariables(vars));
                     if (typeof parsed.savedAt === "number" && Date.now() - parsed.savedAt < RATE_CACHE_TTL_MS) {
                         isLocalFresh = true;
                     }
@@ -674,7 +678,6 @@ export default function PostageCalculator({
                 : getServiceColor(selectedService?.id);
 
     const activeTagline = getServiceTagline(activeServiceKey, locale);
-    const ActiveServiceIcon = getServiceIcon(activeServiceKey);
 
     const bannerStripe =
         destination === "cod"
@@ -1081,7 +1084,7 @@ export default function PostageCalculator({
                                         style={{ backgroundColor: "var(--svc)" }}
                                         className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] md:text-[11px] font-extrabold text-white shrink-0"
                                     >
-                                        <ActiveServiceIcon className="w-3 h-3 shrink-0" strokeWidth={2.5} aria-hidden="true" />
+                                        <ServiceIcon serviceId={activeServiceKey} className="w-3 h-3 shrink-0" strokeWidth={2.5} />
                                         <span>{banner.badgeLabel}</span>
                                     </span>
                                     {banner.items.length > 0 && (

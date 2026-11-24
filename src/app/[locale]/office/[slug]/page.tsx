@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
@@ -5,6 +6,7 @@ import { Building2, PenLine } from "lucide-react";
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 import { getLocalOfficeBySlug } from "@/lib/local-sqlite";
 import { getPostOfficeStatus } from "@/lib/holidays";
+import { safeJsonLd } from "@/lib/security";
 import {
     buildLocalizedAlternates,
     buildLocalizedUrl,
@@ -26,21 +28,7 @@ import OfficeActions from "./OfficeActions";
 
 export const revalidate = 86400; // Cache the post office page for 24 hours
 
-async function findOfficeWithFields(slug: string) {
-    if (!hasDatabaseUrl) {
-        return getLocalOfficeBySlug(slug);
-    }
-    try {
-        return await prisma.postOffice.findUnique({
-            where: { slug },
-            include: { fields: true }
-        });
-    } catch {
-        return getLocalOfficeBySlug(slug);
-    }
-}
-
-async function findOfficeDetails(slug: string) {
+const findOfficeDetails = cache(async function findOfficeDetails(slug: string) {
     if (!hasDatabaseUrl) {
         return getLocalOfficeBySlug(slug);
     }
@@ -51,7 +39,7 @@ async function findOfficeDetails(slug: string) {
                 fields: true,
                 photos: {
                     where: { status: "APPROVED" },
-                    orderBy: { createdAt: "desc" }
+                    orderBy: { createdAt: "desc" },
                 },
                 reviews: {
                     where: { status: "APPROVED" },
@@ -60,17 +48,44 @@ async function findOfficeDetails(slug: string) {
                 },
                 controllingOffice: { select: { id: true, slug: true, name: true, postalCode: true } },
                 controlledOffices: { select: { id: true, slug: true, name: true, postalCode: true } },
-            }
+            },
         });
     } catch {
         return getLocalOfficeBySlug(slug);
+    }
+});
+
+async function getApprovedReviewSummary(
+    postOfficeId: string,
+    fallbackReviews: { rating: number }[]
+): Promise<{ count: number; avgRating: number | undefined }> {
+    if (!hasDatabaseUrl) {
+        if (fallbackReviews.length === 0) return { count: 0, avgRating: undefined };
+        const avg = fallbackReviews.reduce((s, r) => s + r.rating, 0) / fallbackReviews.length;
+        return { count: fallbackReviews.length, avgRating: avg };
+    }
+    try {
+        const agg = await prisma.review.aggregate({
+            where: { postOfficeId, status: "APPROVED" },
+            _avg: { rating: true },
+            _count: { _all: true },
+        });
+        const count = agg._count._all;
+        return {
+            count,
+            avgRating: count > 0 && agg._avg.rating !== null ? agg._avg.rating : undefined,
+        };
+    } catch {
+        if (fallbackReviews.length === 0) return { count: 0, avgRating: undefined };
+        const avg = fallbackReviews.reduce((s, r) => s + r.rating, 0) / fallbackReviews.length;
+        return { count: fallbackReviews.length, avgRating: avg };
     }
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string; slug: string }> }): Promise<Metadata> {
     const { locale, slug } = await params;
 
-    const office = await findOfficeWithFields(slug);
+    const office = await findOfficeDetails(slug);
 
     if (!office) {
         return {
@@ -110,8 +125,11 @@ export default async function OfficeDetails({ params }: { params: Promise<{ loca
         notFound();
     }
 
-    const t = await getTranslations("Office");
-    const tStatus = await getTranslations("Status");
+    const [t, tStatus, reviewSummary] = await Promise.all([
+        getTranslations("Office"),
+        getTranslations("Status"),
+        getApprovedReviewSummary(office.id, office.reviews),
+    ]);
 
     const normalizedCode = normalizePostalCode(office.postalCode);
     const type = office.fields.find((f) => f.name === "Type")?.value;
@@ -130,9 +148,8 @@ export default async function OfficeDetails({ params }: { params: Promise<{ loca
     const currentStatus = getPostOfficeStatus(locale, is24Hour);
     const statusLabel = currentStatus.status === "holiday" ? tStatus("holiday") : tStatus(currentStatus.label);
 
-    const avgRating = office.reviews.length > 0
-        ? office.reviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / office.reviews.length
-        : undefined;
+    const avgRating = reviewSummary.avgRating;
+    const totalApprovedReviews = reviewSummary.count;
 
     const firstImage = office.photos.length > 0 ? office.photos[0].url : undefined;
     const officeUrl = buildLocalizedUrl(`/office/${office.slug}`, locale);
@@ -178,11 +195,11 @@ export default async function OfficeDetails({ params }: { params: Promise<{ loca
                 "closes": "13:00"
             }
         ],
-        ...(avgRating ? {
+        ...(avgRating !== undefined && totalApprovedReviews > 0 ? {
             "aggregateRating": {
                 "@type": "AggregateRating",
                 "ratingValue": avgRating.toFixed(1),
-                "reviewCount": office.reviews.length
+                "reviewCount": totalApprovedReviews
             }
         } : {}),
     };
@@ -231,11 +248,11 @@ export default async function OfficeDetails({ params }: { params: Promise<{ loca
         <article className="container mx-auto max-w-3xl px-4 py-4 md:py-10">
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+                dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
             />
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
+                dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbLd) }}
             />
 
             <div className="hidden md:block mb-4">

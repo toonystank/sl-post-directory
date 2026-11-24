@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isSafePublicImageUrl } from "./security";
+import { isUploadcareImageUrl, normalizeUploadcareImageUrl } from "./security";
 
 // Shared Schemas
 export const emailSchema = z.string().trim().email("Invalid email address").max(100);
@@ -93,6 +93,7 @@ export const reviewSchema = z.object({
     content: z.string().trim().min(10, "Review must be at least 10 characters").max(1000),
     authorName: z.string().trim().min(2, "Name must be at least 2 characters").max(50),
     postOfficeId: z.string().trim().min(1).max(64),
+    turnstileToken: turnstileTokenSchema,
 });
 
 // Community Photo Upload Payload
@@ -102,8 +103,10 @@ export const photoUploadSchema = z.object({
         .trim()
         .min(1, "URL is required")
         .max(2048)
-        .refine(isSafePublicImageUrl, "Photo URL must be a valid public HTTPS image URL"),
+        .refine(isUploadcareImageUrl, "Photo must be uploaded through the official Lanka Post uploader")
+        .transform(normalizeUploadcareImageUrl),
     caption: z.string().trim().max(200).optional().default(""),
+    turnstileToken: turnstileTokenSchema,
 });
 
 // 6-digit TOTP token validation

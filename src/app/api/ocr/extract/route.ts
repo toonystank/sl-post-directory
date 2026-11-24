@@ -208,9 +208,13 @@ export async function POST(req: NextRequest): Promise<NextResponse<AiOcrApiRespo
             { status: 200, headers }
         );
     } catch (err) {
-        const message = err instanceof Error ? err.message : "AI extraction request failed";
+        console.error("Gemini OCR extraction error:", err);
         return NextResponse.json(
-            { success: false, aiAvailable: true, error: message },
+            {
+                success: false,
+                aiAvailable: true,
+                error: "AI scan service is temporarily unavailable. Falling back to local scanner.",
+            },
             { status: 502, headers }
         );
     }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
+import { getPublicConfigCache, setPublicConfigCache } from "@/lib/server-caches";
 
 const PUBLIC_CONFIG_CACHE_CONTROL =
     "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400";
@@ -16,7 +17,6 @@ interface PublicConfigPayload {
     rateVariables: { key: string; value: string }[];
 }
 
-let cachedConfig: { data: PublicConfigPayload; builtAt: number } | null = null;
 const MEMORY_TTL_MS = 1000 * 60 * 5;
 
 /**
@@ -25,6 +25,7 @@ const MEMORY_TTL_MS = 1000 * 60 * 5;
  * on public user-facing pages.
  */
 export async function GET() {
+    const cachedConfig = getPublicConfigCache();
     if (cachedConfig && Date.now() - cachedConfig.builtAt < MEMORY_TTL_MS) {
         return NextResponse.json(cachedConfig.data, {
             status: 200,
@@ -38,7 +39,7 @@ export async function GET() {
     };
 
     if (!hasDatabaseUrl) {
-        cachedConfig = { data: fallback, builtAt: Date.now() };
+        setPublicConfigCache({ data: fallback, builtAt: Date.now() });
         return NextResponse.json(fallback, {
             status: 200,
             headers: { "Cache-Control": PUBLIC_CONFIG_CACHE_CONTROL },
@@ -62,7 +63,7 @@ export async function GET() {
             adsEnabled: settings?.adsEnabled ?? true,
             rateVariables: variables,
         };
-        cachedConfig = { data, builtAt: Date.now() };
+        setPublicConfigCache({ data, builtAt: Date.now() });
 
         return NextResponse.json(data, {
             status: 200,

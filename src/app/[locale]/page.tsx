@@ -6,6 +6,7 @@ import BlogCard from "@/components/BlogCard";
 import { getLatestPosts } from "@/lib/blog";
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 import { loadLocalOffices } from "@/lib/local-sqlite";
+import { safeJsonLd } from "@/lib/security";
 import {
     buildLocalizedAlternates,
     buildLocalizedUrl,
@@ -112,7 +113,7 @@ export default async function Home({
         <div className="flex flex-col min-h-screen bg-background overflow-x-clip">
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+                dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
             />
             <div suppressHydrationWarning className="w-full bg-background relative z-20">
                 <HomeHero total={totalOffices} />

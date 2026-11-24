@@ -99,7 +99,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         localizedEntry("/rates/local", { lastModified: now, changeFrequency: "monthly", priority: 0.85 }),
         localizedEntry("/rates/cod", { lastModified: now, changeFrequency: "monthly", priority: 0.85 }),
         localizedEntry("/blog", { lastModified: now, changeFrequency: "weekly", priority: 0.85 }),
+        localizedEntry("/about", { lastModified: now, changeFrequency: "monthly", priority: 0.5 }),
         localizedEntry("/privacy", { lastModified: now, changeFrequency: "yearly", priority: 0.4 }),
+        localizedEntry("/terms", { lastModified: now, changeFrequency: "yearly", priority: 0.4 }),
     ];
 
     // Programmatic International Country Rate Pages (/rates/taiwan, /rates/united-kingdom, etc.)

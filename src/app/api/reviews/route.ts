@@ -1,5 +1,6 @@
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 import { checkRateLimit, rateLimiters, rateLimitHeaders } from "@/lib/rate-limiter";
+import { verifyTurnstile } from "@/lib/turnstile";
 import { reviewSchema } from "@/lib/validations";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -27,7 +28,12 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const { rating, content, authorName, postOfficeId } = parsed.data;
+        const { rating, content, authorName, postOfficeId, turnstileToken } = parsed.data;
+
+        const captcha = await verifyTurnstile(turnstileToken);
+        if (!captcha.ok) {
+            return NextResponse.json({ error: captcha.error }, { status: captcha.status });
+        }
 
         const office = await prisma.postOffice.findUnique({
             where: { id: postOfficeId },

@@ -21,7 +21,6 @@ export default async function ContributorDashboard({ userId, userName }: Contrib
 
     const pendingEdits = myEdits.filter(edit => edit.status === "PENDING" || edit.status === "MORE_INFO");
     const approvedEdits = myEdits.filter(edit => edit.status === "APPROVED");
-    const rejectedEdits = myEdits.filter(edit => edit.status === "REJECTED");
 
     return (
         <div className="container mx-auto px-4 py-12 max-w-6xl min-h-[calc(100vh-4rem)]">
@@ -145,7 +144,6 @@ export default async function ContributorDashboard({ userId, userName }: Contrib
                                             Postal Code: <span className="font-medium text-foreground">{edit.postOffice?.postalCode || (() => { try { return JSON.parse(edit.changes).postalCode || "N/A" } catch { return "N/A" } })()}</span>
                                         </p>
                                         <div className="bg-background/50 rounded-xl p-4 border border-border/50">
-                                            {/* @ts-ignore */}
                                             <RenderChanges edit={edit} />
                                         </div>
                                     </div>
@@ -159,11 +157,22 @@ export default async function ContributorDashboard({ userId, userName }: Contrib
     );
 }
 
-function RenderChanges({ edit }: { edit: any }) {
+interface RenderableEditItem {
+    changes: string;
+    type?: string;
+    reason?: string | null;
+    postOffice?: {
+        name?: string;
+        postalCode?: string;
+        fields: Array<{ name: string; value: string }>;
+    } | null;
+}
+
+function RenderChanges({ edit }: { edit: RenderableEditItem }) {
     const changesJson = edit.changes;
     const type = edit.type || "EDIT";
     const reason = edit.reason;
-    const currentOffice: { name?: string, postalCode?: string, fields: Array<{ name: string, value: string }> } = edit.postOffice || { fields: [] };
+    const currentOffice: { name?: string; postalCode?: string; fields: Array<{ name: string; value: string }> } = edit.postOffice || { fields: [] };
 
     if (type === "REMOVAL") {
         return (
@@ -177,7 +186,11 @@ function RenderChanges({ edit }: { edit: any }) {
     }
 
     try {
-        const changes = JSON.parse(changesJson || "{}");
+        const changes = JSON.parse(changesJson || "{}") as {
+            name?: string;
+            postalCode?: string;
+            fields?: Array<{ name: string; value: string }>;
+        };
 
         if (type === "ADD") {
             return (
@@ -195,7 +208,7 @@ function RenderChanges({ edit }: { edit: any }) {
                         <span className="font-medium text-muted-foreground w-24 shrink-0">Postal Code</span>
                         <span className="text-emerald-500 font-medium">+ {changes.postalCode}</span>
                     </div>
-                    {changes.fields && changes.fields.map((f: any, i: number) => (
+                    {changes.fields && changes.fields.map((f, i: number) => (
                         <div key={i} className="flex items-center gap-3 py-1.5 px-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
                             <span className="font-medium text-muted-foreground w-24 shrink-0">{f.name}</span>
                             <span className="text-emerald-500 font-medium">+ {f.value}</span>
@@ -206,7 +219,7 @@ function RenderChanges({ edit }: { edit: any }) {
         }
 
         // EDIT logic
-        const currentFieldMap = new Map(currentOffice.fields?.map((f: any) => [f.name, f.value]) || []);
+        const currentFieldMap = new Map(currentOffice.fields?.map((f) => [f.name, f.value]) || []);
 
         return (
             <div className="space-y-3 text-sm">

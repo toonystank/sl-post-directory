@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Edit3, Trash2, CheckCircle, XCircle, FileText } from "lucide-react";
+import { PlusCircle, Edit3, Trash2, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import BlogEditor from "./BlogEditor";
@@ -55,7 +55,7 @@ export default function BlogManager() {
                     <CardTitle className="text-lg flex items-center gap-2">
                         Blog Articles
                     </CardTitle>
-                    <CardDescription className="text-sm mt-1">Manage your site's postal guides and articles.</CardDescription>
+                    <CardDescription className="text-sm mt-1">Manage your site&apos;s postal guides and articles.</CardDescription>
                 </div>
                 <Button onClick={() => setIsCreating(true)} className="gap-2 rounded-xl h-10">
                     <PlusCircle className="w-4 h-4" /> New Article

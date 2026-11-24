@@ -26,7 +26,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         });
 
         return NextResponse.json({ success: true, message: `2FA disabled successfully for ${updatedUser.email}` });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Admin 2FA Reset Error:", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }

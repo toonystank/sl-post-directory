@@ -85,15 +85,30 @@ export default async function CountryWeightRatePage({
         <article className="container mx-auto max-w-5xl px-4 py-5 md:py-10 space-y-8">
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(seo.breadcrumbJsonLd) }}
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify(seo.breadcrumbJsonLd)
+                        .replace(/</g, "\\u003c")
+                        .replace(/>/g, "\\u003e")
+                        .replace(/&/g, "\\u0026"),
+                }}
             />
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(seo.faqJsonLd) }}
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify(seo.faqJsonLd)
+                        .replace(/</g, "\\u003c")
+                        .replace(/>/g, "\\u003e")
+                        .replace(/&/g, "\\u0026"),
+                }}
             />
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(seo.serviceJsonLd) }}
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify(seo.serviceJsonLd)
+                        .replace(/</g, "\\u003c")
+                        .replace(/>/g, "\\u003e")
+                        .replace(/&/g, "\\u0026"),
+                }}
             />
 
             {/* Breadcrumbs */}

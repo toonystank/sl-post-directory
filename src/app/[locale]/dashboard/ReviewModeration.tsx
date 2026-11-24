@@ -23,6 +23,22 @@ interface ReviewModerationProps {
     initialPendingReviewItems: Review[];
 }
 
+function StarRating({ rating }: { rating: number }) {
+    return (
+        <div className="flex gap-0.5">
+            {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                    key={star}
+                    className={`w-3.5 h-3.5 ${star <= rating
+                        ? "fill-amber-400 text-amber-400"
+                        : "text-muted-foreground/30"
+                        }`}
+                />
+            ))}
+        </div>
+    );
+}
+
 export default function ReviewModeration({ initialPendingReviews, initialPendingReviewItems }: ReviewModerationProps) {
     const [pendingReviews, setPendingReviews] = useState(initialPendingReviews);
     const [reviewItems, setReviewItems] = useState(initialPendingReviewItems);
@@ -55,22 +71,6 @@ export default function ReviewModeration({ initialPendingReviews, initialPending
             setProcessingId(null);
         }
     };
-
-    function StarRating({ rating }: { rating: number }) {
-        return (
-            <div className="flex gap-0.5">
-                {[1, 2, 3, 4, 5].map((star) => (
-                    <Star
-                        key={star}
-                        className={`w-3.5 h-3.5 ${star <= rating
-                            ? "fill-amber-400 text-amber-400"
-                            : "text-muted-foreground/30"
-                            }`}
-                    />
-                ))}
-            </div>
-        );
-    }
 
     return (
         <Card className="border-border/50 overflow-hidden">
@@ -117,7 +117,7 @@ export default function ReviewModeration({ initialPendingReviews, initialPending
                                         <div className="pl-11">
                                             <StarRating rating={review.rating} />
                                             <p className="text-sm mt-2 text-foreground/90 leading-relaxed italic">
-                                                "{review.content}"
+                                                &ldquo;{review.content}&rdquo;
                                             </p>
                                         </div>
                                     </div>

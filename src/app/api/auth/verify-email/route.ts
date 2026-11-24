@@ -37,7 +37,7 @@ export async function GET(req: Request) {
         // Redirect to a success page or back to the login page with a success parameter
         return NextResponse.redirect(new URL("/login?verified=true", req.url));
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Verification Error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }

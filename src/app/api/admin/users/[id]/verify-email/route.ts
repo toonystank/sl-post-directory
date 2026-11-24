@@ -32,7 +32,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
         return NextResponse.json({ success: true, user: updatedUser });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Force Verify Email Error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }

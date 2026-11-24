@@ -6,6 +6,7 @@ import crypto from "node:crypto";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/options";
 import { checkRateLimit, rateLimiters } from "@/lib/rate-limiter";
+import { verifyTurnstile } from "@/lib/turnstile";
 import { suggestSchema, suggestAddSchema } from "@/lib/validations";
 
 export async function POST(req: Request) {
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Rate limit exceeded. Try again later." }, { status: 429 });
         }
 
-        const body = await req.json();
+        const body = (await req.json()) as Record<string, unknown>;
 
         // Validate Payload using Zod based on the type
         const isAddRequest = body.type === "ADD";
@@ -30,33 +31,23 @@ export async function POST(req: Request) {
             );
         }
 
-        const data = validation.data;
-        const type = data.type || "EDIT";
-        const reason = data.reason || null;
-        const officeId = isAddRequest ? null : (data as any).officeId;
+        const data = validation.data as Record<string, unknown>;
+        const type = typeof data.type === "string" ? data.type : "EDIT";
+        const reason = typeof data.reason === "string" && data.reason ? data.reason : null;
+        const officeId = isAddRequest ? null : typeof data.officeId === "string" ? data.officeId : null;
 
-        const { submitterName, submitterEmail, submitterPassword, turnstileToken, name, postalCode, newFieldName, newFieldValue, ...fields } = data as any;
+        const submitterName = typeof data.submitterName === "string" ? data.submitterName : undefined;
+        const submitterEmail = typeof data.submitterEmail === "string" ? data.submitterEmail : undefined;
+        const submitterPassword = typeof data.submitterPassword === "string" ? data.submitterPassword : undefined;
+        const turnstileToken = typeof data.turnstileToken === "string" ? data.turnstileToken : null;
+        const name = typeof data.name === "string" ? data.name : undefined;
+        const postalCode = typeof data.postalCode === "string" ? data.postalCode : undefined;
+        const newFieldName = typeof data.newFieldName === "string" ? data.newFieldName : undefined;
+        const newFieldValue = typeof data.newFieldValue === "string" ? data.newFieldValue : undefined;
 
-        // Verify Captcha — fail-closed in production
-        const turnstileSecret = process.env.TURNSTILE_SECRET_KEY;
-        if (turnstileSecret && turnstileToken) {
-            const formData = new FormData();
-            formData.append("secret", turnstileSecret);
-            formData.append("response", turnstileToken);
-
-            const result = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-                body: formData,
-                method: "POST",
-            });
-            const outcome = await result.json();
-            if (!outcome.success) {
-                return NextResponse.json({ error: "Captcha verification failed" }, { status: 400 });
-            }
-        } else if (turnstileSecret && !turnstileToken) {
-            return NextResponse.json({ error: "Please complete the Captcha" }, { status: 400 });
-        } else if (!turnstileSecret && process.env.NODE_ENV === "production") {
-            console.error("CRITICAL: TURNSTILE_SECRET_KEY is not configured in production!");
-            return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
+        const captcha = await verifyTurnstile(turnstileToken);
+        if (!captcha.ok) {
+            return NextResponse.json({ error: captcha.error }, { status: captcha.status });
         }
 
         let user;
@@ -64,7 +55,7 @@ export async function POST(req: Request) {
 
         if (session && session.user?.email) {
             user = await prisma.user.findUnique({
-                where: { email: session.user.email }
+                where: { email: session.user.email },
             });
 
             if (!user) {
@@ -76,11 +67,8 @@ export async function POST(req: Request) {
                 return NextResponse.json({ error: "Name, email, and password are required to create an account." }, { status: 400 });
             }
 
-
-
-            // Check existing user
             const existingUser = await prisma.user.findUnique({
-                where: { email: submitterEmail }
+                where: { email: submitterEmail },
             });
 
             if (existingUser) {
@@ -88,7 +76,6 @@ export async function POST(req: Request) {
                 return NextResponse.json({ error: "Please log in to submit suggestions." }, { status: 400 });
             }
 
-            // Create new user
             const passwordHash = await bcrypt.hash(submitterPassword, 10);
             const verificationToken = crypto.randomBytes(32).toString("hex");
 
@@ -98,11 +85,10 @@ export async function POST(req: Request) {
                     email: submitterEmail,
                     passwordHash,
                     role: "CONTRIBUTOR",
-                    verificationToken
-                }
+                    verificationToken,
+                },
             });
 
-            // Send Verification Email
             await sendVerificationEmail(submitterEmail, submitterName, verificationToken);
         }
 
@@ -113,7 +99,7 @@ export async function POST(req: Request) {
             }
 
             office = await prisma.postOffice.findUnique({
-                where: { id: officeId }
+                where: { id: officeId },
             });
 
             if (!office) {
@@ -121,49 +107,47 @@ export async function POST(req: Request) {
             }
         }
 
-        // Build the changes object (for EDIT and ADD)
-        const changes: any = {
+        const changes: {
+            name?: string;
+            postalCode?: string;
+            fields: { name: string; value: string }[];
+        } = {
             name,
             postalCode,
-            fields: []
+            fields: [],
         };
 
-        // Process dynamic fields
-        for (const [key, value] of Object.entries(fields)) {
-            if (key.startsWith("field_") && key !== "type" && key !== "reason") {
+        for (const [key, value] of Object.entries(data)) {
+            if (key.startsWith("field_") && key !== "type" && key !== "reason" && typeof value === "string") {
                 const fieldName = key.replace("field_", "");
                 changes.fields.push({ name: fieldName, value });
             }
         }
 
-        // Processing a potential new field addition
         if (newFieldName && newFieldValue) {
             changes.fields.push({ name: newFieldName, value: newFieldValue });
         }
 
-        // Create the edit request
         const editRequest = await prisma.editRequest.create({
             data: {
                 postOfficeId: officeId,
                 requestedById: user.id,
-                type: type,
-                reason: reason,
+                type,
+                reason,
                 changes: JSON.stringify(changes),
-                status: "PENDING"
-            }
+                status: "PENDING",
+            },
         });
 
-        // Trigger email notification for the edit
         const emailOfficeName = isAddRequest ? name || "New Office" : office?.name || "";
         await sendEditRequestReceivedEmail(user.email, user.name, emailOfficeName);
 
         return NextResponse.json({
             success: true,
             message: `${type === "ADD" ? "Addition" : type === "REMOVAL" ? "Removal" : "Edit"} request submitted successfully`,
-            requestId: editRequest.id
+            requestId: editRequest.id,
         });
-
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Suggest API Error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }

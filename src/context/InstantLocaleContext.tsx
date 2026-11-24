@@ -101,18 +101,15 @@ export function InstantLocaleProvider({
     const [, startTransition] = useTransition();
     const normalizedInitial = normalizeAppLocale(initialLocale);
 
-    // Hydrate module cache synchronously with SSR-provided messages for the initial locale
-    if (initialMessages && !messageCache[normalizedInitial]) {
-        messageCache[normalizedInitial] = initialMessages;
-    }
-
     const [locale, setLocaleState] = useState<AppLocale>(normalizedInitial);
     const [activeMessages, setActiveMessages] = useState<AbstractIntlMessages>(
         () => initialMessages || messageCache[normalizedInitial] || messageCache.en!
     );
-    const [allMessagesCached, setAllMessagesCached] = useState(
-        Boolean(messageCache.en && messageCache.si && messageCache.ta)
-    );
+    const [allMessagesCached, setAllMessagesCached] = useState(() => {
+        const hasSi = Boolean(messageCache.si || (normalizedInitial === "si" && initialMessages));
+        const hasTa = Boolean(messageCache.ta || (normalizedInitial === "ta" && initialMessages));
+        return Boolean(messageCache.en && hasSi && hasTa);
+    });
     const pendingLocaleRef = useRef<AppLocale | null>(null);
 
     const prefetchLocale = useCallback((target: AppLocale) => {
@@ -133,10 +130,13 @@ export function InstantLocaleProvider({
         if (pendingLocaleRef.current) {
             if (normalizedInitial === pendingLocaleRef.current) {
                 pendingLocaleRef.current = null;
-                setLocaleState(normalizedInitial);
-                if (messageCache[normalizedInitial]) {
-                    setActiveMessages(messageCache[normalizedInitial]!);
-                }
+                const syncedMsgs = messageCache[normalizedInitial];
+                queueMicrotask(() => {
+                    setLocaleState(normalizedInitial);
+                    if (syncedMsgs) {
+                        setActiveMessages(syncedMsgs);
+                    }
+                });
                 if (typeof document !== "undefined") {
                     document.documentElement.lang = normalizedInitial;
                 }
@@ -144,11 +144,15 @@ export function InstantLocaleProvider({
             return;
         }
 
-        setLocaleState(normalizedInitial);
-        if (messageCache[normalizedInitial]) {
-            setActiveMessages(messageCache[normalizedInitial]!);
+        const cachedMsgs = messageCache[normalizedInitial];
+        if (cachedMsgs) {
+            queueMicrotask(() => {
+                setLocaleState(normalizedInitial);
+                setActiveMessages(cachedMsgs);
+            });
         } else {
             void loadLocaleMessages(normalizedInitial).then((msgs) => {
+                setLocaleState(normalizedInitial);
                 setActiveMessages(msgs);
             });
         }

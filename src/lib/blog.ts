@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { cache } from "react";
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 import type { BlogPost } from "@prisma/client";
 
@@ -146,20 +147,20 @@ export async function getAllPosts(): Promise<BlogPost[]> {
     }
 }
 
-export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
+export const getPostBySlug = cache(async function getPostBySlug(slug: string): Promise<BlogPost | null> {
     if (!hasDatabaseUrl) {
         return getLocalMarkdownPosts().find((post) => post.slug === slug) ?? null;
     }
 
     try {
         const post = await prisma.blogPost.findUnique({
-            where: { slug }
+            where: { slug },
         });
         return post ?? getLocalMarkdownPosts().find((p) => p.slug === slug) ?? null;
     } catch {
         return getLocalMarkdownPosts().find((post) => post.slug === slug) ?? null;
     }
-}
+});
 
 export async function getLatestPosts(count: number): Promise<BlogPost[]> {
     if (!hasDatabaseUrl) {

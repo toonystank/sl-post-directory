@@ -15,6 +15,12 @@ interface PhotoGalleryProps {
     officeName?: string;
 }
 
+function withUploadcarePreview(rawUrl: string, dimensions: string): string {
+    const trimmed = rawUrl.trim();
+    const base = trimmed.endsWith("/") ? trimmed : `${trimmed}/`;
+    return `${base}-/preview/${dimensions}/-/quality/smart/`;
+}
+
 export default function PhotoGallery({ photos, officeName }: PhotoGalleryProps) {
     const t = useTranslations("Photos");
     const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
@@ -41,7 +47,7 @@ export default function PhotoGallery({ photos, officeName }: PhotoGalleryProps) 
                         className="tap group relative aspect-square rounded-md overflow-hidden border border-border hover:border-foreground transition-colors"
                     >
                         <Image
-                            src={`${photo.url}-/preview/400x400/-/quality/smart/`}
+                            src={withUploadcarePreview(photo.url, "400x400")}
                             alt={photo.caption || `${officeName} photo ${idx + 1}`}
                             fill
                             sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
@@ -68,7 +74,7 @@ export default function PhotoGallery({ photos, officeName }: PhotoGalleryProps) 
                     </button>
                     <div className="relative w-full h-full max-h-[90vh] flex items-center justify-center">
                         <Image
-                            src={`${selectedPhoto.url}-/preview/1200x900/-/quality/smart/`}
+                            src={withUploadcarePreview(selectedPhoto.url, "1200x900")}
                             alt={selectedPhoto.caption || "Community photo"}
                             fill
                             className="object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-300"

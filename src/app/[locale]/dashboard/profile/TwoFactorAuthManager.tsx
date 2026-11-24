@@ -257,7 +257,7 @@ export default function TwoFactorAuthManager({ enabled, backupCodes: initialBack
                     <div className="space-y-2">
                         <h4 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Step 1</h4>
                         <p className="text-sm">Scan the QR code with an authenticator app like Google Authenticator, Authy, or 1Password.</p>
-                        <p className="text-xs text-muted-foreground mt-1">If you can't scan the QR code, use this manual setup key:</p>
+                        <p className="text-xs text-muted-foreground mt-1">If you can&apos;t scan the QR code, use this manual setup key:</p>
                         <div className="flex items-center gap-2 mt-2">
                             <code className="bg-muted px-2 py-1 rounded text-xs font-mono">{secret}</code>
                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(secret)}>

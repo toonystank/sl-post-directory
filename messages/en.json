@@ -106,7 +106,9 @@
     "aboutTitle": "About this app",
     "disclaimer": "Lanka Post Directory is an independent, community-maintained project. It is not affiliated with or endorsed by Sri Lanka Post. Always confirm hours with the office before you travel.",
     "openSource": "Open source on GitHub",
-    "privacy": "Privacy policy"
+    "about": "About & Contact",
+    "privacy": "Privacy policy",
+    "terms": "Terms of use"
   },
   "Footer": {
     "disclaimer": "An independent, community-maintained directory of Sri Lankan post offices. Not affiliated with or endorsed by Sri Lanka Post.",
@@ -115,7 +117,9 @@
     "project": "Project",
     "source": "Source code",
     "contribute": "Contribute data",
+    "about": "About & Contact",
     "privacy": "Privacy policy",
+    "terms": "Terms of use",
     "rights": "Data provided as-is."
   },
   "Home": {

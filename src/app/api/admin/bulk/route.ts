@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
+import { invalidateOfficeIndexCache } from "@/lib/server-caches";
 import { adminBulkSchema } from "@/lib/validations";
 
 export async function POST(req: Request) {
@@ -26,6 +28,14 @@ export async function POST(req: Request) {
 
         if (action === "delete") {
             await prisma.$transaction([
+                prisma.postOffice.updateMany({
+                    where: { controllingOfficeId: { in: officeIds } },
+                    data: { controllingOfficeId: null },
+                }),
+                prisma.user.updateMany({
+                    where: { postOfficeId: { in: officeIds } },
+                    data: { postOfficeId: null },
+                }),
                 prisma.editRequest.deleteMany({
                     where: { postOfficeId: { in: officeIds } },
                 }),
@@ -33,6 +43,10 @@ export async function POST(req: Request) {
                     where: { id: { in: officeIds } },
                 }),
             ]);
+
+            invalidateOfficeIndexCache();
+            revalidatePath("/");
+            revalidatePath("/browse");
 
             return NextResponse.json({ success: true, message: "Offices deleted" });
         }
@@ -43,7 +57,7 @@ export async function POST(req: Request) {
 
         const offices = await prisma.postOffice.findMany({
             where: { id: { in: officeIds } },
-            select: { id: true, services: true },
+            select: { id: true, slug: true, services: true },
         });
 
         if (action === "add_service") {
@@ -58,6 +72,8 @@ export async function POST(req: Request) {
 
             if (updates.length > 0) {
                 await prisma.$transaction(updates);
+                invalidateOfficeIndexCache();
+                revalidatePath("/browse");
             }
 
             return NextResponse.json({ success: true, message: "Services added" });
@@ -75,6 +91,8 @@ export async function POST(req: Request) {
 
             if (updates.length > 0) {
                 await prisma.$transaction(updates);
+                invalidateOfficeIndexCache();
+                revalidatePath("/browse");
             }
 
             return NextResponse.json({ success: true, message: "Services removed" });

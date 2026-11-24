@@ -36,7 +36,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
         return NextResponse.json({ success: true, user: updatedUser });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Super Admin Edit User Role Error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
@@ -66,7 +66,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
         return NextResponse.json({ success: true });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Super Admin Delete User Error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }

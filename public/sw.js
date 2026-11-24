@@ -20,7 +20,7 @@ const INSTALL_STATIC_URLS = [
   "/manifest.webmanifest",
 ];
 
-const APP_SHELL_PATH_RE = /^\/(?:(?:si|ta)\/)?(?:|calculator|browse|track|blog|offline|rates(?:\/.*)?|district(?:\/.*)?)$/;
+const APP_SHELL_PATH_RE = /^\/(?:(?:si|ta)\/)?(?:|calculator|browse|track|blog|about|privacy|terms|offline|rates(?:\/.*)?|district(?:\/.*)?)$/;
 
 const STATIC_EXT_RE = /\.(?:png|jpg|jpeg|webp|avif|svg|ico|woff2?|css|js|webmanifest)$/i;
 // Next.js / Turbopack development chunks have mutable paths and `no-store` headers;
@@ -30,7 +30,6 @@ const CACHEABLE_API_PREFIXES = [
   "/api/autocomplete",
   "/api/offices",
   "/api/exchange-rate",
-  "/api/posts",
   "/api/public/config",
 ];
 
