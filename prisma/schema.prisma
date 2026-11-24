@@ -121,18 +121,25 @@ model SiteSettings {
 }
 
 model BlogPost {
-  id          String   @id @default(cuid())
-  slug        String   @unique
-  title       String
-  excerpt     String
-  date        DateTime @default(now())
-  author      String
-  tags        String[] @default([])
-  contentHtml String
-  readingTime Int      @default(1)
-  published   Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  slug         String   @unique
+  title        String
+  excerpt      String
+  date         DateTime @default(now())
+  author       String
+  tags         String[] @default([])
+  contentHtml  String
+  readingTime  Int      @default(1)
+  published    Boolean  @default(true)
+  category     String   @default("GUIDE") // NEWS, ALERT, TARIFF, GUIDE
+  coverImage   String?
+  coverCaption String?
+  featured     Boolean  @default(false)
+  sourceUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([published, category, date])
 }
 
 model SiteVariable {

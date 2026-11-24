@@ -44,7 +44,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             return NextResponse.json({ error: "Not Found" }, { status: 404 });
         }
 
-        return NextResponse.json({ office });
+        return NextResponse.json({ office }, { headers: { "Cache-Control": "no-store" } });
     } catch (error) {
         console.error("Admin Get Office Error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -70,7 +70,21 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
             );
         }
 
-        const { name, postalCode, newFieldName, newFieldValue, controllingOfficeId, controlledOfficesIds, ...fields } = parsed.data;
+        const {
+            name,
+            postalCode,
+            operatingHours,
+            services,
+            rmsc,
+            latitude,
+            longitude,
+            customFields,
+            newFieldName,
+            newFieldValue,
+            controllingOfficeId,
+            controlledOfficesIds,
+            ...fields
+        } = parsed.data;
 
         const result = await prisma.$transaction(async (tx) => {
             if (controlledOfficesIds !== undefined) {
@@ -85,6 +99,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
                 data: {
                     name,
                     postalCode,
+                    ...(operatingHours !== undefined && { operatingHours: operatingHours || null }),
+                    ...(services !== undefined && { services }),
+                    ...(rmsc !== undefined && { rmsc: rmsc || null }),
+                    ...(latitude !== undefined && { latitude }),
+                    ...(longitude !== undefined && { longitude }),
                     ...(controllingOfficeId !== undefined && { controllingOfficeId: controllingOfficeId || null }),
                     ...(controlledOfficesIds !== undefined && {
                         controlledOffices: {
@@ -99,15 +118,29 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
             });
 
             const newFields: { name: string; value: string; type: string; postOfficeId: string }[] = [];
-            for (const [key, value] of Object.entries(fields)) {
-                if (key.startsWith("field_") && typeof value === "string" && value.trim() !== "") {
-                    const fieldName = key.replace("field_", "");
-                    newFields.push({
-                        name: fieldName,
-                        value: value.trim(),
-                        type: "TEXT",
-                        postOfficeId: id,
-                    });
+
+            if (Array.isArray(customFields)) {
+                for (const item of customFields) {
+                    if (item.name.trim() && item.value.trim()) {
+                        newFields.push({
+                            name: item.name.trim(),
+                            value: item.value.trim(),
+                            type: "TEXT",
+                            postOfficeId: id,
+                        });
+                    }
+                }
+            } else {
+                for (const [key, value] of Object.entries(fields)) {
+                    if (key.startsWith("field_") && typeof value === "string" && value.trim() !== "") {
+                        const fieldName = key.replace("field_", "");
+                        newFields.push({
+                            name: fieldName,
+                            value: value.trim(),
+                            type: "TEXT",
+                            postOfficeId: id,
+                        });
+                    }
                 }
             }
 

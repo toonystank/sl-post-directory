@@ -178,6 +178,7 @@
     -webkit-tap-highlight-color: transparent;
     text-size-adjust: 100%;
     overscroll-behavior-y: contain;
+    scroll-padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
   }
 
   body {
@@ -242,6 +243,7 @@
   font-weight: 800;
   letter-spacing: -0.015em;
   line-height: 0.95;
+  text-wrap: balance;
 }
 
 /* Small mono label: used sparingly (postcodes, data labels) */
@@ -636,4 +638,55 @@
 }
 .dark .prose-custom [style*="background"] {
   background-color: transparent !important;
+}
+
+.prose-custom figure {
+  margin: 1.5rem 0;
+  border: 2px solid hsl(var(--frame));
+  background: hsl(var(--card));
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: 3px 3px 0 0 hsl(var(--shadow-ink));
+}
+
+.prose-custom figure img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.prose-custom figcaption {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid hsl(var(--border));
+  background: hsl(var(--muted) / 0.45);
+}
+
+.prose-custom .callout-alert {
+  border-left: 4px solid hsl(var(--primary));
+  background: hsl(var(--primary) / 0.08);
+  padding: 0.85rem 1rem;
+  margin: 1.25rem 0;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.prose-custom .callout-alert p:last-child {
+  margin-bottom: 0;
+}
+
+/* ---------- News Studio Tiptap Editor ---------- */
+.tiptap-editor .ProseMirror {
+  min-height: 300px;
+  outline: none;
+  padding: 1rem;
+}
+
+.tiptap-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: hsl(var(--muted-foreground));
+  pointer-events: none;
+  height: 0;
 }

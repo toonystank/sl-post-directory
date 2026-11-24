@@ -1,360 +1,633 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Edit3, Trash2, Search, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
+import {
+    Edit3,
+    Trash2,
+    Search,
+    AlertCircle,
+    PlusCircle,
+    Loader2,
+    ChevronLeft,
+    ChevronRight,
+    ExternalLink,
+    MapPin,
+    Clock,
+} from "lucide-react";
+import { Link } from "@/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { showNativeToast } from "@/components/shell/NativeToast";
+import ConfirmDialog from "@/components/admin/ConfirmDialog";
+import { cn } from "@/lib/utils";
 import OfficeEditModal from "./OfficeEditModal";
 
 interface Office {
     id: string;
+    slug: string;
     name: string;
     postalCode: string;
+    operatingHours: string | null;
+    services: string[];
+    rmsc: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    _count?: { fields: number };
 }
 
-export default function AdminOfficeManager({ isContributor = false }: { isContributor?: boolean }) {
+type OfficeFilter = "all" | "missing_gps" | "missing_hours" | "has_services";
+
+const FILTER_OPTIONS: Array<{ id: OfficeFilter; label: string }> = [
+    { id: "all", label: "All Offices" },
+    { id: "missing_gps", label: "Missing GPS" },
+    { id: "missing_hours", label: "Missing Hours" },
+    { id: "has_services", label: "Has Services" },
+];
+
+const SERVICE_TAGS = ["Foreign parcel unit", "postal complex", "regional sorting unit"];
+
+export default function AdminOfficeManager({
+    isContributor = false,
+    userRole,
+}: {
+    isContributor?: boolean;
+    userRole?: string;
+}) {
+    const searchParams = useSearchParams();
+    const initialQuery = searchParams.get("q") || "";
+
     const [offices, setOffices] = useState<Office[]>([]);
-    const [searchQuery, setSearchQuery] = useState("");
-    const [, setLoading] = useState(false);
-    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [total, setTotal] = useState(0);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [searchQuery, setSearchQuery] = useState(initialQuery);
+    const [activeFilter, setActiveFilter] = useState<OfficeFilter>("all");
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [bulkAction, setBulkAction] = useState<string>("add_service");
     const [bulkService, setBulkService] = useState<string>("Foreign parcel unit");
     const [isBulking, setIsBulking] = useState(false);
-    const [isMobileCollapsed, setIsMobileCollapsed] = useState(true);
+
     const [editingOfficeId, setEditingOfficeId] = useState<string | null>(null);
-    const router = useRouter();
+    const [pendingDelete, setPendingDelete] = useState<Office | null>(null);
+    const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
-    const SERVICE_TAGS = ["Foreign parcel unit", "postal complex", "regional sorting unit"];
+    const resolvedRole = userRole || (isContributor ? "CONTRIBUTOR" : "ADMIN");
+    const canDirectEdit = resolvedRole === "ADMIN" || resolvedRole === "SUPER_ADMIN";
 
-    const fetchOffices = async (query: string = "") => {
+    const fetchOffices = useCallback(async (query: string, targetPage: number, filter: OfficeFilter) => {
         setLoading(true);
+        setError("");
         try {
-            const res = await fetch(`/api/offices?q=${encodeURIComponent(query)}`);
-            if (res.ok) {
-                const data = await res.json();
-                setOffices(data.offices || []);
+            const params = new URLSearchParams({
+                q: query.trim(),
+                page: String(targetPage),
+                limit: "20",
+                filter,
+            });
+            const res = await fetch(`/api/admin/offices?${params.toString()}`, { cache: "no-store" });
+            if (!res.ok) {
+                setError("Could not load post offices.");
+                return;
             }
-        } catch (error) {
-            console.error("Error fetching offices:", error);
+            const data = (await res.json()) as {
+                offices: Office[];
+                total: number;
+                page: number;
+                totalPages: number;
+            };
+            setOffices(data.offices || []);
+            setTotal(data.total || 0);
+            setTotalPages(data.totalPages || 1);
+        } catch {
+            setError("Network error fetching post offices.");
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
-    // Debounced search (also handles initial load since searchQuery starts as "")
+    useEffect(() => {
+        setSearchQuery(initialQuery);
+        setPage(1);
+    }, [initialQuery]);
+
     useEffect(() => {
         const timer = setTimeout(() => {
-            fetchOffices(searchQuery);
-        }, 300);
+            void fetchOffices(searchQuery, page, activeFilter);
+        }, 250);
         return () => clearTimeout(timer);
-    }, [searchQuery]);
+    }, [searchQuery, page, activeFilter, fetchOffices]);
 
-    const handleDelete = async (id: string, name: string) => {
-        if (!confirm(`Are you sure you want to completely delete the ${name} Post Office? This cannot be undone.`)) {
-            return;
-        }
-
-        setDeletingId(id);
+    const handleDeleteConfirmed = async () => {
+        if (!pendingDelete) return;
+        setDeleting(true);
         try {
-            const res = await fetch(`/api/admin/office/${id}`, {
+            const res = await fetch(`/api/admin/office/${pendingDelete.id}`, {
                 method: "DELETE",
             });
-
             if (res.ok) {
-                setOffices(offices.filter(o => o.id !== id));
-                router.refresh(); // Refresh total count in parent
+                showNativeToast(`Deleted ${pendingDelete.name}`);
+                setPendingDelete(null);
+                setSelectedIds((prev) => {
+                    const next = new Set(prev);
+                    next.delete(pendingDelete.id);
+                    return next;
+                });
+                void fetchOffices(searchQuery, page, activeFilter);
             } else {
-                alert("Failed to delete post office.");
+                const err = (await res.json().catch(() => ({}))) as { error?: string };
+                showNativeToast(err.error || "Failed to delete post office.");
             }
-        } catch (error) {
-            console.error("Deletion error:", error);
-            alert("Network error during deletion.");
+        } catch {
+            showNativeToast("Network error during deletion.");
         } finally {
-            setDeletingId(null);
+            setDeleting(false);
         }
     };
 
     const toggleSelect = (id: string) => {
-        const newSet = new Set(selectedIds);
-        if (newSet.has(id)) newSet.delete(id);
-        else newSet.add(id);
-        setSelectedIds(newSet);
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
     };
 
     const toggleSelectAll = () => {
-        if (selectedIds.size === offices.length) {
+        if (offices.length > 0 && selectedIds.size === offices.length) {
             setSelectedIds(new Set());
         } else {
             setSelectedIds(new Set(offices.map((o) => o.id)));
         }
     };
 
-    const handleBulkAction = async () => {
+    const executeBulkAction = async () => {
         if (selectedIds.size === 0) return;
-        if (bulkAction === 'delete' && !confirm(`Are you sure you want to delete ${selectedIds.size} post offices?`)) {
-            return;
-        }
-
         setIsBulking(true);
         try {
-            const res = await fetch('/api/admin/bulk', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+            const res = await fetch("/api/admin/bulk", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     officeIds: Array.from(selectedIds),
                     action: bulkAction,
-                    serviceQuery: bulkService
-                })
+                    serviceQuery: bulkService,
+                }),
             });
 
             if (res.ok) {
-                alert(`Bulk operation successful on ${selectedIds.size} offices.`);
+                showNativeToast(`Updated ${selectedIds.size} office(s)`);
                 setSelectedIds(new Set());
-                fetchOffices(searchQuery);
-                router.refresh();
+                setConfirmBulkDelete(false);
+                void fetchOffices(searchQuery, page, activeFilter);
             } else {
-                alert('Bulk operation failed.');
+                const err = (await res.json().catch(() => ({}))) as { error?: string };
+                showNativeToast(err.error || "Bulk operation failed.");
             }
-        } catch (error) {
-            console.error(error);
-            alert('Error during bulk operation.');
+        } catch {
+            showNativeToast("Network error during bulk action.");
         } finally {
             setIsBulking(false);
         }
     };
 
     return (
-        <Card className="border-border/50">
-            <CardHeader 
-                className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/40 bg-card/80 cursor-pointer md:cursor-default"
-                onClick={(e) => {
-                    if ((e.target as HTMLElement).closest('input')) return;
-                    if (window.innerWidth < 768) setIsMobileCollapsed(!isMobileCollapsed);
-                }}
-            >
-                <div className="flex items-center justify-between w-full md:w-auto">
-                    <div>
-                        <CardTitle className="text-lg flex items-center gap-2">
-                            {isContributor ? "Directory Search" : "Directory Management"}
-                        </CardTitle>
-                        <CardDescription className="text-xs md:text-sm mt-1">
-                            {isContributor
-                                ? "Search the directory to find post offices and suggest edits."
-                                : "Search explicitly to edit or delete any existing directory entry."}
-                        </CardDescription>
-                    </div>
-                    <div className="md:hidden text-muted-foreground ml-4 shrink-0 flex items-center">
-                        {isMobileCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
-                    </div>
+        <div className="space-y-5">
+            <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+                <div>
+                    <p className="label-mono">Directory Management</p>
+                    <h1 className="display text-3xl sm:text-4xl mt-1">
+                        {canDirectEdit ? "Post Offices" : "Search Directory"}
+                    </h1>
+                    <p className="text-sm text-muted-foreground mt-1">
+                        {total.toLocaleString()} matching office{total === 1 ? "" : "s"}
+                    </p>
                 </div>
-                <div className="flex w-full md:w-auto items-center gap-3">
-                    <div className="relative w-full md:w-64">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Search by name or code..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-9 h-10 rounded-xl bg-background w-full"
-                        />
-                    </div>
+
+                {canDirectEdit && (
+                    <Link
+                        href="/dashboard/add"
+                        className="tap inline-flex min-h-[44px] items-center justify-center gap-2 rounded-md border-2 border-foreground bg-secondary px-4 text-sm font-extrabold text-secondary-foreground shadow-[2px_2px_0_0_hsl(var(--foreground))]"
+                    >
+                        <PlusCircle className="h-4 w-4" aria-hidden="true" />
+                        <span>Add New Office</span>
+                    </Link>
+                )}
+            </header>
+
+            {/* Search & Filter Strip */}
+            <div className="rounded-md border-2 border-foreground bg-card p-3.5 sm:p-4 space-y-3">
+                <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                    <Input
+                        type="search"
+                        placeholder="Search by office name, postcode, or RMSC..."
+                        value={searchQuery}
+                        onChange={(e) => {
+                            setSearchQuery(e.target.value);
+                            setPage(1);
+                        }}
+                        enterKeyHint="search"
+                        className="h-12 pl-10 text-base bg-background"
+                    />
                 </div>
-            </CardHeader>
 
-            <div className={`transition-all ${isMobileCollapsed ? 'hidden md:block' : ''}`}>
-            {!isContributor && (
-                <div className="bg-muted/20 border-b border-border/40 p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <span className="text-sm font-medium text-muted-foreground">
-                        {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select items below for bulk actions'}
-                    </span>
-
-                    <div className={`flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-auto transition-opacity ${selectedIds.size > 0 ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
-                        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                            <select
-                                className="text-sm rounded-lg border border-border bg-background px-3 py-2 w-full sm:w-auto"
-                                value={bulkAction}
-                                onChange={(e) => setBulkAction(e.target.value)}
-                            >
-                                <option value="add_service">Add Service Tag</option>
-                                <option value="remove_service">Remove Service Tag</option>
-                                <option value="delete">Delete Offices</option>
-                            </select>
-
-                            {(bulkAction === 'add_service' || bulkAction === 'remove_service') && (
-                                <select
-                                    className="text-sm rounded-lg border border-border bg-background px-3 py-2 w-full sm:w-auto flex-1 sm:flex-none"
-                                    value={bulkService}
-                                    onChange={(e) => setBulkService(e.target.value)}
-                                >
-                                    {SERVICE_TAGS.map(tag => (
-                                        <option key={tag} value={tag}>{tag}</option>
-                                    ))}
-                                </select>
+                <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-0.5">
+                    {FILTER_OPTIONS.map((opt) => (
+                        <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => {
+                                setActiveFilter(opt.id);
+                                setPage(1);
+                                setSelectedIds(new Set());
+                            }}
+                            className={cn(
+                                "tap shrink-0 min-h-[40px] rounded-md border px-3 text-xs font-bold whitespace-nowrap",
+                                activeFilter === opt.id
+                                    ? "border-foreground bg-foreground text-background"
+                                    : "border-border bg-background text-muted-foreground hover:text-foreground"
                             )}
-                        </div>
+                        >
+                            {opt.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
 
-                        <Button size="sm" onClick={handleBulkAction} disabled={isBulking} className="w-full sm:w-auto h-9">
-                            {isBulking ? 'Applying...' : 'Apply Action'}
+            {/* Bulk Toolbar (Admin/Super Admin only when items selected) */}
+            {canDirectEdit && selectedIds.size > 0 && (
+                <div className="rounded-md border-2 border-foreground bg-secondary/20 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <span className="text-sm font-bold text-foreground">
+                        {selectedIds.size} office{selectedIds.size === 1 ? "" : "s"} selected
+                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <select
+                            className="h-11 rounded-md border border-foreground bg-card px-3 text-sm font-medium"
+                            value={bulkAction}
+                            onChange={(e) => setBulkAction(e.target.value)}
+                        >
+                            <option value="add_service">Add Service Tag</option>
+                            <option value="remove_service">Remove Service Tag</option>
+                            <option value="delete">Delete Offices</option>
+                        </select>
+
+                        {(bulkAction === "add_service" || bulkAction === "remove_service") && (
+                            <select
+                                className="h-11 rounded-md border border-foreground bg-card px-3 text-sm font-medium"
+                                value={bulkService}
+                                onChange={(e) => setBulkService(e.target.value)}
+                            >
+                                {SERVICE_TAGS.map((tag) => (
+                                    <option key={tag} value={tag}>
+                                        {tag}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+
+                        <Button
+                            type="button"
+                            disabled={isBulking}
+                            variant={bulkAction === "delete" ? "destructive" : "default"}
+                            onClick={() => {
+                                if (bulkAction === "delete") setConfirmBulkDelete(true);
+                                else void executeBulkAction();
+                            }}
+                            className="h-11 font-bold"
+                        >
+                            {isBulking ? "Applying..." : "Apply Bulk"}
                         </Button>
                     </div>
                 </div>
             )}
 
-            <CardContent className="p-0">
-                {offices.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                        <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                        <p>No post offices found matching &ldquo;{searchQuery}&rdquo;</p>
+            {error && (
+                <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3.5 text-sm font-medium text-destructive">
+                    {error}
+                </div>
+            )}
+
+            {/* List / Table Container */}
+            <div className="rounded-md border-2 border-foreground bg-card overflow-hidden">
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-14 text-muted-foreground gap-2">
+                        <Loader2 className="h-7 w-7 animate-spin text-primary" aria-hidden="true" />
+                        <p className="font-mono text-xs uppercase tracking-wider">Searching offices...</p>
+                    </div>
+                ) : offices.length === 0 ? (
+                    <div className="p-10 text-center text-muted-foreground">
+                        <AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-30" aria-hidden="true" />
+                        <p className="text-sm font-bold text-foreground">No post offices matched</p>
+                        <p className="text-xs mt-1">Try another office name, postcode, or clear the active filter.</p>
                     </div>
                 ) : (
-                    <div className="overflow-y-auto overflow-x-hidden max-h-[500px]">
-                        {/* Desktop Table View */}
-                        <table className="hidden md:table w-full text-sm text-left relative">
-                            <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border/50 sticky top-0 z-10">
-                                <tr>
-                                    {!isContributor && (
-                                        <th className="px-6 py-4 font-medium w-12">
-                                            <input
-                                                type="checkbox"
-                                                onChange={toggleSelectAll}
-                                                checked={offices.length > 0 && selectedIds.size === offices.length}
-                                                className="rounded border-border"
-                                            />
-                                        </th>
-                                    )}
-                                    <th className="px-6 py-4 font-medium">Post Office</th>
-                                    <th className="px-6 py-4 font-medium">Postal Code</th>
-                                    <th className="px-6 py-4 font-medium text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border/50">
-                                {offices.map((office) => (
-                                    <tr key={office.id} className={`hover:bg-muted/30 transition-colors ${selectedIds.has(office.id) ? 'bg-primary/5' : ''}`}>
-                                        {!isContributor && (
-                                            <td className="px-6 py-3 w-12">
+                    <>
+                        {/* Desktop Table */}
+                        <div className="hidden md:block overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="border-b border-border bg-muted/50 text-xs font-mono uppercase text-muted-foreground">
+                                    <tr>
+                                        {canDirectEdit && (
+                                            <th className="px-4 py-3 w-12">
                                                 <input
                                                     type="checkbox"
-                                                    checked={selectedIds.has(office.id)}
-                                                    onChange={() => toggleSelect(office.id)}
-                                                    className="rounded border-border text-primary focus:ring-primary"
+                                                    aria-label="Select all on page"
+                                                    checked={offices.length > 0 && selectedIds.size === offices.length}
+                                                    onChange={toggleSelectAll}
+                                                    className="h-4 w-4 rounded border-border"
                                                 />
-                                            </td>
+                                            </th>
                                         )}
-                                        <td className="px-6 py-3">
-                                            <div className="font-medium text-foreground">{office.name}</div>
-                                            <div className="text-xs text-muted-foreground mt-0.5 font-mono">{office.id}</div>
-                                        </td>
-                                        <td className="px-6 py-3">
-                                            <Badge variant="outline" className="font-mono">{office.postalCode}</Badge>
-                                        </td>
-                                        <td className="px-6 py-3 text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                                {isContributor ? (
-                                                    <Button asChild size="sm" variant="outline" className="h-8 shadow-none gap-1 hover:bg-primary/10 hover:text-primary">
-                                                        <Link href={`/suggest/${office.id}`}>
-                                                            <Edit3 className="w-3.5 h-3.5" /> Suggest Edit
-                                                        </Link>
-                                                    </Button>
-                                                ) : (
-                                                    <>
-                                                        <Button 
-                                                            size="sm" 
-                                                            variant="outline" 
-                                                            className="h-8 shadow-none gap-1"
-                                                            onClick={() => setEditingOfficeId(office.id)}
-                                                        >
-                                                            <Edit3 className="w-3.5 h-3.5" /> Edit
-                                                        </Button>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            className="h-8 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                                            onClick={() => handleDelete(office.id, office.name)}
-                                                            disabled={deletingId === office.id}
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </Button>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </td>
+                                        <th className="px-4 py-3">Post Office</th>
+                                        <th className="px-4 py-3">Postcode</th>
+                                        <th className="px-4 py-3">Metadata</th>
+                                        <th className="px-4 py-3 text-right">Actions</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {offices.map((office) => (
+                                        <tr key={office.id} className={cn("hover:bg-muted/30", selectedIds.has(office.id) && "bg-secondary/15")}>
+                                            {canDirectEdit && (
+                                                <td className="px-4 py-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        aria-label={`Select ${office.name}`}
+                                                        checked={selectedIds.has(office.id)}
+                                                        onChange={() => toggleSelect(office.id)}
+                                                        className="h-4 w-4 rounded border-border"
+                                                    />
+                                                </td>
+                                            )}
+                                            <td className="px-4 py-3">
+                                                <p className="font-bold text-foreground">{office.name}</p>
+                                                <p className="font-mono text-xs text-muted-foreground">
+                                                    {office.rmsc || "Standard Post Office"} · {office._count?.fields ?? 0} fields
+                                                </p>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className="inline-block rounded-sm border border-foreground/40 bg-background px-2 py-0.5 font-mono text-xs font-bold">
+                                                    {office.postalCode}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex flex-wrap gap-1.5 text-[11px] font-mono">
+                                                    {office.latitude !== null && office.longitude !== null ? (
+                                                        <span className="text-status-open font-semibold">GPS</span>
+                                                    ) : (
+                                                        <span className="text-muted-foreground">No GPS</span>
+                                                    )}
+                                                    <span>·</span>
+                                                    {office.operatingHours ? (
+                                                        <span className="text-status-open font-semibold">Hours</span>
+                                                    ) : (
+                                                        <span className="text-muted-foreground">No Hours</span>
+                                                    )}
+                                                    {office.services.length > 0 && (
+                                                        <>
+                                                            <span>·</span>
+                                                            <span className="text-foreground font-semibold">
+                                                                {office.services.length} svc
+                                                            </span>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                <div className="inline-flex items-center gap-1.5">
+                                                    <Link
+                                                        href={`/office/${office.slug}`}
+                                                        target="_blank"
+                                                        className="tap inline-flex h-10 items-center gap-1 rounded-md border border-border bg-background px-3 text-xs font-semibold hover:border-foreground"
+                                                    >
+                                                        <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                                                        <span>View</span>
+                                                    </Link>
+                                                    {canDirectEdit ? (
+                                                        <>
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() => setEditingOfficeId(office.id)}
+                                                                className="h-10 border-foreground font-bold gap-1"
+                                                            >
+                                                                <Edit3 className="h-3.5 w-3.5" aria-hidden="true" />
+                                                                <span>Edit</span>
+                                                            </Button>
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                aria-label={`Delete ${office.name}`}
+                                                                onClick={() => setPendingDelete(office)}
+                                                                className="h-10 w-10 p-0 text-destructive hover:bg-destructive/10"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                                            </Button>
+                                                        </>
+                                                    ) : (
+                                                        <Link
+                                                            href={`/suggest/${office.id}`}
+                                                            className="tap inline-flex h-10 items-center gap-1 rounded-md border border-foreground bg-secondary px-3 text-xs font-extrabold text-secondary-foreground"
+                                                        >
+                                                            <Edit3 className="h-3.5 w-3.5" aria-hidden="true" />
+                                                            <span>Suggest Edit</span>
+                                                        </Link>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
 
-                        {/* Mobile Card View */}
-                        <div className="md:hidden flex flex-col divide-y divide-border/50">
+                        {/* Mobile Card Feed */}
+                        <div className="md:hidden divide-y divide-border">
                             {offices.map((office) => (
-                                <div key={office.id} className={`p-4 flex flex-col gap-3 hover:bg-muted/30 transition-colors ${selectedIds.has(office.id) ? 'bg-primary/5' : ''}`}>
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="flex items-start gap-3">
-                                            {!isContributor && (
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedIds.has(office.id)}
-                                                    onChange={() => toggleSelect(office.id)}
-                                                    className="mt-1 rounded border-border text-primary focus:ring-primary shrink-0"
-                                                />
+                                <div
+                                    key={`mob-${office.id}`}
+                                    className={cn("p-4 space-y-3", selectedIds.has(office.id) && "bg-secondary/15")}
+                                >
+                                    <div className="flex items-start justify-between gap-2.5">
+                                        <div className="flex items-start gap-2.5 min-w-0">
+                                            {canDirectEdit && (
+                                                <label className="flex min-h-[44px] min-w-[32px] items-center justify-center shrink-0">
+                                                    <input
+                                                        type="checkbox"
+                                                        aria-label={`Select ${office.name}`}
+                                                        checked={selectedIds.has(office.id)}
+                                                        onChange={() => toggleSelect(office.id)}
+                                                        className="h-5 w-5 rounded border-border"
+                                                    />
+                                                </label>
                                             )}
                                             <div className="min-w-0">
-                                                <div className="font-medium text-foreground truncate">{office.name}</div>
-                                                <div className="text-xs text-muted-foreground mt-0.5 font-mono truncate">{office.id}</div>
+                                                <h3 className="font-heading text-base font-extrabold text-foreground leading-snug">
+                                                    {office.name}
+                                                </h3>
+                                                <div className="mt-1 flex flex-wrap items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                                                    <span className="inline-flex items-center gap-1">
+                                                        <MapPin className="h-3 w-3" aria-hidden="true" />
+                                                        {office.latitude !== null ? "GPS Set" : "No GPS"}
+                                                    </span>
+                                                    <span className="inline-flex items-center gap-1">
+                                                        <Clock className="h-3 w-3" aria-hidden="true" />
+                                                        {office.operatingHours ? "Hours Set" : "No Hours"}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
-                                        <Badge variant="outline" className="font-mono shrink-0">{office.postalCode}</Badge>
+                                        <span className="shrink-0 rounded-sm border-2 border-foreground bg-secondary/40 px-2 py-0.5 font-mono text-xs font-extrabold">
+                                            {office.postalCode}
+                                        </span>
                                     </div>
-                                    <div className="flex items-center justify-end gap-2 mt-1">
-                                        {isContributor ? (
-                                            <Button asChild size="sm" variant="outline" className="h-8 shadow-none gap-1 hover:bg-primary/10 hover:text-primary w-full">
-                                                <Link href={`/suggest/${office.id}`}>
-                                                    <Edit3 className="w-3.5 h-3.5" /> Suggest Edit
+
+                                    {office.services.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {office.services.slice(0, 3).map((svc) => (
+                                                <span
+                                                    key={svc}
+                                                    className="rounded-sm border border-border bg-background px-2 py-0.5 font-mono text-[10px] font-semibold"
+                                                >
+                                                    {svc}
+                                                </span>
+                                            ))}
+                                            {office.services.length > 3 && (
+                                                <span className="font-mono text-[10px] text-muted-foreground px-1 py-0.5">
+                                                    +{office.services.length - 3} more
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <div className="flex items-center gap-2 pt-1">
+                                        {canDirectEdit ? (
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEditingOfficeId(office.id)}
+                                                    className="tap flex-1 min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-md border-2 border-foreground bg-card px-3 text-xs font-extrabold text-foreground"
+                                                >
+                                                    <Edit3 className="h-3.5 w-3.5" aria-hidden="true" />
+                                                    <span>Edit Office Sheet</span>
+                                                </button>
+                                                <Link
+                                                    href={`/office/${office.slug}`}
+                                                    target="_blank"
+                                                    aria-label={`View ${office.name} public page`}
+                                                    className="tap min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-md border border-border bg-background text-foreground"
+                                                >
+                                                    <ExternalLink className="h-4 w-4" aria-hidden="true" />
                                                 </Link>
-                                            </Button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setPendingDelete(office)}
+                                                    aria-label={`Delete ${office.name}`}
+                                                    className="tap min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-md border border-destructive/40 bg-destructive/10 text-destructive"
+                                                >
+                                                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                                </button>
+                                            </>
                                         ) : (
                                             <>
-                                                <Button 
-                                                    size="sm" 
-                                                    variant="outline" 
-                                                    className="h-8 shadow-none gap-1 flex-1"
-                                                    onClick={() => setEditingOfficeId(office.id)}
+                                                <Link
+                                                    href={`/suggest/${office.id}`}
+                                                    className="tap flex-1 min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-md border-2 border-foreground bg-secondary px-3 text-xs font-extrabold text-secondary-foreground"
                                                 >
-                                                    <Edit3 className="w-3.5 h-3.5" /> Edit
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    className="h-8 px-3 text-destructive hover:bg-destructive/10 hover:text-destructive border border-destructive/20"
-                                                    onClick={() => handleDelete(office.id, office.name)}
-                                                    disabled={deletingId === office.id}
+                                                    <Edit3 className="h-3.5 w-3.5" aria-hidden="true" />
+                                                    <span>Suggest Edit</span>
+                                                </Link>
+                                                <Link
+                                                    href={`/office/${office.slug}`}
+                                                    target="_blank"
+                                                    className="tap min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-md border border-border bg-background text-foreground"
+                                                    aria-label={`Open ${office.name}`}
                                                 >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
+                                                    <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                                                </Link>
                                             </>
                                         )}
                                     </div>
                                 </div>
                             ))}
                         </div>
-                    </div>
+                    </>
                 )}
-            </CardContent>
             </div>
-            
-            {/* Edit Modal */}
-            <OfficeEditModal 
-                officeId={editingOfficeId} 
-                onClose={() => setEditingOfficeId(null)} 
+
+            {/* Pagination Footer */}
+            {totalPages > 1 && (
+                <div className="flex items-center justify-between gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        disabled={page <= 1 || loading}
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        className="h-11 border-2 border-foreground font-bold gap-1"
+                    >
+                        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                        <span>Previous</span>
+                    </Button>
+                    <span className="font-mono text-xs text-muted-foreground">
+                        Page {page} of {totalPages}
+                    </span>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        disabled={page >= totalPages || loading}
+                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                        className="h-11 border-2 border-foreground font-bold gap-1"
+                    >
+                        <span>Next</span>
+                        <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                </div>
+            )}
+
+            {/* Edit Sheet */}
+            <OfficeEditModal
+                officeId={editingOfficeId}
+                onClose={() => setEditingOfficeId(null)}
                 onSaved={() => {
                     setEditingOfficeId(null);
-                    fetchOffices(searchQuery);
-                    router.refresh();
-                }} 
+                    void fetchOffices(searchQuery, page, activeFilter);
+                }}
             />
-        </Card>
+
+            {/* Single Delete Confirmation */}
+            <ConfirmDialog
+                open={!!pendingDelete}
+                onOpenChange={(open) => !open && setPendingDelete(null)}
+                title="Delete Post Office"
+                description={
+                    pendingDelete
+                        ? `Permanently delete "${pendingDelete.name}" (${pendingDelete.postalCode})? Controlled offices and contributor edits will lose this link.`
+                        : ""
+                }
+                confirmLabel="Delete Office"
+                destructive
+                loading={deleting}
+                onConfirm={handleDeleteConfirmed}
+            />
+
+            {/* Bulk Delete Confirmation */}
+            <ConfirmDialog
+                open={confirmBulkDelete}
+                onOpenChange={setConfirmBulkDelete}
+                title="Bulk Delete Offices"
+                description={`Permanently delete ${selectedIds.size} selected post office(s)? This cannot be undone.`}
+                confirmLabel="Delete Selected"
+                destructive
+                loading={isBulking}
+                onConfirm={executeBulkAction}
+            />
+        </div>
     );
 }

@@ -53,6 +53,10 @@ export default function Navbar() {
         isOfflineFallbackPage ||
         (!hasMounted && typeof document !== "undefined" && Boolean(document.getElementById("slpost-offline-fallback")));
 
+    if (!isOfflineFallback && ["/login", "/register", "/dashboard"].some((p) => pathname.startsWith(p))) {
+        return null;
+    }
+
     const user = session?.user as { name?: string | null; role?: string } | undefined;
     const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN" || user?.role === "MODERATOR";
 

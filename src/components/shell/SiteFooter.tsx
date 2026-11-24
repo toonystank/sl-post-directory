@@ -1,13 +1,22 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Link } from "@/navigation";
+import { Link, usePathname } from "@/navigation";
 import StampLogo from "@/components/brand/StampLogo";
+import { stripLocalePrefix } from "@/lib/locale";
+
+const HIDDEN_ON = ["/login", "/register", "/dashboard"];
 
 /** Desktop footer (hidden on mobile — the More sheet carries this info there). */
 export default function SiteFooter() {
+    const pathname = stripLocalePrefix(usePathname() || "/");
     const t = useTranslations("Footer");
     const tNav = useTranslations("Nav");
+
+    if (HIDDEN_ON.some((p) => pathname.startsWith(p))) {
+        return null;
+    }
+
     return (
         <footer className="hide-in-standalone hidden md:block mt-auto border-t-2 border-foreground bg-card">
             <div className="airmail-stripe h-1.5" aria-hidden="true" />

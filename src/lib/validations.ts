@@ -53,20 +53,89 @@ export const suggestAddSchema = z.object({
 }).passthrough(); // Allow dynamic field_* keys through; API routes filter by prefix
 
 // Create Office Payload (Admin)
+export const customOfficeFieldSchema = z.object({
+    name: z.string().trim().min(1, "Field name is required").max(60),
+    value: z.string().trim().min(1, "Field value is required").max(300),
+});
+
 export const createOfficeSchema = z.object({
     name: z.string().trim().min(2, "Office name must be at least 2 characters").max(100),
     postalCode: z.string().trim().min(2, "Postal code is required").max(20),
+    operatingHours: z.string().trim().max(200).nullable().optional(),
+    services: z.array(z.string().trim().min(1).max(80)).max(30).optional(),
+    rmsc: z.string().trim().max(120).nullable().optional(),
+    latitude: z.number().min(-90).max(90).nullable().optional(),
+    longitude: z.number().min(-180).max(180).nullable().optional(),
+    customFields: z.array(customOfficeFieldSchema).max(60).optional(),
 }).passthrough(); // Allow dynamic field_* keys through; API routes filter by prefix
 
 // Update Office Payload (Admin)
 export const updateOfficeSchema = z.object({
     name: z.string().trim().min(2, "Office name must be at least 2 characters").max(100),
     postalCode: z.string().trim().min(1, "Postal code is required").max(20),
+    operatingHours: z.string().trim().max(200).nullable().optional(),
+    services: z.array(z.string().trim().min(1).max(80)).max(30).optional(),
+    rmsc: z.string().trim().max(120).nullable().optional(),
+    latitude: z.number().min(-90).max(90).nullable().optional(),
+    longitude: z.number().min(-180).max(180).nullable().optional(),
+    customFields: z.array(customOfficeFieldSchema).max(60).optional(),
     newFieldName: z.string().trim().max(50).optional(),
     newFieldValue: z.string().trim().max(255).optional(),
     controllingOfficeId: z.string().trim().max(64).nullable().optional(),
     controlledOfficesIds: z.array(z.string().trim().min(1).max(64)).max(500).optional(),
 }).passthrough();
+
+// Blog & News Studio Payloads
+export const blogCategorySchema = z.enum(["NEWS", "ALERT", "TARIFF", "GUIDE"]).default("GUIDE");
+
+const optionalCoverImageSchema = z
+    .string()
+    .trim()
+    .max(2048)
+    .nullable()
+    .optional()
+    .refine(
+        (val) => !val || isUploadcareImageUrl(val),
+        "Cover photo must be uploaded via Uploadcare"
+    )
+    .transform((val) => {
+        if (val === undefined) return undefined;
+        return val ? normalizeUploadcareImageUrl(val) : null;
+    });
+
+const optionalSourceUrlSchema = z
+    .string()
+    .trim()
+    .max(2048)
+    .nullable()
+    .optional()
+    .refine((val) => {
+        if (!val) return true;
+        try {
+            return new URL(val).protocol === "https:";
+        } catch {
+            return false;
+        }
+    }, "Official source URL must start with https://")
+    .transform((val) => {
+        if (val === undefined) return undefined;
+        return val && val.length > 0 ? val : null;
+    });
+
+export const blogPostInputSchema = z.object({
+    title: z.string().trim().min(3, "Headline must be at least 3 characters").max(200),
+    slug: z.string().trim().min(2, "URL slug is required").max(160),
+    excerpt: z.string().trim().max(400).optional().default(""),
+    contentHtml: z.string().min(1, "Article content is required"),
+    tags: z.array(z.string().trim().min(1).max(40)).max(12).optional().default([]),
+    published: z.boolean().optional().default(true),
+    category: blogCategorySchema,
+    coverImage: optionalCoverImageSchema,
+    coverCaption: z.string().trim().max(240).nullable().optional(),
+    featured: z.boolean().optional().default(false),
+    sourceUrl: optionalSourceUrlSchema,
+    author: z.string().trim().min(1).max(80).optional(),
+});
 
 // Admin Bulk Operations Payload
 export const adminBulkSchema = z.object({

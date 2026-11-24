@@ -1,33 +1,39 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
-import { prisma } from "@/lib/prisma";
-import { ShieldCheck, User, Edit3, Building2, TrendingUp, PlusCircle, Users, Clock, Download } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import AdminOfficeManager from "./AdminOfficeManager";
-import ModerationQueue from "./ModerationQueue";
-import PhotoModeration from "./PhotoModeration";
-import ReviewModeration from "./ReviewModeration";
-import AdToggle from "./AdToggle";
+import { hasDatabaseUrl, prisma } from "@/lib/prisma";
+import { Link } from "@/navigation";
+import {
+    Building2,
+    Edit3,
+    FileText,
+    PlusCircle,
+    ShieldCheck,
+    Calculator,
+    Camera,
+    MessageSquare,
+    ArrowRight,
+    Clock,
+    Star,
+} from "lucide-react";
+import ContributorDashboard from "./ContributorDashboard";
 
 interface SessionUser {
     id?: string;
     name?: string | null;
     email?: string | null;
-    image?: string | null;
     role?: string;
 }
 
-import ContributorDashboard from "./ContributorDashboard";
-import BlogManager from "./BlogManager";
-import VariableManager from "./VariableManager";
-import PostageRateManager from "./PostageRateManager";
+const CATEGORY_PILL: Record<string, string> = {
+    ALERT: "border-primary bg-primary text-primary-foreground",
+    TARIFF: "border-foreground bg-secondary text-secondary-foreground",
+    NEWS: "border-foreground/40 bg-card text-foreground",
+    GUIDE: "border-border bg-muted text-foreground",
+};
 
 export default async function AdminDashboard() {
     const session = await getServerSession(authOptions);
-
     const user = session?.user as SessionUser | undefined;
 
     if (!session) {
@@ -35,157 +41,369 @@ export default async function AdminDashboard() {
     }
 
     if (user?.role === "CONTRIBUTOR") {
-        return <ContributorDashboard userId={user.id!} userName={user.name!} />;
+        return <ContributorDashboard userId={user.id!} userName={user.name || "Contributor"} />;
     }
 
-    if (!["ADMIN", "SUPER_ADMIN", "MODERATOR"].includes(user?.role || "")) {
+    const role = user?.role || "";
+    if (!["ADMIN", "SUPER_ADMIN", "MODERATOR"].includes(role)) {
         redirect("/login");
     }
 
-    // Dashboard Stats
-    const [totalOffices, pendingEdits, employeeCount, pendingEditItems, communityPhotos, pendingReviewsCount, pendingReviewItems] = await Promise.all([
-        prisma.postOffice.count(),
-        prisma.editRequest.count({ where: { status: { in: ["PENDING", "MORE_INFO"] } } }),
-        prisma.user.count({ where: { role: "CONTRIBUTOR" } }),
-        prisma.editRequest.findMany({
-            where: { status: { in: ["PENDING", "MORE_INFO"] } },
-            include: {
-                postOffice: { select: { name: true, postalCode: true, fields: { select: { name: true, value: true } } } },
-                requestedBy: { select: { name: true, email: true } }
-            },
-            orderBy: { createdAt: 'desc' }
-        }),
-        prisma.communityPhoto.findMany({
-            include: {
-                postOffice: { select: { name: true, postalCode: true, slug: true } }
-            },
-            orderBy: { createdAt: 'desc' },
-            take: 100 // Limit to recent 100 for safety
-        }),
-        prisma.review.count({ where: { status: "PENDING" } }),
-        prisma.review.findMany({
-            where: { status: "PENDING" },
-            include: {
-                postOffice: { select: { name: true, postalCode: true } }
-            },
-            orderBy: { createdAt: 'desc' }
-        })
-    ]);
+    const isAdminPlus = role === "ADMIN" || role === "SUPER_ADMIN";
+
+    let totalOffices = 0;
+    let pendingEdits = 0;
+    let pendingPhotos = 0;
+    let pendingReviews = 0;
+    let publishedNews = 0;
+    let priorityEdits: Array<{
+        id: string;
+        type: string;
+        status: string;
+        createdAt: Date;
+        changes: string;
+        postOffice: { name: string; postalCode: string } | null;
+        requestedBy: { name: string };
+    }> = [];
+    let recentUpdates: Array<{
+        id: string;
+        slug: string;
+        title: string;
+        category: string;
+        featured: boolean;
+        published: boolean;
+        date: Date;
+        readingTime: number;
+    }> = [];
+
+    if (hasDatabaseUrl) {
+        const [
+            officeCount,
+            editsCount,
+            photosCount,
+            reviewsCount,
+            newsCount,
+            topEdits,
+            topNews,
+        ] = await Promise.all([
+            prisma.postOffice.count(),
+            prisma.editRequest.count({ where: { status: { in: ["PENDING", "MORE_INFO"] } } }),
+            prisma.communityPhoto.count({ where: { status: "PENDING" } }),
+            prisma.review.count({ where: { status: "PENDING" } }),
+            prisma.blogPost.count({ where: { published: true } }),
+            prisma.editRequest.findMany({
+                where: { status: { in: ["PENDING", "MORE_INFO"] } },
+                select: {
+                    id: true,
+                    type: true,
+                    status: true,
+                    createdAt: true,
+                    changes: true,
+                    postOffice: { select: { name: true, postalCode: true } },
+                    requestedBy: { select: { name: true } },
+                },
+                orderBy: { createdAt: "desc" },
+                take: 4,
+            }),
+            prisma.blogPost.findMany({
+                select: {
+                    id: true,
+                    slug: true,
+                    title: true,
+                    category: true,
+                    featured: true,
+                    published: true,
+                    date: true,
+                    readingTime: true,
+                },
+                orderBy: [{ featured: "desc" }, { date: "desc" }],
+                take: 4,
+            }),
+        ]);
+
+        totalOffices = officeCount;
+        pendingEdits = editsCount;
+        pendingPhotos = photosCount;
+        pendingReviews = reviewsCount;
+        publishedNews = newsCount;
+        priorityEdits = topEdits;
+        recentUpdates = topNews;
+    }
+
+    const mediaQueueTotal = pendingPhotos + pendingReviews;
 
     return (
-        <div className="container mx-auto px-4 py-12 max-w-6xl min-h-[calc(100vh-4rem)]">
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-4">
+        <div className="space-y-6">
+            {/* Desk Masthead */}
+            <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
                 <div>
-                    <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-3">
-                        <div className="p-2.5 bg-primary/10 text-primary rounded-xl">
-                            <ShieldCheck className="w-7 h-7" />
-                        </div>
-                        Admin Dashboard
+                    <p className="label-mono">Postal Operations Desk</p>
+                    <h1 className="display text-3xl sm:text-4xl mt-1">
+                        Welcome back, {user?.name?.split(" ")[0] || "Admin"}
                     </h1>
-                    <p className="text-muted-foreground mt-2 ml-[52px]">Manage directories, user roles, and moderation queues.</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto mt-4 md:mt-0">
-                    {user?.role === "SUPER_ADMIN" && (
-                        <Button asChild variant="outline" className="rounded-xl flex-1 min-w-[140px] sm:flex-none">
-                            <Link href="/dashboard/users">
-                                <Users className="w-4 h-4 mr-2 shrink-0" /> <span className="truncate">Manage Users</span>
-                            </Link>
-                        </Button>
+                <div className="flex items-center gap-2">
+                    <Link
+                        href="/dashboard/news/new"
+                        className="tap inline-flex min-h-[44px] items-center gap-2 rounded-md border-2 border-foreground bg-primary px-4 text-sm font-bold text-primary-foreground shadow-[2px_2px_0_0_hsl(var(--foreground))] hover:bg-primary/95"
+                    >
+                        <FileText className="h-4 w-4" aria-hidden="true" />
+                        <span>Write Update</span>
+                    </Link>
+                    {isAdminPlus && (
+                        <Link
+                            href="/dashboard/add"
+                            className="tap inline-flex min-h-[44px] items-center gap-2 rounded-md border-2 border-foreground bg-secondary px-4 text-sm font-extrabold text-secondary-foreground shadow-[2px_2px_0_0_hsl(var(--foreground))]"
+                        >
+                            <PlusCircle className="h-4 w-4" aria-hidden="true" />
+                            <span>Add Office</span>
+                        </Link>
                     )}
-                    <Button asChild variant="outline" className="rounded-xl flex-1 min-w-[140px] sm:flex-none border-blue-500/20 text-blue-500 hover:bg-blue-500/10 hover:text-blue-500">
-                        <Link href="/dashboard/activity">
-                            <Clock className="w-4 h-4 mr-2 shrink-0" /> <span className="truncate">Activity Log</span>
-                        </Link>
-                    </Button>
-                    <Button asChild variant="outline" className="rounded-xl flex-1 min-w-[140px] sm:flex-none border-amber-500/20 text-amber-500 hover:bg-amber-500/10 hover:text-amber-500">
-                        <a href="/api/admin/backup" download>
-                            <Download className="w-4 h-4 mr-2 shrink-0" /> <span className="truncate">Backup Data</span>
-                        </a>
-                    </Button>
-                    <Button asChild variant="default" className="rounded-xl flex-1 min-w-[140px] sm:flex-none">
-                        <Link href="/dashboard/add">
-                            <PlusCircle className="w-4 h-4 mr-2 shrink-0" /> <span className="truncate">Add New Office</span>
-                        </Link>
-                    </Button>
                 </div>
-            </div>
+            </header>
 
-            {/* Super Admin: Ad Toggle */}
-            {user?.role === "SUPER_ADMIN" && (
-                <div className="mb-6">
-                    <AdToggle />
-                </div>
-            )}
-
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-                <Card className="border-border/50 hover:shadow-lg hover:shadow-primary/5 transition-all py-4 md:py-6 gap-3 md:gap-6">
-                    <CardHeader className="flex flex-row items-center justify-between pb-0 px-5 md:px-6">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Total Directories</CardTitle>
-                        <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                            <Building2 className="w-4 h-4" />
-                        </div>
-                    </CardHeader>
-                    <CardContent className="px-5 md:px-6">
-                        <div className="text-3xl md:text-4xl font-extrabold tracking-tight">{totalOffices.toLocaleString()}</div>
-                        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                            <TrendingUp className="w-3 h-3 text-secondary" /> All registered offices
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-border/50 hover:shadow-lg hover:shadow-amber-500/5 transition-all py-4 md:py-6 gap-3 md:gap-6">
-                    <CardHeader className="flex flex-row items-center justify-between pb-0 px-5 md:px-6">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Pending Edits</CardTitle>
-                        <div className="p-2 bg-amber-500/10 rounded-lg text-amber-500">
-                            <Edit3 className="w-4 h-4" />
-                        </div>
-                    </CardHeader>
-                    <CardContent className="px-5 md:px-6">
-                        <div className="text-3xl md:text-4xl font-extrabold tracking-tight">{pendingEdits}</div>
-                        <p className="text-xs text-muted-foreground mt-1">Awaiting moderation</p>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-border/50 hover:shadow-lg hover:shadow-secondary/5 transition-all py-4 md:py-6 gap-3 md:gap-6">
-                    <CardHeader className="flex flex-row items-center justify-between pb-0 px-5 md:px-6">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Approved Contributors</CardTitle>
-                        <div className="p-2 bg-secondary/10 rounded-lg text-secondary">
-                            <User className="w-4 h-4" />
-                        </div>
-                    </CardHeader>
-                    <CardContent className="px-5 md:px-6">
-                        <div className="text-3xl md:text-4xl font-extrabold tracking-tight">{employeeCount}</div>
-                        <p className="text-xs text-muted-foreground mt-1">Registered contributors</p>
-                    </CardContent>
-                </Card>
-            </div>
-
-            <div className="grid grid-cols-1 gap-8">
-                {/* Active Directory Management */}
-                <AdminOfficeManager />
-
-                {/* Content Management */}
-                {["SUPER_ADMIN", "ADMIN", "MODERATOR"].includes(user?.role || "") && (
-                    <div className="space-y-8">
-                        <BlogManager />
-                        {["SUPER_ADMIN", "ADMIN"].includes(user?.role || "") && (
-                            <>
-                                <PostageRateManager />
-                                <VariableManager />
-                            </>
-                        )}
+            {/* 2x2 Mobile KPI Grid -> 4-col Desktop */}
+            <section aria-label="Workspace metrics" className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                <Link
+                    href="/dashboard/offices"
+                    className="tap rounded-md border-2 border-foreground bg-card p-4 shadow-[3px_3px_0_0_hsl(var(--foreground))] flex flex-col justify-between gap-2"
+                >
+                    <div className="flex items-center justify-between">
+                        <span className="label-mono">Offices</span>
+                        <Building2 className="h-4 w-4 text-primary" aria-hidden="true" />
                     </div>
+                    <p className="display text-3xl">{totalOffices.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">Browse & edit directory</p>
+                </Link>
+
+                <Link
+                    href="/dashboard/queue"
+                    className="tap rounded-md border-2 border-foreground bg-card p-4 shadow-[3px_3px_0_0_hsl(var(--foreground))] flex flex-col justify-between gap-2"
+                >
+                    <div className="flex items-center justify-between">
+                        <span className="label-mono">Pending Edits</span>
+                        <Edit3 className="h-4 w-4 text-primary" aria-hidden="true" />
+                    </div>
+                    <p className="display text-3xl text-primary">{pendingEdits}</p>
+                    <p className="text-xs text-muted-foreground">Open triage queue</p>
+                </Link>
+
+                <Link
+                    href="/dashboard/queue?tab=photos"
+                    className="tap rounded-md border-2 border-foreground bg-card p-4 shadow-[3px_3px_0_0_hsl(var(--foreground))] flex flex-col justify-between gap-2"
+                >
+                    <div className="flex items-center justify-between">
+                        <span className="label-mono">Photos & Reviews</span>
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                            <Camera className="h-3.5 w-3.5" aria-hidden="true" />
+                            <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" />
+                        </div>
+                    </div>
+                    <p className="display text-3xl">{mediaQueueTotal}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {pendingPhotos} photos · {pendingReviews} reviews
+                    </p>
+                </Link>
+
+                <Link
+                    href="/dashboard/news"
+                    className="tap rounded-md border-2 border-foreground bg-card p-4 shadow-[3px_3px_0_0_hsl(var(--foreground))] flex flex-col justify-between gap-2"
+                >
+                    <div className="flex items-center justify-between">
+                        <span className="label-mono">Published News</span>
+                        <FileText className="h-4 w-4 text-status-open" aria-hidden="true" />
+                    </div>
+                    <p className="display text-3xl">{publishedNews}</p>
+                    <p className="text-xs text-muted-foreground">Alerts, tariffs & guides</p>
+                </Link>
+            </section>
+
+            {/* Quick Action Horizontal Snap Strip */}
+            <section aria-label="Quick actions" className="flex gap-2 overflow-x-auto scrollbar-hide snap-carousel pb-1">
+                <Link
+                    href="/dashboard/offices"
+                    className="tap shrink-0 inline-flex min-h-[44px] items-center gap-2 rounded-md border border-foreground bg-card px-3.5 text-xs font-bold hover:bg-muted"
+                >
+                    <Building2 className="h-4 w-4 text-primary" aria-hidden="true" />
+                    <span>Search Offices</span>
+                </Link>
+                <Link
+                    href="/dashboard/queue"
+                    className="tap shrink-0 inline-flex min-h-[44px] items-center gap-2 rounded-md border border-foreground bg-card px-3.5 text-xs font-bold hover:bg-muted"
+                >
+                    <ShieldCheck className="h-4 w-4 text-primary" aria-hidden="true" />
+                    <span>Review Queue ({pendingEdits + mediaQueueTotal})</span>
+                </Link>
+                <Link
+                    href="/dashboard/news"
+                    className="tap shrink-0 inline-flex min-h-[44px] items-center gap-2 rounded-md border border-foreground bg-card px-3.5 text-xs font-bold hover:bg-muted"
+                >
+                    <FileText className="h-4 w-4 text-primary" aria-hidden="true" />
+                    <span>News Studio</span>
+                </Link>
+                {isAdminPlus && (
+                    <Link
+                        href="/dashboard/rates"
+                        className="tap shrink-0 inline-flex min-h-[44px] items-center gap-2 rounded-md border border-foreground bg-card px-3.5 text-xs font-bold hover:bg-muted"
+                    >
+                        <Calculator className="h-4 w-4 text-primary" aria-hidden="true" />
+                        <span>Postage Rates</span>
+                    </Link>
                 )}
+                <Link
+                    href="/dashboard/activity"
+                    className="tap shrink-0 inline-flex min-h-[44px] items-center gap-2 rounded-md border border-foreground bg-card px-3.5 text-xs font-bold hover:bg-muted"
+                >
+                    <Clock className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    <span>Activity Log</span>
+                </Link>
+            </section>
 
-                {/* Moderation Queue */}
-                <ModerationQueue initialPendingEdits={pendingEdits} initialPendingEditItems={pendingEditItems} />
+            {/* Priority Triage + Latest Postal Dispatches */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Priority Triage */}
+                <section className="rounded-md border-2 border-foreground bg-card overflow-hidden">
+                    <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                        <div>
+                            <p className="label-mono">Priority Triage</p>
+                            <h2 className="font-heading text-lg font-extrabold">Open Edit Submissions</h2>
+                        </div>
+                        <Link
+                            href="/dashboard/queue"
+                            className="tap inline-flex min-h-[44px] items-center gap-1 text-xs font-bold text-primary hover:underline"
+                        >
+                            <span>Open Queue</span>
+                            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                        </Link>
+                    </div>
 
-                {/* Photo Moderation */}
-                <PhotoModeration photos={communityPhotos} />
+                    {priorityEdits.length === 0 ? (
+                        <div className="p-8 text-center">
+                            <ShieldCheck className="h-10 w-10 mx-auto text-muted-foreground/40 mb-2" aria-hidden="true" />
+                            <p className="text-sm font-bold text-foreground">All caught up</p>
+                            <p className="text-xs text-muted-foreground mt-1">No pending office edit requests right now.</p>
+                        </div>
+                    ) : (
+                        <div className="divide-y divide-border">
+                            {priorityEdits.map((item) => {
+                                let fallbackName = "New Post Office";
+                                let fallbackCode = "";
+                                try {
+                                    const parsed = JSON.parse(item.changes || "{}") as { name?: string; postalCode?: string };
+                                    if (parsed.name) fallbackName = parsed.name;
+                                    if (parsed.postalCode) fallbackCode = parsed.postalCode;
+                                } catch {
+                                    // ignore parse fallback
+                                }
+                                const officeName = item.postOffice?.name || fallbackName;
+                                const postalCode = item.postOffice?.postalCode || fallbackCode;
 
-                {/* Review Moderation */}
-                <ReviewModeration initialPendingReviews={pendingReviewsCount} initialPendingReviewItems={pendingReviewItems} />
+                                return (
+                                    <Link
+                                        key={item.id}
+                                        href="/dashboard/queue"
+                                        className="tap flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors"
+                                    >
+                                        <div className="min-w-0">
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                <span className="font-mono text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-sm border border-foreground/40 bg-background">
+                                                    {item.type}
+                                                </span>
+                                                {item.status === "MORE_INFO" && (
+                                                    <span className="font-mono text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-sm border border-status-closing text-status-closing bg-status-closing/10">
+                                                        More Info
+                                                    </span>
+                                                )}
+                                                {postalCode && (
+                                                    <span className="font-mono text-[11px] text-muted-foreground">
+                                                        {postalCode}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-sm font-bold text-foreground truncate mt-1">{officeName}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                By {item.requestedBy.name} · {new Date(item.createdAt).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                        <span className="shrink-0 rounded-md border border-foreground bg-secondary px-3 py-1.5 text-xs font-extrabold text-secondary-foreground">
+                                            Review
+                                        </span>
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    )}
+                </section>
+
+                {/* Latest Postal Updates */}
+                <section className="rounded-md border-2 border-foreground bg-card overflow-hidden">
+                    <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                        <div>
+                            <p className="label-mono">Newsroom</p>
+                            <h2 className="font-heading text-lg font-extrabold">Latest Postal Updates</h2>
+                        </div>
+                        <Link
+                            href="/dashboard/news"
+                            className="tap inline-flex min-h-[44px] items-center gap-1 text-xs font-bold text-primary hover:underline"
+                        >
+                            <span>Manage News</span>
+                            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                        </Link>
+                    </div>
+
+                    {recentUpdates.length === 0 ? (
+                        <div className="p-8 text-center">
+                            <FileText className="h-10 w-10 mx-auto text-muted-foreground/40 mb-2" aria-hidden="true" />
+                            <p className="text-sm font-bold text-foreground">No database dispatches yet</p>
+                            <p className="text-xs text-muted-foreground mt-1 mb-4">
+                                Publish breaking service alerts, tariff updates, or postal guides.
+                            </p>
+                            <Link
+                                href="/dashboard/news/new"
+                                className="tap inline-flex min-h-[44px] items-center gap-1.5 rounded-md border-2 border-foreground bg-primary px-4 text-xs font-bold text-primary-foreground"
+                            >
+                                <PlusCircle className="h-4 w-4" aria-hidden="true" />
+                                <span>Write First Update</span>
+                            </Link>
+                        </div>
+                    ) : (
+                        <div className="divide-y divide-border">
+                            {recentUpdates.map((post) => (
+                                <Link
+                                    key={post.id}
+                                    href={`/dashboard/news/${post.id}`}
+                                    className="tap flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors"
+                                >
+                                    <div className="min-w-0">
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                            <span
+                                                className={`font-mono text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-sm border ${CATEGORY_PILL[post.category] || CATEGORY_PILL.GUIDE}`}
+                                            >
+                                                {post.category}
+                                            </span>
+                                            {post.featured && (
+                                                <span className="inline-flex items-center gap-0.5 font-mono text-[10px] font-bold uppercase text-primary">
+                                                    <Star className="h-3 w-3 fill-current" aria-hidden="true" />
+                                                    Pinned
+                                                </span>
+                                            )}
+                                            {!post.published && (
+                                                <span className="font-mono text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-sm border border-border bg-muted text-muted-foreground">
+                                                    Draft
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-sm font-bold text-foreground truncate mt-1">{post.title}</p>
+                                        <p className="font-mono text-[11px] text-muted-foreground">
+                                            {new Date(post.date).toLocaleDateString()} · {post.readingTime} min read
+                                        </p>
+                                    </div>
+                                    <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                </Link>
+                            ))}
+                        </div>
+                    )}
+                </section>
             </div>
         </div>
     );

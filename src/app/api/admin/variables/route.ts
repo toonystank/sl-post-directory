@@ -9,7 +9,7 @@ export async function GET() {
     const session = await getServerSession(authOptions);
     const userRole = (session?.user as { role?: string } | undefined)?.role;
 
-    if (!session || !userRole || !["SUPER_ADMIN", "ADMIN"].includes(userRole)) {
+    if (!session || !userRole || !["SUPER_ADMIN", "ADMIN", "MODERATOR"].includes(userRole)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

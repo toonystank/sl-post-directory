@@ -2,7 +2,11 @@
 
 import { useEffect, useState, useRef } from "react";
 import { MapPin } from "lucide-react";
+import { usePathname } from "@/navigation";
+import { stripLocalePrefix } from "@/lib/locale";
 import { useAds } from "./AdManager";
+
+const HIDDEN_ON = ["/login", "/register", "/dashboard"];
 
 type WindowWithCapacitor = Window & {
     Capacitor?: { isNativePlatform?: () => boolean };
@@ -20,11 +24,14 @@ interface AdBannerProps {
 }
 
 export default function AdBanner({ position = "in-feed", className = "", style }: AdBannerProps) {
+    const pathname = stripLocalePrefix(usePathname() || "/");
     const [isNative, setIsNative] = useState<boolean | null>(null);
     const hasRequestedNativeBanner = useRef(false);
     const { adsEnabled, loading } = useAds();
+    const isHiddenRoute = HIDDEN_ON.some((p) => pathname.startsWith(p));
 
     useEffect(() => {
+        if (isHiddenRoute) return;
         const native = isNativePlatform();
         setIsNative(native);
 
@@ -58,10 +65,10 @@ export default function AdBanner({ position = "in-feed", className = "", style }
                 hasRequestedNativeBanner.current = false;
             };
         }
-    }, [position, adsEnabled]);
+    }, [position, adsEnabled, isHiddenRoute]);
 
-    // Don't render if ads are disabled or still loading
-    if (loading || !adsEnabled) return null;
+    // Hide on auth/admin workspace or when disabled
+    if (isHiddenRoute || loading || !adsEnabled) return null;
 
     // Don't render until we know the platform
     if (isNative === null) return null;

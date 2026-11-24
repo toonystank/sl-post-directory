@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Save, Loader2 } from "lucide-react";
+import { showNativeToast } from "@/components/shell/NativeToast";
 
 export default function ChangePasswordForm() {
     const [currentPassword, setCurrentPassword] = useState("");
@@ -19,12 +20,12 @@ export default function ChangePasswordForm() {
         setSuccess("");
 
         if (newPassword !== confirmPassword) {
-            setError("New passwords do not match");
+            setError("New passwords do not match.");
             return;
         }
 
         if (newPassword.length < 8) {
-            setError("New password must be at least 8 characters long");
+            setError("New password must be at least 8 characters long.");
             return;
         }
 
@@ -37,17 +38,18 @@ export default function ChangePasswordForm() {
                 body: JSON.stringify({ currentPassword, newPassword }),
             });
 
-            const data = await res.json();
+            const data = (await res.json()) as { error?: string };
 
             if (!res.ok) {
-                setError(data.error || "Failed to update password");
+                setError(data.error || "Failed to update password.");
             } else {
-                setSuccess("Password successfully updated. You can now use it on your next login.");
+                setSuccess("Password updated successfully.");
+                showNativeToast("Password updated");
                 setCurrentPassword("");
                 setNewPassword("");
                 setConfirmPassword("");
             }
-        } catch (err) {
+        } catch {
             setError("An unexpected error occurred. Please try again.");
         } finally {
             setLoading(false);
@@ -57,51 +59,63 @@ export default function ChangePasswordForm() {
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-                <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-lg font-medium">
+                <div role="alert" className="bg-destructive/10 border border-destructive/40 text-destructive text-sm p-3 rounded-md font-medium">
                     {error}
                 </div>
             )}
             {success && (
-                <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-sm p-3 rounded-lg font-medium">
+                <div role="status" className="bg-status-open/10 border border-status-open/40 text-status-open text-sm p-3 rounded-md font-medium">
                     {success}
                 </div>
             )}
 
-            <div className="space-y-1.5">
-                <label className="text-sm font-medium">Current Password</label>
+            <div>
+                <label className="label-mono block mb-1.5" htmlFor="current-password">
+                    Current Password
+                </label>
                 <Input
+                    id="current-password"
                     type="password"
+                    autoComplete="current-password"
                     required
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="bg-background"
+                    className="h-12 text-base bg-background"
                 />
             </div>
 
-            <div className="space-y-1.5 pt-2 border-t border-border/50">
-                <label className="text-sm font-medium">New Password</label>
+            <div className="pt-2 border-t border-border">
+                <label className="label-mono block mb-1.5" htmlFor="new-password">
+                    New Password
+                </label>
                 <Input
+                    id="new-password"
                     type="password"
+                    autoComplete="new-password"
                     required
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="bg-background"
+                    className="h-12 text-base bg-background"
                 />
             </div>
 
-            <div className="space-y-1.5">
-                <label className="text-sm font-medium">Confirm New Password</label>
+            <div>
+                <label className="label-mono block mb-1.5" htmlFor="confirm-password">
+                    Confirm New Password
+                </label>
                 <Input
+                    id="confirm-password"
                     type="password"
+                    autoComplete="new-password"
                     required
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="bg-background"
+                    className="h-12 text-base bg-background"
                 />
             </div>
 
-            <Button type="submit" className="w-full sm:w-auto mt-4" disabled={loading}>
-                {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+            <Button type="submit" className="w-full sm:w-auto h-11 font-bold" disabled={loading}>
+                {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" /> : <Save className="w-4 h-4 mr-2" aria-hidden="true" />}
                 Update Password
             </Button>
         </form>

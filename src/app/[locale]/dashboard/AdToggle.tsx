@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Megaphone, Loader2 } from "lucide-react";
+import { showNativeToast } from "@/components/shell/NativeToast";
+import { cn } from "@/lib/utils";
 
 export default function AdToggle() {
     const [adsEnabled, setAdsEnabled] = useState(true);
@@ -10,16 +11,18 @@ export default function AdToggle() {
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
-        fetch("/api/admin/settings")
-            .then(res => res.json())
-            .then(data => setAdsEnabled(data.adsEnabled))
+        fetch("/api/admin/settings", { cache: "no-store" })
+            .then((res) => res.json())
+            .then((data: { adsEnabled?: boolean }) => {
+                if (typeof data.adsEnabled === "boolean") setAdsEnabled(data.adsEnabled);
+            })
             .catch(() => {})
             .finally(() => setLoading(false));
     }, []);
 
     const handleToggle = async () => {
         const newValue = !adsEnabled;
-        setAdsEnabled(newValue); // Optimistic update
+        setAdsEnabled(newValue);
         setSaving(true);
 
         try {
@@ -29,60 +32,80 @@ export default function AdToggle() {
                 body: JSON.stringify({ adsEnabled: newValue }),
             });
 
-            if (!res.ok) {
-                setAdsEnabled(!newValue); // Revert on error
+            if (res.ok) {
+                showNativeToast(newValue ? "Sitewide ads enabled" : "Sitewide ads disabled");
+            } else {
+                setAdsEnabled(!newValue);
+                showNativeToast("Failed to update ad setting.");
             }
         } catch {
-            setAdsEnabled(!newValue); // Revert on error
+            setAdsEnabled(!newValue);
+            showNativeToast("Network error updating ads.");
         } finally {
             setSaving(false);
         }
     };
 
     if (loading) {
-        return null;
+        return (
+            <div className="h-[82px] rounded-md border-2 border-border bg-card p-4 animate-pulse flex items-center justify-between">
+                <div className="space-y-2">
+                    <div className="h-4 w-32 rounded bg-muted" />
+                    <div className="h-3 w-48 rounded bg-muted" />
+                </div>
+                <div className="h-7 w-12 rounded-full bg-muted" />
+            </div>
+        );
     }
 
     return (
-        <Card className="border-border/50 py-4 md:py-6 gap-3 md:gap-6">
-            <CardHeader className="flex flex-row items-center justify-between pb-0 px-5 md:px-6">
-                <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${adsEnabled ? 'bg-green-500/10 text-green-500' : 'bg-muted text-muted-foreground'}`}>
-                        <Megaphone className="w-4 h-4" />
-                    </div>
-                    <div>
-                        <CardTitle className="text-sm font-medium">Advertisements</CardTitle>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                            {adsEnabled ? "Ads are currently displayed site-wide" : "Ads are currently hidden site-wide"}
-                        </p>
-                    </div>
-                </div>
-                <button
-                    onClick={handleToggle}
-                    disabled={saving}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-                        adsEnabled ? 'bg-green-500' : 'bg-muted-foreground/30'
-                    }`}
-                    role="switch"
-                    aria-checked={adsEnabled}
-                    aria-label="Toggle advertisements"
-                >
-                    {saving ? (
-                        <span className="absolute inset-0 flex items-center justify-center">
-                            <Loader2 className="w-3 h-3 animate-spin text-white" />
-                        </span>
-                    ) : (
-                        <span
-                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition-transform ${
-                                adsEnabled ? 'translate-x-5' : 'translate-x-0.5'
-                            }`}
-                        />
+        <div className="rounded-md border-2 border-foreground bg-card p-4 sm:p-5 flex items-center justify-between gap-4 shadow-[3px_3px_0_0_hsl(var(--foreground))]">
+            <div className="flex items-start gap-3">
+                <span
+                    className={cn(
+                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border",
+                        adsEnabled
+                            ? "border-status-open/40 bg-status-open/10 text-status-open"
+                            : "border-border bg-muted text-muted-foreground"
                     )}
-                </button>
-            </CardHeader>
-            <CardContent className="px-5 md:px-6 pt-0">
-                {/* Empty for clean look, card header has all info */}
-            </CardContent>
-        </Card>
+                >
+                    <Megaphone className="w-5 h-5" aria-hidden="true" />
+                </span>
+                <div>
+                    <h2 className="font-heading text-base font-extrabold">Sitewide Advertisements</h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                        {adsEnabled
+                            ? "AdSense & Native AdMob units are currently active."
+                            : "All ad placements are hidden across web & native apps."}
+                    </p>
+                </div>
+            </div>
+
+            <button
+                type="button"
+                onClick={() => void handleToggle()}
+                disabled={saving}
+                role="switch"
+                aria-checked={adsEnabled}
+                aria-label="Toggle sitewide advertisements"
+                className={cn(
+                    "tap relative inline-flex h-8 w-14 shrink-0 items-center rounded-full border-2 border-foreground transition-colors disabled:opacity-50",
+                    adsEnabled ? "bg-status-open" : "bg-muted"
+                )}
+            >
+                {saving ? (
+                    <span className="mx-auto">
+                        <Loader2 className="w-4 h-4 animate-spin text-foreground" aria-hidden="true" />
+                    </span>
+                ) : (
+                    <span
+                        className={cn(
+                            "inline-block h-6 w-6 transform rounded-full bg-card border border-foreground transition-transform",
+                            adsEnabled ? "translate-x-6" : "translate-x-0.5"
+                        )}
+                    />
+                )}
+            </button>
+        </div>
     );
 }

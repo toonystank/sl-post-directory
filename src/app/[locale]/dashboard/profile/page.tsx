@@ -1,11 +1,8 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
-import { prisma } from "@/lib/prisma";
-import { User as UserIcon, ShieldAlert, ArrowLeft } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
+import { hasDatabaseUrl, prisma } from "@/lib/prisma";
+import { ShieldAlert } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ChangePasswordForm from "./ChangePasswordForm";
 import TwoFactorAuthManager from "./TwoFactorAuthManager";
@@ -17,76 +14,81 @@ export default async function ProfileSettingsPage() {
         redirect("/login");
     }
 
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        select: {
-            id: true,
-            email: true,
-            name: true,
-            role: true,
-            twoFactorEnabled: true,
-            backupCodes: true
-        }
-    });
+    const user = hasDatabaseUrl
+        ? await prisma.user.findUnique({
+              where: { email: session.user.email },
+              select: {
+                  id: true,
+                  email: true,
+                  name: true,
+                  role: true,
+                  twoFactorEnabled: true,
+                  backupCodes: true,
+              },
+          })
+        : null;
 
     if (!user) {
         redirect("/login");
     }
 
     return (
-        <div className="container mx-auto px-4 py-12 max-w-5xl min-h-[calc(100vh-4rem)]">
-            <Button variant="ghost" asChild className="mb-8 hover:bg-primary/10 hover:text-primary transition-colors -ml-4">
-                <Link href="/dashboard">
-                    <ArrowLeft className="w-4 h-4 mr-2" /> Back to Dashboard
-                </Link>
-            </Button>
+        <div className="max-w-3xl space-y-5">
+            <header>
+                <p className="label-mono">Account Security</p>
+                <h1 className="display text-3xl sm:text-4xl mt-1">Profile &amp; 2FA</h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                    Manage your password, authenticator app &amp; recovery backup codes.
+                </p>
+            </header>
 
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-                <div>
-                    <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-3">
-                        <div className="p-2.5 bg-primary/10 text-primary rounded-xl">
-                            <UserIcon className="w-7 h-7" />
-                        </div>
-                        Profile Settings
-                    </h1>
-                    <p className="text-muted-foreground mt-2 ml-[52px]">Manage your account security and authentication methods.</p>
-                </div>
-            </div>
-
-            <Tabs defaultValue="security" className="w-full">
-                <TabsList className="mb-6 grid w-full max-w-md grid-cols-2">
-                    <TabsTrigger value="security">Password & Security</TabsTrigger>
-                    <TabsTrigger value="2fa">Two-Factor Auth</TabsTrigger>
+            <Tabs defaultValue="security" className="w-full space-y-4">
+                <TabsList className="grid w-full max-w-md grid-cols-2 h-12 border-2 border-foreground bg-muted p-1">
+                    <TabsTrigger value="security" className="font-bold">
+                        Password
+                    </TabsTrigger>
+                    <TabsTrigger value="2fa" className="font-bold">
+                        Two-Factor Auth
+                    </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="security" className="space-y-6 max-w-2xl">
-                    <Card className="border-border/50 shadow-xl bg-card/50 backdrop-blur-xl">
-                        <CardHeader className="border-b border-border/40 bg-card/80 p-6">
-                            <CardTitle className="text-lg flex items-center gap-2">
-                                <ShieldAlert className="w-5 h-5 text-primary" /> Security Basics
-                            </CardTitle>
-                            <CardDescription>Update your account password.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="p-6">
+                <TabsContent value="security">
+                    <div className="rounded-md border-2 border-foreground bg-card overflow-hidden shadow-[3px_3px_0_0_hsl(var(--foreground))]">
+                        <div className="border-b border-border bg-muted/40 px-5 py-4 flex items-center gap-2.5">
+                            <ShieldAlert className="w-5 h-5 text-primary" aria-hidden="true" />
+                            <div>
+                                <h2 className="font-heading text-lg font-extrabold">Update Password</h2>
+                                <p className="text-xs text-muted-foreground">
+                                    Signed in as {user.email}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="p-5 sm:p-6">
                             <ChangePasswordForm />
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
                 </TabsContent>
 
-                <TabsContent value="2fa" className="space-y-6 max-w-3xl">
-                    <Card className="border-border/50 shadow-xl bg-card/50 backdrop-blur-xl">
-                        <CardHeader className="border-b border-border/40 bg-card/80 p-6">
-                            <CardTitle className="text-lg flex items-center gap-2">
-                                <ShieldAlert className="w-5 h-5 text-primary" /> Two-Factor Authentication (2FA)
-                            </CardTitle>
-                            <CardDescription>
-                                Add an extra layer of security to your account by configuring a device-based authenticator.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="p-6">
-                            <TwoFactorAuthManager enabled={user.twoFactorEnabled} backupCodes={user.backupCodes} />
-                        </CardContent>
-                    </Card>
+                <TabsContent value="2fa">
+                    <div className="rounded-md border-2 border-foreground bg-card overflow-hidden shadow-[3px_3px_0_0_hsl(var(--foreground))]">
+                        <div className="border-b border-border bg-muted/40 px-5 py-4 flex items-center gap-2.5">
+                            <ShieldAlert className="w-5 h-5 text-primary" aria-hidden="true" />
+                            <div>
+                                <h2 className="font-heading text-lg font-extrabold">
+                                    Two-Factor Authentication (2FA)
+                                </h2>
+                                <p className="text-xs text-muted-foreground">
+                                    Use an authenticator app + backup recovery codes at login.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="p-5 sm:p-6">
+                            <TwoFactorAuthManager
+                                enabled={user.twoFactorEnabled}
+                                backupCodes={user.backupCodes}
+                            />
+                        </div>
+                    </div>
                 </TabsContent>
             </Tabs>
         </div>

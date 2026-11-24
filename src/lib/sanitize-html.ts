@@ -77,6 +77,8 @@ const TAG_ALLOWED_ATTRS: Record<string, Set<string>> = {
     th: new Set(["colspan", "rowspan", "scope"]),
     td: new Set(["colspan", "rowspan"]),
     ol: new Set(["start", "type"]),
+    div: new Set(["data-callout"]),
+    figure: new Set(["data-figure"]),
 };
 
 function isSafeLinkHref(raw: string): boolean {
@@ -112,7 +114,7 @@ function isElementNode(node: AnyNode): node is Element {
 }
 
 /**
- * Allowlist-based HTML sanitizer for rich-text blog articles edited via Jodit.
+ * Allowlist-based HTML sanitizer for rich-text news dispatches and postal guides edited via Tiptap.
  * Removes executable tags (`<script>`, `<svg>`, `<iframe>`, etc.), event handlers (`on*`),
  * and unsafe URL protocols (`javascript:`, `data:`, `vbscript:`).
  */

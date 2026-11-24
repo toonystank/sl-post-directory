@@ -8,6 +8,17 @@ import type { BlogPost } from "@prisma/client";
 // though we now use Prisma's BlogPost type natively
 export type { BlogPost };
 
+export const BLOG_CATEGORIES = ["NEWS", "ALERT", "TARIFF", "GUIDE"] as const;
+export type BlogCategory = (typeof BLOG_CATEGORIES)[number];
+
+export function normalizeBlogCategory(raw?: string | null): BlogCategory {
+    const upper = String(raw || "").trim().toUpperCase();
+    if (upper === "NEWS" || upper === "ALERT" || upper === "TARIFF" || upper === "GUIDE") {
+        return upper;
+    }
+    return "GUIDE";
+}
+
 const CONTENT_DIR = path.join(process.cwd(), "src", "content", "blog");
 
 export function calculateReadingTime(text: string): number {
@@ -23,6 +34,11 @@ export interface FrontmatterData {
     date?: string;
     author?: string;
     tags?: string[];
+    category?: string;
+    coverImage?: string;
+    coverCaption?: string;
+    featured?: string;
+    sourceUrl?: string;
     [key: string]: string | string[] | undefined;
 }
 
@@ -120,12 +136,20 @@ function getLocalMarkdownPosts(): BlogPost[] {
                 contentHtml: htmlContent,
                 readingTime: calculateReadingTime(htmlContent),
                 published: true,
+                category: normalizeBlogCategory(typeof data.category === "string" ? data.category : undefined),
+                coverImage: typeof data.coverImage === "string" && data.coverImage ? data.coverImage : null,
+                coverCaption: typeof data.coverCaption === "string" && data.coverCaption ? data.coverCaption : null,
+                featured: String(data.featured || "").toLowerCase() === "true",
+                sourceUrl: typeof data.sourceUrl === "string" && data.sourceUrl ? data.sourceUrl : null,
                 createdAt: validDate,
                 updatedAt: validDate,
             };
         });
 
-        return posts.sort((a, b) => b.date.getTime() - a.date.getTime());
+        return posts.sort((a, b) => {
+            if (a.featured !== b.featured) return a.featured ? -1 : 1;
+            return b.date.getTime() - a.date.getTime();
+        });
     } catch {
         return [];
     }
@@ -139,7 +163,7 @@ export async function getAllPosts(): Promise<BlogPost[]> {
     try {
         const posts = await prisma.blogPost.findMany({
             where: { published: true },
-            orderBy: { date: 'desc' }
+            orderBy: [{ featured: "desc" }, { date: "desc" }],
         });
         return posts.length > 0 ? posts : getLocalMarkdownPosts();
     } catch {
@@ -170,11 +194,30 @@ export async function getLatestPosts(count: number): Promise<BlogPost[]> {
     try {
         const posts = await prisma.blogPost.findMany({
             where: { published: true },
-            orderBy: { date: 'desc' },
-            take: count
+            orderBy: [{ featured: "desc" }, { date: "desc" }],
+            take: count,
         });
         return posts.length > 0 ? posts : getLocalMarkdownPosts().slice(0, count);
     } catch {
         return getLocalMarkdownPosts().slice(0, count);
+    }
+}
+
+export async function getFeaturedAlert(): Promise<BlogPost | null> {
+    const localFallback = () =>
+        getLocalMarkdownPosts().find((post) => post.published && post.featured && post.category === "ALERT") ?? null;
+
+    if (!hasDatabaseUrl) {
+        return localFallback();
+    }
+
+    try {
+        const alert = await prisma.blogPost.findFirst({
+            where: { published: true, featured: true, category: "ALERT" },
+            orderBy: { date: "desc" },
+        });
+        return alert ?? localFallback();
+    } catch {
+        return localFallback();
     }
 }

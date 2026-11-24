@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { ChevronDown, ChevronRight, Truck } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, Truck } from "lucide-react";
 import { Link } from "@/navigation";
 import { Button } from "@/components/ui/button";
 import CountryFlag from "@/components/brand/CountryFlag";
@@ -43,12 +43,20 @@ export interface DivisionLink {
     slug: string;
 }
 
+export interface FeaturedAlertPeek {
+    slug: string;
+    title: string;
+    excerpt: string;
+}
+
 export default function HomeBottomSection({
     children,
     divisions = [],
+    featuredAlert = null,
 }: {
     children: React.ReactNode;
     divisions?: DivisionLink[];
+    featuredAlert?: FeaturedAlertPeek | null;
 }) {
     const t = useTranslations("Home");
     const [divisionsOpen, setDivisionsOpen] = React.useState(false);
@@ -104,6 +112,27 @@ export default function HomeBottomSection({
     return (
         <section className="bg-card/50 py-6 md:py-14 flex-1">
             <div className="container mx-auto px-4 space-y-6 md:space-y-10">
+                {featuredAlert && (
+                    <Link
+                        href={`/blog/${featuredAlert.slug}`}
+                        onClick={() => triggerHaptic("light")}
+                        className="tap flex items-center gap-3 rounded-md border-2 border-foreground bg-primary/10 p-3.5 shadow-[3px_3px_0_0_hsl(var(--foreground))] hover:bg-primary/15 transition-colors"
+                    >
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-foreground bg-primary text-primary-foreground">
+                            <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                            <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-primary block">
+                                {t("breakingAlert")}
+                            </span>
+                            <span className="font-heading text-sm sm:text-base font-extrabold text-foreground block truncate">
+                                {featuredAlert.title}
+                            </span>
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                    </Link>
+                )}
+
                 {/* Active Parcel Peek Card (mobile + desktop when user has tracked parcels) */}
                 {activeParcel && (
                     <Link

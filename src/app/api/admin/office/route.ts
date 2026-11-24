@@ -26,13 +26,31 @@ export async function POST(req: Request) {
             );
         }
 
-        const { name, postalCode, ...fields } = validation.data;
+        const {
+            name,
+            postalCode,
+            operatingHours,
+            services,
+            rmsc,
+            latitude,
+            longitude,
+            customFields,
+            ...fields
+        } = validation.data;
 
         const dynamicFields: { name: string; value: string; type: string }[] = [];
-        for (const [key, value] of Object.entries(fields)) {
-            if (key.startsWith("field_") && typeof value === "string" && value.trim() !== "") {
-                const fieldName = key.replace("field_", "");
-                dynamicFields.push({ name: fieldName, value: value.trim(), type: "TEXT" });
+        if (Array.isArray(customFields)) {
+            for (const f of customFields) {
+                if (f.name.trim() && f.value.trim()) {
+                    dynamicFields.push({ name: f.name.trim(), value: f.value.trim(), type: "TEXT" });
+                }
+            }
+        } else {
+            for (const [key, value] of Object.entries(fields)) {
+                if (key.startsWith("field_") && typeof value === "string" && value.trim() !== "") {
+                    const fieldName = key.replace("field_", "");
+                    dynamicFields.push({ name: fieldName, value: value.trim(), type: "TEXT" });
+                }
             }
         }
 
@@ -45,6 +63,11 @@ export async function POST(req: Request) {
                 name,
                 slug: finalSlug,
                 postalCode,
+                ...(operatingHours !== undefined && { operatingHours: operatingHours || null }),
+                ...(services !== undefined && { services }),
+                ...(rmsc !== undefined && { rmsc: rmsc || null }),
+                ...(latitude !== undefined && { latitude }),
+                ...(longitude !== undefined && { longitude }),
                 fields: {
                     create: dynamicFields,
                 },
@@ -56,8 +79,14 @@ export async function POST(req: Request) {
 
         invalidateOfficeIndexCache();
         revalidatePath("/");
+        revalidatePath("/si");
+        revalidatePath("/ta");
         revalidatePath("/browse");
+        revalidatePath("/si/browse");
+        revalidatePath("/ta/browse");
         revalidatePath(`/office/${newOffice.slug}`);
+        revalidatePath(`/si/office/${newOffice.slug}`);
+        revalidatePath(`/ta/office/${newOffice.slug}`);
 
         return NextResponse.json({ success: true, office: newOffice });
     } catch (error: unknown) {

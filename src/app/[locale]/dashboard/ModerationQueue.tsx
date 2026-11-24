@@ -1,91 +1,123 @@
 "use client";
 
-import { useState, Fragment } from "react";
+import { useState, useMemo } from "react";
 import { ShieldCheck, Check, X, Info, ChevronDown, ChevronUp } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { useRouter } from "next/navigation";
+import { showNativeToast } from "@/components/shell/NativeToast";
+import ConfirmDialog from "@/components/admin/ConfirmDialog";
+import { cn } from "@/lib/utils";
+
+export interface ModerationEditItem {
+    id: string;
+    createdAt: Date | string;
+    status: string;
+    type: string;
+    reason?: string | null;
+    changes: string;
+    postOfficeId?: string | null;
+    requestedById: string;
+    postOffice?: {
+        name: string;
+        postalCode: string;
+        fields: Array<{ name: string; value: string }>;
+    } | null;
+    requestedBy: {
+        name: string;
+        email: string;
+    };
+}
 
 interface ModerationQueueProps {
     initialPendingEdits: number;
-    initialPendingEditItems: Array<{
-        id: string;
-        createdAt: Date;
-        status: string;
-        type: string;
-        reason?: string | null;
-        changes: string;
-        postOfficeId?: string | null;
-        requestedById: string;
-        postOffice?: {
-            name: string;
-            postalCode: string;
-            fields: Array<{ name: string; value: string }>;
-        } | null;
-        requestedBy: {
-            name: string;
-            email: string;
-        };
-    }>;
+    initialPendingEditItems: ModerationEditItem[];
+    onCountChange?: (newOpenCount: number) => void;
 }
 
-export default function ModerationQueue({ initialPendingEdits, initialPendingEditItems }: ModerationQueueProps) {
-    const [pendingEdits, setPendingEdits] = useState(initialPendingEdits);
-    const [pendingEditItems, setPendingEditItems] = useState(initialPendingEditItems);
-    const [processingId, setProcessingId] = useState<string | null>(null);
+type StatusFilter = "ALL" | "PENDING" | "MORE_INFO";
+
+export default function ModerationQueue({
+    initialPendingEdits,
+    initialPendingEditItems,
+    onCountChange,
+}: ModerationQueueProps) {
+    const [pendingEditItems, setPendingEditItems] = useState<ModerationEditItem[]>(initialPendingEditItems);
+    const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
     const [expandedId, setExpandedId] = useState<string | null>(null);
-    const [isMobileCollapsed, setIsMobileCollapsed] = useState(true);
-    const router = useRouter();
+    const [pendingAction, setPendingAction] = useState<{
+        item: ModerationEditItem;
+        action: "APPROVE" | "REJECT" | "MORE_INFO";
+    } | null>(null);
+    const [processing, setProcessing] = useState(false);
 
-    const handleAction = async (requestId: string, action: "APPROVE" | "REJECT" | "MORE_INFO") => {
-        let actionWord = action.toLowerCase();
-        if (action === "MORE_INFO") actionWord = "request more info for";
-        if (!confirm(`Are you sure you want to ${actionWord} this edit request?`)) return;
+    const openCount = pendingEditItems.length || (initialPendingEdits === 0 ? 0 : pendingEditItems.length);
+    const pendingOnlyCount = useMemo(
+        () => pendingEditItems.filter((item) => item.status === "PENDING").length,
+        [pendingEditItems]
+    );
+    const moreInfoCount = useMemo(
+        () => pendingEditItems.filter((item) => item.status === "MORE_INFO").length,
+        [pendingEditItems]
+    );
 
-        setProcessingId(requestId);
+    const visibleItems = useMemo(() => {
+        if (statusFilter === "ALL") return pendingEditItems;
+        return pendingEditItems.filter((item) => item.status === statusFilter);
+    }, [pendingEditItems, statusFilter]);
+
+    const executeAction = async () => {
+        if (!pendingAction) return;
+        const { item, action } = pendingAction;
+        setProcessing(true);
+
         try {
             const res = await fetch("/api/admin/moderate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ requestId, action }),
+                body: JSON.stringify({ requestId: item.id, action }),
             });
 
             if (res.ok) {
-                // Remove the processed item from the local state
-                setPendingEditItems(prev => prev.filter(item => item.id !== requestId));
-                setPendingEdits(prev => prev - 1);
-
-                // Instruct the server components to re-fetch their data
-                router.refresh();
+                if (action === "MORE_INFO") {
+                    setPendingEditItems((prev) =>
+                        prev.map((row) => (row.id === item.id ? { ...row, status: "MORE_INFO" } : row))
+                    );
+                    showNativeToast("Marked as More Info Sent");
+                } else {
+                    setPendingEditItems((prev) => {
+                        const next = prev.filter((row) => row.id !== item.id);
+                        onCountChange?.(next.length);
+                        return next;
+                    });
+                    showNativeToast(action === "APPROVE" ? "Edit approved & published" : "Edit request rejected");
+                }
+                setPendingAction(null);
             } else {
-                const err = await res.json();
-                alert(`Error: ${err.error || "Failed to process request."}`);
+                const err = (await res.json().catch(() => ({}))) as { error?: string };
+                showNativeToast(err.error || "Failed to process request.");
             }
-        } catch (error) {
-            console.error("Moderation action failed:", error);
-            alert("A network error occurred.");
+        } catch {
+            showNativeToast("Network error occurred.");
         } finally {
-            setProcessingId(null);
+            setProcessing(false);
         }
     };
 
-    const toggleDetails = (id: string) => {
-        setExpandedId(expandedId === id ? null : id);
-    };
-
-    const renderChanges = (edit: ModerationQueueProps["initialPendingEditItems"][number]) => {
+    const renderChanges = (edit: ModerationEditItem) => {
         const changesJson = edit.changes;
         const type = edit.type || "EDIT";
         const reason = edit.reason;
-        const currentOffice: { name?: string; postalCode?: string; fields: Array<{ name: string; value: string }> } = edit.postOffice || { fields: [] };
+        const currentOffice: {
+            name?: string;
+            postalCode?: string;
+            fields: Array<{ name: string; value: string }>;
+        } = edit.postOffice || { fields: [] };
 
         if (type === "REMOVAL") {
             return (
-                <div className="space-y-3 text-sm">
-                    <div className="p-4 bg-destructive/10 text-destructive rounded-xl border border-destructive/20 shadow-sm">
-                        <span className="font-bold flex items-center gap-2 mb-1"><ShieldCheck className="w-4 h-4" /> Reason for removal requested:</span>
-                        {reason || "No reason provided."}
-                    </div>
+                <div className="p-3 bg-destructive/10 text-destructive rounded-md border border-destructive/30 text-sm">
+                    <span className="font-bold flex items-center gap-2 mb-1">
+                        <ShieldCheck className="w-4 h-4" aria-hidden="true" /> Reason for removal requested:
+                    </span>
+                    {reason || "No reason provided."}
                 </div>
             );
         }
@@ -99,80 +131,77 @@ export default function ModerationQueue({ initialPendingEdits, initialPendingEdi
 
             if (type === "ADD") {
                 return (
-                    <div className="space-y-3 text-sm">
+                    <div className="space-y-2 text-sm">
                         {reason && (
-                            <div className="p-3 mb-4 bg-muted/40 rounded-lg text-muted-foreground border border-border/50">
-                                <span className="font-bold text-foreground">Submitter notes:</span> {reason}
-                            </div>
+                            <p className="p-2.5 bg-background rounded-md text-muted-foreground border border-border">
+                                <strong className="text-foreground">Notes:</strong> {reason}
+                            </p>
                         )}
-                        <div className="flex items-center gap-3 py-2 px-3 bg-emerald-500/5 border-l-2 border-emerald-500 rounded-r-lg">
-                            <span className="font-medium text-muted-foreground w-28 shrink-0">Name</span>
-                            <span className="text-emerald-500 font-medium">+ {changes.name}</span>
+                        <div className="flex items-center gap-3 py-1.5 px-3 bg-status-open/10 border-l-2 border-status-open rounded-r-sm">
+                            <span className="font-mono text-xs text-muted-foreground w-24 shrink-0">Name</span>
+                            <span className="text-status-open font-semibold">+ {changes.name}</span>
                         </div>
-                        <div className="flex items-center gap-3 py-2 px-3 bg-emerald-500/5 border-l-2 border-emerald-500 rounded-r-lg">
-                            <span className="font-medium text-muted-foreground w-28 shrink-0">Postal Code</span>
-                            <span className="text-emerald-500 font-medium">+ {changes.postalCode}</span>
+                        <div className="flex items-center gap-3 py-1.5 px-3 bg-status-open/10 border-l-2 border-status-open rounded-r-sm">
+                            <span className="font-mono text-xs text-muted-foreground w-24 shrink-0">Postcode</span>
+                            <span className="text-status-open font-semibold">+ {changes.postalCode}</span>
                         </div>
-                        {changes.fields && changes.fields.map((f, i: number) => (
-                            <div key={i} className="flex items-center gap-3 py-2 px-3 bg-emerald-500/5 border-l-2 border-emerald-500 rounded-r-lg">
-                                <span className="font-medium text-muted-foreground w-28 shrink-0">{f.name}</span>
-                                <span className="text-emerald-500 font-medium">+ {f.value}</span>
+                        {changes.fields?.map((f, i) => (
+                            <div key={i} className="flex items-center gap-3 py-1.5 px-3 bg-status-open/10 border-l-2 border-status-open rounded-r-sm">
+                                <span className="font-mono text-xs text-muted-foreground w-24 shrink-0 truncate">{f.name}</span>
+                                <span className="text-status-open font-semibold">+ {f.value}</span>
                             </div>
                         ))}
                     </div>
                 );
             }
 
-            // EDIT logic
             const currentFieldMap = new Map(currentOffice.fields.map((f) => [f.name, f.value]));
 
             return (
-                <div className="space-y-3 text-sm">
-                    {/* Basic fields — name & postalCode */}
+                <div className="space-y-2 text-sm">
                     {changes.name && (
-                        <div className="flex items-center gap-3 py-2 px-3 bg-muted/20 border-l-2 border-primary rounded-r-lg">
-                            <span className="font-medium text-muted-foreground w-28 shrink-0">Name</span>
-                            <span className="line-through text-destructive font-medium bg-destructive/10 px-1.5 rounded">{currentOffice.name}</span>
-                            <span className="text-muted-foreground">→</span>
-                            <span className="text-emerald-500 font-medium bg-emerald-500/10 px-1.5 rounded">{changes.name}</span>
+                        <div className="flex flex-wrap items-center gap-2 py-1.5 px-3 bg-background border-l-2 border-primary rounded-r-sm">
+                            <span className="font-mono text-xs text-muted-foreground w-24 shrink-0">Name</span>
+                            <span className="line-through text-destructive font-medium">{currentOffice.name}</span>
+                            <span>&rarr;</span>
+                            <span className="text-status-open font-semibold">{changes.name}</span>
                         </div>
                     )}
                     {changes.postalCode && (
-                        <div className="flex items-center gap-3 py-2 px-3 bg-muted/20 border-l-2 border-primary rounded-r-lg">
-                            <span className="font-medium text-muted-foreground w-28 shrink-0">Postal Code</span>
-                            <span className="line-through text-destructive font-medium bg-destructive/10 px-1.5 rounded">{currentOffice.postalCode}</span>
-                            <span className="text-muted-foreground">→</span>
-                            <span className="text-emerald-500 font-medium bg-emerald-500/10 px-1.5 rounded">{changes.postalCode}</span>
+                        <div className="flex flex-wrap items-center gap-2 py-1.5 px-3 bg-background border-l-2 border-primary rounded-r-sm">
+                            <span className="font-mono text-xs text-muted-foreground w-24 shrink-0">Postcode</span>
+                            <span className="line-through text-destructive font-medium">{currentOffice.postalCode}</span>
+                            <span>&rarr;</span>
+                            <span className="text-status-open font-semibold">{changes.postalCode}</span>
                         </div>
                     )}
-
-                    {/* Dynamic fields */}
-                    {changes.fields && changes.fields.length > 0 && (
-                        <div className="space-y-1.5">
-                            {changes.fields.map((f: { name: string; value: string }, i: number) => {
-                                const currentValue = currentFieldMap.get(f.name);
-                                const isNew = currentValue === undefined;
-                                const isChanged = !isNew && currentValue !== f.value;
-
-                                return (
-                                    <div key={i} className={`flex items-center gap-3 py-2 px-3 bg-muted/20 border-l-2 rounded-r-lg ${isNew ? 'border-emerald-500' : isChanged ? 'border-primary' : 'border-border'}`}>
-                                        <span className="font-medium text-muted-foreground w-28 shrink-0">{f.name}</span>
-                                        {isNew ? (
-                                            <span className="text-emerald-500 font-medium bg-emerald-500/10 px-1.5 rounded">+ {f.value}</span>
-                                        ) : isChanged ? (
-                                            <>
-                                                <span className="line-through text-destructive font-medium bg-destructive/10 px-1.5 rounded">{currentValue}</span>
-                                                <span className="text-muted-foreground">→</span>
-                                                <span className="text-emerald-500 font-medium bg-emerald-500/10 px-1.5 rounded">{f.value}</span>
-                                            </>
-                                        ) : (
-                                            <span className="text-muted-foreground/60 italic">{f.value}</span>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
+                    {changes.fields?.map((f, i) => {
+                        const currentValue = currentFieldMap.get(f.name);
+                        const isNew = currentValue === undefined;
+                        const isChanged = !isNew && currentValue !== f.value;
+                        return (
+                            <div
+                                key={i}
+                                className={cn(
+                                    "flex flex-wrap items-center gap-2 py-1.5 px-3 bg-background border-l-2 rounded-r-sm",
+                                    isNew ? "border-status-open" : isChanged ? "border-primary" : "border-border"
+                                )}
+                            >
+                                <span className="font-mono text-xs text-muted-foreground w-24 shrink-0 truncate">{f.name}</span>
+                                {isNew ? (
+                                    <span className="text-status-open font-semibold">+ {f.value}</span>
+                                ) : isChanged ? (
+                                    <>
+                                        <span className="line-through text-destructive font-medium">{currentValue}</span>
+                                        <span>&rarr;</span>
+                                        <span className="text-status-open font-semibold">{f.value}</span>
+                                    </>
+                                ) : (
+                                    <span className="text-muted-foreground italic">{f.value}</span>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             );
         } catch {
@@ -180,223 +209,180 @@ export default function ModerationQueue({ initialPendingEdits, initialPendingEdi
         }
     };
 
+    const actionLabels = {
+        APPROVE: {
+            title: "Approve Edit Request",
+            confirm: "Approve & Publish",
+            destructive: false,
+            desc: "Apply these changes directly to the public directory and notify the contributor?",
+        },
+        MORE_INFO: {
+            title: "Request More Information",
+            confirm: "Request More Info",
+            destructive: false,
+            desc: "Email the contributor asking for clarification and keep this submission in your More Info queue?",
+        },
+        REJECT: {
+            title: "Reject Edit Request",
+            confirm: "Reject Submission",
+            destructive: true,
+            desc: "Reject this submission without modifying the public directory entry?",
+        },
+    };
+
     return (
-        <Card className="border-border/50 overflow-hidden">
-            <CardHeader 
-                className="border-b border-border/40 bg-card/80 flex flex-row items-center justify-between cursor-pointer md:cursor-default"
-                onClick={() => window.innerWidth < 768 && setIsMobileCollapsed(!isMobileCollapsed)}
-            >
-                <CardTitle className="text-lg flex items-center gap-2">
-                    Moderation Queue
-                    {pendingEdits > 0 && (
-                        <Badge variant="destructive" className="ml-2 rounded-full px-2 h-5 text-xs flex items-center justify-center">
-                            {pendingEdits}
-                        </Badge>
-                    )}
-                </CardTitle>
-                <div className="md:hidden text-muted-foreground flex items-center">
-                    {isMobileCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+        <div className="space-y-4">
+            {/* Filter Chips */}
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-0.5">
+                {(
+                    [
+                        { id: "ALL", label: `All Open (${openCount})` },
+                        { id: "PENDING", label: `Pending (${pendingOnlyCount})` },
+                        { id: "MORE_INFO", label: `More Info Sent (${moreInfoCount})` },
+                    ] as Array<{ id: StatusFilter; label: string }>
+                ).map((chip) => (
+                    <button
+                        key={chip.id}
+                        type="button"
+                        onClick={() => setStatusFilter(chip.id)}
+                        className={cn(
+                            "tap shrink-0 min-h-[40px] rounded-md border px-3 text-xs font-bold whitespace-nowrap",
+                            statusFilter === chip.id
+                                ? "border-foreground bg-foreground text-background"
+                                : "border-border bg-card text-muted-foreground hover:text-foreground"
+                        )}
+                    >
+                        {chip.label}
+                    </button>
+                ))}
+            </div>
+
+            {visibleItems.length === 0 ? (
+                <div className="rounded-md border-2 border-dashed border-foreground/40 bg-card p-10 text-center text-muted-foreground">
+                    <ShieldCheck className="w-12 h-12 mx-auto mb-3 opacity-25" aria-hidden="true" />
+                    <p className="font-heading text-lg font-extrabold text-foreground">All Clear</p>
+                    <p className="text-sm mt-1">No edit requests match this filter.</p>
                 </div>
-            </CardHeader>
-            <CardContent className={`p-0 ${isMobileCollapsed ? 'hidden md:block' : ''}`}>
-                {pendingEdits === 0 ? (
-                    <div className="text-center py-16 text-muted-foreground">
-                        <ShieldCheck className="w-16 h-16 mx-auto mb-4 opacity-15" />
-                        <p className="text-lg font-medium mb-1">All Clear</p>
-                        <p className="text-sm">No pending edit requests to moderate.</p>
-                    </div>
-                ) : (
-                    <div className="overflow-y-auto overflow-x-hidden max-h-[600px]">
-                        {/* Desktop Table */}
-                        <table className="hidden md:table w-full text-sm text-left relative">
-                            <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border/50 sticky top-0 z-10">
-                                <tr>
-                                    <th className="px-6 py-4 font-medium">Post Office</th>
-                                    <th className="px-6 py-4 font-medium">Requested By</th>
-                                    <th className="px-6 py-4 font-medium">Status</th>
-                                    <th className="px-6 py-4 font-medium">Date</th>
-                                    <th className="px-6 py-4 font-medium text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border/50">
-                                {pendingEditItems.map((edit) => (
-                                    <Fragment key={edit.id}>
-                                        <tr className="hover:bg-muted/30 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <div className="font-medium text-foreground flex flex-wrap items-center gap-2">
-                                                    {String(edit.postOffice?.name || (() => { try { return JSON.parse(edit.changes).name || "New Office" } catch { return "New Office" } })())}
-                                                    <Badge variant="outline" className={`text-[10px] uppercase font-bold tracking-wider ${edit.type === "ADD" ? "text-blue-500 bg-blue-500/10 border-blue-500/30" :
-                                                        edit.type === "REMOVAL" ? "text-destructive bg-destructive/10 border-destructive/30" :
-                                                            "text-primary bg-primary/10 border-primary/30"
-                                                        }`}>
-                                                        {edit.type || "EDIT"}
-                                                    </Badge>
-                                                </div>
-                                                <div className="text-xs text-muted-foreground mt-1 font-mono">
-                                                    {String(edit.postOffice?.postalCode || (() => { try { return JSON.parse(edit.changes).postalCode || "N/A" } catch { return "N/A" } })())}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
-                                                        {edit.requestedBy.name.charAt(0)}
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <div className="font-medium text-foreground truncate">{edit.requestedBy.name}</div>
-                                                        <div className="text-xs text-muted-foreground mt-0.5 truncate">{edit.requestedBy.email}</div>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                {edit.status === "MORE_INFO" ? (
-                                                    <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-500 bg-amber-500/10">
-                                                        Needs Info
-                                                    </Badge>
-                                                ) : (
-                                                    <Badge variant="outline" className="text-[10px] border-primary/30 text-primary bg-primary/10">
-                                                        Pending
-                                                    </Badge>
+            ) : (
+                <div className="space-y-3">
+                    {visibleItems.map((edit) => {
+                        let fallbackName = "New Post Office";
+                        let fallbackCode = "N/A";
+                        try {
+                            const parsed = JSON.parse(edit.changes || "{}") as { name?: string; postalCode?: string };
+                            if (parsed.name) fallbackName = parsed.name;
+                            if (parsed.postalCode) fallbackCode = parsed.postalCode;
+                        } catch {
+                            // ignore parse
+                        }
+                        const officeName = edit.postOffice?.name || fallbackName;
+                        const postalCode = edit.postOffice?.postalCode || fallbackCode;
+                        const isExpanded = expandedId === edit.id;
+
+                        return (
+                            <article
+                                key={edit.id}
+                                className="rounded-md border-2 border-foreground bg-card p-4 space-y-3 shadow-[3px_3px_0_0_hsl(var(--foreground))]"
+                            >
+                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                            <span
+                                                className={cn(
+                                                    "font-mono text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-sm border",
+                                                    edit.type === "ADD"
+                                                        ? "border-foreground bg-secondary text-secondary-foreground"
+                                                        : edit.type === "REMOVAL"
+                                                          ? "border-destructive bg-destructive text-destructive-foreground"
+                                                          : "border-border bg-muted text-foreground"
                                                 )}
-                                            </td>
-                                            <td className="px-6 py-4 text-muted-foreground font-mono text-xs">
-                                                {new Date(edit.createdAt).toLocaleDateString()}
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <button
-                                                        className="px-3 py-2 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2 text-xs font-bold"
-                                                        title="Approve"
-                                                        disabled={processingId === edit.id}
-                                                        onClick={() => handleAction(edit.id, "APPROVE")}
-                                                    >
-                                                        <Check className="w-4 h-4" /> Approve
-                                                    </button>
-                                                    <button
-                                                        className="px-3 py-2 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2 text-xs font-bold"
-                                                        title="Need More Info"
-                                                        disabled={processingId === edit.id}
-                                                        onClick={() => handleAction(edit.id, "MORE_INFO")}
-                                                    >
-                                                        <Info className="w-4 h-4" /> Needs Info
-                                                    </button>
-                                                    <button
-                                                        className="px-3 py-2 bg-destructive/10 text-destructive hover:bg-destructive/20 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2 text-xs font-bold"
-                                                        title="Reject"
-                                                        disabled={processingId === edit.id}
-                                                        onClick={() => handleAction(edit.id, "REJECT")}
-                                                    >
-                                                        <X className="w-4 h-4" /> Reject
-                                                    </button>
-                                                </div>
-                                                <button
-                                                    className="text-[10px] text-muted-foreground mt-1 cursor-pointer hover:underline flex items-center gap-1 ml-auto"
-                                                    onClick={() => toggleDetails(edit.id)}
-                                                >
-                                                    {expandedId === edit.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                                                    {expandedId === edit.id ? "Hide Details" : "View Details"}
-                                                </button>
-                                            </td>
-                                        </tr>
-                                        {expandedId === edit.id && (
-                                            <tr>
-                                                <td colSpan={5} className="px-6 py-4 bg-muted/20 border-t border-border/30">
-                                                    <div className="max-w-2xl">
-                                                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Proposed {edit.type === "REMOVAL" ? "Details" : "Changes"}</p>
-                                                        {renderChanges(edit)}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </Fragment>
-                                ))}
-                            </tbody>
-                        </table>
-
-                        {/* Mobile Cards */}
-                        <div className="md:hidden flex flex-col divide-y divide-border/50">
-                            {pendingEditItems.map((edit) => (
-                                <div key={`mob-${edit.id}`} className="p-4 flex flex-col gap-3 hover:bg-muted/30 transition-colors">
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="min-w-0">
-                                            <div className="font-medium text-foreground flex flex-wrap items-center gap-2">
-                                                <span className="truncate">{String(edit.postOffice?.name || (() => { try { return JSON.parse(edit.changes).name || "New Office" } catch { return "New Office" } })())}</span>
-                                                <Badge variant="outline" className={`text-[10px] uppercase font-bold tracking-wider shrink-0 ${edit.type === "ADD" ? "text-blue-500 bg-blue-500/10 border-blue-500/30" : edit.type === "REMOVAL" ? "text-destructive bg-destructive/10 border-destructive/30" : "text-primary bg-primary/10 border-primary/30"}`}>
-                                                    {edit.type || "EDIT"}
-                                                </Badge>
-                                            </div>
-                                            <div className="text-xs text-muted-foreground mt-1 font-mono">
-                                                {String(edit.postOffice?.postalCode || (() => { try { return JSON.parse(edit.changes).postalCode || "N/A" } catch { return "N/A" } })())}
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-col items-end gap-1 shrink-0">
+                                            >
+                                                {edit.type || "EDIT"}
+                                            </span>
                                             {edit.status === "MORE_INFO" ? (
-                                                <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-500 bg-amber-500/10">Needs Info</Badge>
+                                                <span className="font-mono text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-sm border border-status-closing text-status-closing bg-status-closing/10">
+                                                    Needs Info
+                                                </span>
                                             ) : (
-                                                <Badge variant="outline" className="text-[10px] border-primary/30 text-primary bg-primary/10">Pending</Badge>
+                                                <span className="font-mono text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-sm border border-primary/50 text-primary bg-primary/10">
+                                                    Pending
+                                                </span>
                                             )}
-                                            <span className="text-[10px] font-mono text-muted-foreground">{new Date(edit.createdAt).toLocaleDateString()}</span>
+                                            <span className="font-mono text-xs text-muted-foreground">{postalCode}</span>
                                         </div>
+                                        <h3 className="font-heading text-lg font-extrabold mt-1">{officeName}</h3>
                                     </div>
-                                    
-                                    <div className="flex items-center gap-2 bg-background/50 p-2.5 rounded-lg border border-border/50">
-                                        <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
-                                            {edit.requestedBy.name.charAt(0)}
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="text-sm font-medium text-foreground truncate">{edit.requestedBy.name}</div>
-                                            <div className="text-xs text-muted-foreground truncate">{edit.requestedBy.email}</div>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center justify-between mt-1">
-                                        <button
-                                            className="text-xs font-medium text-primary cursor-pointer hover:underline flex items-center gap-1"
-                                            onClick={() => toggleDetails(edit.id)}
-                                        >
-                                            {expandedId === edit.id ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                                            {expandedId === edit.id ? "Hide Details" : "View Details"}
-                                        </button>
-                                        
-                                        <div className="flex items-center gap-1">
-                                            <button
-                                                className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-colors disabled:opacity-50"
-                                                title="Approve"
-                                                disabled={processingId === edit.id}
-                                                onClick={() => handleAction(edit.id, "APPROVE")}
-                                            >
-                                                <Check className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                className="p-1.5 text-amber-500 hover:bg-amber-500/10 rounded-lg transition-colors disabled:opacity-50"
-                                                title="Need More Info"
-                                                disabled={processingId === edit.id}
-                                                onClick={() => handleAction(edit.id, "MORE_INFO")}
-                                            >
-                                                <Info className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                className="p-1.5 text-destructive hover:bg-destructive/10 rounded-lg transition-colors disabled:opacity-50"
-                                                title="Reject"
-                                                disabled={processingId === edit.id}
-                                                onClick={() => handleAction(edit.id, "REJECT")}
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {expandedId === edit.id && (
-                                        <div className="mt-2 p-3 bg-muted/20 border border-border/30 rounded-xl">
-                                            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Proposed {edit.type === "REMOVAL" ? "Details" : "Changes"}</p>
-                                            {renderChanges(edit)}
-                                        </div>
-                                    )}
+                                    <span className="font-mono text-xs text-muted-foreground shrink-0">
+                                        {new Date(edit.createdAt).toLocaleDateString()}
+                                    </span>
                                 </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </CardContent>
-        </Card>
+
+                                <div className="rounded-md border border-border bg-background px-3 py-2 flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-bold text-foreground truncate">{edit.requestedBy.name}</p>
+                                        <p className="text-[11px] text-muted-foreground truncate">{edit.requestedBy.email}</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setExpandedId(isExpanded ? null : edit.id)}
+                                        className="tap inline-flex min-h-[40px] shrink-0 items-center gap-1 text-xs font-bold text-primary hover:underline"
+                                    >
+                                        {isExpanded ? <ChevronUp className="h-4 w-4" aria-hidden="true" /> : <ChevronDown className="h-4 w-4" aria-hidden="true" />}
+                                        <span>{isExpanded ? "Hide Diff" : "View Diff"}</span>
+                                    </button>
+                                </div>
+
+                                {isExpanded && (
+                                    <div className="rounded-md border border-border bg-muted/30 p-3">
+                                        <p className="label-mono mb-2">
+                                            Proposed {edit.type === "REMOVAL" ? "Removal" : "Changes"}
+                                        </p>
+                                        {renderChanges(edit)}
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-3 gap-2 pt-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setPendingAction({ item: edit, action: "APPROVE" })}
+                                        className="tap min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-md border border-status-open bg-status-open/10 px-2 text-xs font-extrabold text-status-open hover:bg-status-open/20"
+                                    >
+                                        <Check className="h-4 w-4" aria-hidden="true" />
+                                        <span>Approve</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPendingAction({ item: edit, action: "MORE_INFO" })}
+                                        className="tap min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-md border border-status-closing bg-status-closing/10 px-2 text-xs font-extrabold text-status-closing hover:bg-status-closing/20"
+                                    >
+                                        <Info className="h-4 w-4" aria-hidden="true" />
+                                        <span>More Info</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPendingAction({ item: edit, action: "REJECT" })}
+                                        className="tap min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-md border border-destructive/40 bg-destructive/10 px-2 text-xs font-extrabold text-destructive hover:bg-destructive/20"
+                                    >
+                                        <X className="h-4 w-4" aria-hidden="true" />
+                                        <span>Reject</span>
+                                    </button>
+                                </div>
+                            </article>
+                        );
+                    })}
+                </div>
+            )}
+
+            <ConfirmDialog
+                open={!!pendingAction}
+                onOpenChange={(open) => !open && setPendingAction(null)}
+                title={pendingAction ? actionLabels[pendingAction.action].title : ""}
+                description={pendingAction ? actionLabels[pendingAction.action].desc : ""}
+                confirmLabel={pendingAction ? actionLabels[pendingAction.action].confirm : "Confirm"}
+                destructive={pendingAction ? actionLabels[pendingAction.action].destructive : false}
+                loading={processing}
+                onConfirm={executeAction}
+            />
+        </div>
     );
 }

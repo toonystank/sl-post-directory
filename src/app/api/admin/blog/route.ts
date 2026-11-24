@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
+import { Prisma } from "@prisma/client";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
 import { sanitizeRichHtml } from "@/lib/sanitize-html";
+import { blogPostInputSchema } from "@/lib/validations";
 
 function revalidateBlogRoutes(slug?: string) {
     revalidatePath("/");
@@ -19,7 +21,7 @@ function revalidateBlogRoutes(slug?: string) {
     }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
     const session = await getServerSession(authOptions);
     const userRole = (session?.user as { role?: string } | undefined)?.role;
 
@@ -27,10 +29,63 @@ export async function GET() {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const searchParams = req.nextUrl.searchParams;
+    const summaryOnly = searchParams.get("summary") === "1";
+    const category = searchParams.get("category")?.trim().toUpperCase();
+    const status = searchParams.get("status")?.trim().toLowerCase();
+    const q = searchParams.get("q")?.trim().slice(0, 100);
+
+    const where: Prisma.BlogPostWhereInput = {};
+    if (category && ["NEWS", "ALERT", "TARIFF", "GUIDE"].includes(category)) {
+        where.category = category;
+    }
+    if (status === "published") {
+        where.published = true;
+    } else if (status === "draft") {
+        where.published = false;
+    }
+    if (q) {
+        where.OR = [
+            { title: { contains: q, mode: "insensitive" } },
+            { excerpt: { contains: q, mode: "insensitive" } },
+            { slug: { contains: q, mode: "insensitive" } },
+        ];
+    }
+
     try {
-        const posts = await prisma.blogPost.findMany({
-            orderBy: { date: "desc" },
-        });
+        const orderBy: Prisma.BlogPostOrderByWithRelationInput[] = [
+            { featured: "desc" },
+            { date: "desc" },
+        ];
+
+        const posts = summaryOnly
+            ? await prisma.blogPost.findMany({
+                  where,
+                  select: {
+                      id: true,
+                      slug: true,
+                      title: true,
+                      excerpt: true,
+                      date: true,
+                      author: true,
+                      tags: true,
+                      readingTime: true,
+                      published: true,
+                      category: true,
+                      coverImage: true,
+                      coverCaption: true,
+                      featured: true,
+                      sourceUrl: true,
+                      createdAt: true,
+                      updatedAt: true,
+                  },
+                  orderBy,
+              })
+            : await prisma.blogPost.findMany({
+                  where,
+                  orderBy,
+              });
+
         return NextResponse.json(posts, { headers: { "Cache-Control": "no-store" } });
     } catch {
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -46,41 +101,58 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-        const body = (await req.json()) as {
-            title?: string;
-            slug?: string;
-            excerpt?: string;
-            contentHtml?: string;
-            tags?: string[];
-            published?: boolean;
-        };
-        const { title, slug, excerpt, contentHtml, tags, published } = body;
-
-        if (!title?.trim() || !slug?.trim() || !contentHtml?.trim()) {
-            return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+        const body = await req.json();
+        const parsed = blogPostInputSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: parsed.error.issues[0]?.message || "Invalid article data" },
+                { status: 400 }
+            );
         }
 
-        const cleanSlug = slug.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
+        const {
+            title,
+            slug,
+            excerpt,
+            contentHtml,
+            tags,
+            published,
+            category,
+            coverImage,
+            coverCaption,
+            featured,
+            sourceUrl,
+            author,
+        } = parsed.data;
+
+        const cleanSlug = slug
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9-]+/g, "-")
+            .replace(/^-+|-+$/g, "");
         if (!cleanSlug) {
             return NextResponse.json({ error: "Invalid URL slug" }, { status: 400 });
         }
 
         const cleanHtml = sanitizeRichHtml(contentHtml);
-
-        // Calculate reading time roughly from sanitized HTML
         const strippedText = cleanHtml.replace(/<[^>]*>?/gm, "");
         const words = strippedText.split(/\s+/).filter(Boolean).length;
         const readingTime = Math.max(1, Math.ceil(words / 200));
 
         const post = await prisma.blogPost.create({
             data: {
-                title: title.trim(),
+                title,
                 slug: cleanSlug,
-                excerpt: excerpt?.trim() || "",
+                excerpt,
                 contentHtml: cleanHtml,
-                tags: Array.isArray(tags) ? tags.map((t) => String(t).trim()).filter(Boolean) : [],
-                published: published ?? true,
-                author: session.user?.name || "Admin",
+                tags,
+                published,
+                category,
+                coverImage: coverImage ?? null,
+                coverCaption: coverCaption?.trim() || null,
+                featured,
+                sourceUrl: sourceUrl ?? null,
+                author: author || session.user?.name || "Admin",
                 readingTime,
             },
         });

@@ -3,7 +3,7 @@ import { setRequestLocale } from "next-intl/server";
 import HomeHero from "@/components/directory/HomeHero";
 import HomeBottomSection, { type DivisionLink } from "@/components/directory/HomeBottomSection";
 import BlogCard from "@/components/BlogCard";
-import { getLatestPosts } from "@/lib/blog";
+import { getFeaturedAlert, getLatestPosts } from "@/lib/blog";
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 import { loadLocalOffices } from "@/lib/local-sqlite";
 import { safeJsonLd } from "@/lib/security";
@@ -91,8 +91,9 @@ export default async function Home({
 }) {
     const { locale } = await params;
     setRequestLocale(locale);
-    const [posts, { totalOffices, divisions }] = await Promise.all([
+    const [posts, featuredAlert, { totalOffices, divisions }] = await Promise.all([
         getLatestPosts(2),
+        getFeaturedAlert(),
         getHomeDirectoryStats(),
     ]);
 
@@ -119,7 +120,18 @@ export default async function Home({
                 <HomeHero total={totalOffices} />
             </div>
 
-            <HomeBottomSection divisions={divisions}>
+            <HomeBottomSection
+                divisions={divisions}
+                featuredAlert={
+                    featuredAlert
+                        ? {
+                              slug: featuredAlert.slug,
+                              title: featuredAlert.title,
+                              excerpt: featuredAlert.excerpt,
+                          }
+                        : null
+                }
+            >
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     {posts.map((post) => (
                         <BlogCard
@@ -130,6 +142,9 @@ export default async function Home({
                             date={post.date}
                             readingTime={post.readingTime}
                             tags={post.tags}
+                            category={post.category || "GUIDE"}
+                            coverImage={post.coverImage}
+                            featured={Boolean(post.featured)}
                         />
                     ))}
                 </div>

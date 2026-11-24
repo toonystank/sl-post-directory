@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { UserPlus, Shield, ShieldCheck, User, Save, Trash2, ShieldAlert, KeyRound, ShieldOff, MailCheck } from "lucide-react";
+import { UserPlus, Trash2, KeyRound, ShieldOff, MailCheck, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useRouter } from "next/navigation";
+import { Sheet, SheetContent } from "@/components/shell/Sheet";
+import { showNativeToast } from "@/components/shell/NativeToast";
+import ConfirmDialog from "@/components/admin/ConfirmDialog";
 
 type Role = "SUPER_ADMIN" | "ADMIN" | "MODERATOR" | "CONTRIBUTOR";
 
@@ -23,59 +24,50 @@ export default function UserManagementTable({ initialUsers }: { initialUsers: Us
     const [users, setUsers] = useState<UserData[]>(initialUsers);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
-    const [success, setSuccess] = useState("");
-    const router = useRouter();
 
     const [newUserName, setNewUserName] = useState("");
     const [newUserEmail, setNewUserEmail] = useState("");
     const [newUserPassword, setNewUserPassword] = useState("");
     const [newUserRole, setNewUserRole] = useState<Role>("MODERATOR");
 
-    const getRoleBadge = (role: string) => {
-        switch (role) {
-            case "SUPER_ADMIN":
-                return <Badge variant="default" className="bg-destructive hover:bg-destructive"><ShieldAlert className="w-3 h-3 mr-1" /> Super</Badge>;
-            case "ADMIN":
-                return <Badge variant="default" className="bg-primary hover:bg-primary"><ShieldCheck className="w-3 h-3 mr-1" /> Admin</Badge>;
-            case "MODERATOR":
-                return <Badge variant="secondary"><Shield className="w-3 h-3 mr-1" /> Mod</Badge>;
-            default:
-                return <Badge variant="outline"><User className="w-3 h-3 mr-1" /> Contrib</Badge>;
-        }
-    };
+    const [resetPwUser, setResetPwUser] = useState<UserData | null>(null);
+    const [tempPassword, setTempPassword] = useState("");
+
+    const [confirmAction, setConfirmAction] = useState<{
+        type: "delete" | "reset2fa" | "verifyEmail";
+        user: UserData;
+    } | null>(null);
 
     const handleCreateUser = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError("");
-        setSuccess("");
 
         try {
             const res = await fetch("/api/admin/users", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    name: newUserName,
-                    email: newUserEmail,
+                    name: newUserName.trim(),
+                    email: newUserEmail.trim(),
                     password: newUserPassword,
-                    role: newUserRole
-                })
+                    role: newUserRole,
+                }),
             });
 
             if (res.ok) {
-                const data = await res.json();
-                setUsers([...users, data.user]);
-                setSuccess(`Successfully created user ${data.user.email}`);
+                const data = (await res.json()) as { user: UserData };
+                setUsers((prev) => [...prev, data.user]);
+                showNativeToast(`Created ${data.user.email}`);
                 setNewUserName("");
                 setNewUserEmail("");
                 setNewUserPassword("");
-                router.refresh();
             } else {
-                const err = await res.json();
-                setError(err.error || "Failed to create user");
+                const err = (await res.json().catch(() => ({}))) as { error?: string };
+                setError(err.error || "Failed to create user.");
             }
-        } catch (err) {
-            setError("Network error occurred");
+        } catch {
+            setError("Network error occurred.");
         } finally {
             setLoading(false);
         }
@@ -85,129 +77,179 @@ export default function UserManagementTable({ initialUsers }: { initialUsers: Us
         if (currentRole === newRole) return;
         setLoading(true);
         setError("");
-        setSuccess("");
 
         try {
             const res = await fetch(`/api/admin/users/${userId}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ role: newRole })
+                body: JSON.stringify({ role: newRole }),
             });
 
             if (res.ok) {
-                setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
-                setSuccess("Role updated successfully.");
+                setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)));
+                showNativeToast("Role updated");
             } else {
-                const err = await res.json();
-                setError(err.error || "Failed to update role");
+                const err = (await res.json().catch(() => ({}))) as { error?: string };
+                setError(err.error || "Failed to update role.");
             }
-        } catch (err) {
-            setError("Network error occurred");
+        } catch {
+            setError("Network error occurred.");
         } finally {
             setLoading(false);
         }
     };
 
-    const handleDeleteUser = async (userId: string, email: string) => {
-        if (!confirm(`Are you absolutely sure you want to delete ${email}?`)) return;
-        setLoading(true);
-        setError("");
-        setSuccess("");
-
-        try {
-            const res = await fetch(`/api/admin/users/${userId}`, { method: "DELETE" });
-
-            if (res.ok) {
-                setUsers(users.filter(u => u.id !== userId));
-                setSuccess("User deleted.");
-            } else {
-                const err = await res.json();
-                setError(err.error || "Failed to delete user");
-            }
-        } catch (err) {
-            setError("Network error occurred");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleResetPassword = async (userId: string, email: string) => {
-        const newPassword = window.prompt(`Enter new temporary password for ${email} (min 8 chars):`);
-        if (!newPassword || newPassword.length < 8) {
-            if (newPassword) setError("Password must be at least 8 characters.");
+    const submitResetPassword = async () => {
+        if (!resetPwUser || tempPassword.length < 8) {
+            setError("Temporary password must be at least 8 characters.");
             return;
         }
-        setLoading(true); setError(""); setSuccess("");
+        setLoading(true);
+        setError("");
         try {
-            const res = await fetch(`/api/admin/users/${userId}/reset-password`, {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ newPassword })
+            const res = await fetch(`/api/admin/users/${resetPwUser.id}/reset-password`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ newPassword: tempPassword }),
             });
             if (res.ok) {
-                setSuccess(`Password for ${email} has been reset.`);
+                showNativeToast(`Password reset for ${resetPwUser.email}`);
+                setResetPwUser(null);
+                setTempPassword("");
             } else {
-                const err = await res.json(); setError(err.error || "Failed to reset password");
+                const err = (await res.json().catch(() => ({}))) as { error?: string };
+                setError(err.error || "Failed to reset password.");
             }
-        } catch (err) { setError("Network error occurred"); } finally { setLoading(false); }
+        } catch {
+            setError("Network error occurred.");
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleReset2FA = async (userId: string, email: string) => {
-        if (!confirm(`Are you sure you want to disable 2FA for ${email}?`)) return;
-        setLoading(true); setError(""); setSuccess("");
+    const executeConfirmedAction = async () => {
+        if (!confirmAction) return;
+        const { type, user } = confirmAction;
+        setLoading(true);
+        setError("");
+
         try {
-            const res = await fetch(`/api/admin/users/${userId}/reset-2fa`, { method: "POST" });
-            if (res.ok) {
-                setUsers(users.map(u => u.id === userId ? { ...u, twoFactorEnabled: false } : u));
-                setSuccess(`2FA has been disabled for ${email}.`);
+            if (type === "delete") {
+                const res = await fetch(`/api/admin/users/${user.id}`, { method: "DELETE" });
+                if (res.ok) {
+                    setUsers((prev) => prev.filter((u) => u.id !== user.id));
+                    showNativeToast("User deleted");
+                    setConfirmAction(null);
+                } else {
+                    const err = (await res.json().catch(() => ({}))) as { error?: string };
+                    setError(err.error || "Failed to delete user.");
+                }
+            } else if (type === "reset2fa") {
+                const res = await fetch(`/api/admin/users/${user.id}/reset-2fa`, { method: "POST" });
+                if (res.ok) {
+                    setUsers((prev) =>
+                        prev.map((u) => (u.id === user.id ? { ...u, twoFactorEnabled: false } : u))
+                    );
+                    showNativeToast(`2FA disabled for ${user.email}`);
+                    setConfirmAction(null);
+                } else {
+                    const err = (await res.json().catch(() => ({}))) as { error?: string };
+                    setError(err.error || "Failed to disable 2FA.");
+                }
             } else {
-                const err = await res.json(); setError(err.error || "Failed to disable 2FA");
+                const res = await fetch(`/api/admin/users/${user.id}/verify-email`, { method: "POST" });
+                if (res.ok) {
+                    setUsers((prev) =>
+                        prev.map((u) => (u.id === user.id ? { ...u, emailVerified: new Date() } : u))
+                    );
+                    showNativeToast(`Email verified for ${user.email}`);
+                    setConfirmAction(null);
+                } else {
+                    const err = (await res.json().catch(() => ({}))) as { error?: string };
+                    setError(err.error || "Failed to verify email.");
+                }
             }
-        } catch (err) { setError("Network error occurred"); } finally { setLoading(false); }
+        } catch {
+            setError("Network error occurred.");
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleVerifyEmail = async (userId: string, email: string) => {
-        if (!confirm(`Are you sure you want to forcefully verify the email for ${email}?`)) return;
-        setLoading(true); setError(""); setSuccess("");
-        try {
-            const res = await fetch(`/api/admin/users/${userId}/verify-email`, { method: "POST" });
-            if (res.ok) {
-                setUsers(users.map(u => u.id === userId ? { ...u, emailVerified: new Date() } : u));
-                setSuccess(`Email verified for ${email}.`);
-            } else {
-                const err = await res.json(); setError(err.error || "Failed to verify email");
-            }
-        } catch (err) { setError("Network error occurred"); } finally { setLoading(false); }
+    const generateTempPassword = () => {
+        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#";
+        let out = "";
+        for (let i = 0; i < 12; i++) {
+            out += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        setTempPassword(out);
     };
 
     return (
-        <div>
-            {/* Create User Form Header */}
-            <div className="bg-muted/30 p-6 border-b border-border/50">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
-                    <UserPlus className="w-4 h-4" /> Issue New Access
-                </h3>
+        <div className="space-y-6">
+            {/* Issue New Access Form */}
+            <section className="rounded-md border-2 border-foreground bg-card p-4 sm:p-5 space-y-4 shadow-[3px_3px_0_0_hsl(var(--foreground))]">
+                <h2 className="font-heading text-lg font-extrabold flex items-center gap-2">
+                    <UserPlus className="w-5 h-5 text-primary" aria-hidden="true" />
+                    <span>Issue New Access</span>
+                </h2>
 
-                {error && <div className="mb-4 text-xs font-semibold text-destructive bg-destructive/10 p-3 rounded-xl border border-destructive/20">{error}</div>}
-                {success && <div className="mb-4 text-xs font-semibold text-emerald-500 bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20">{success}</div>}
+                {error && (
+                    <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm font-medium text-destructive">
+                        {error}
+                    </div>
+                )}
 
-                <form onSubmit={handleCreateUser} className="flex flex-col md:flex-row gap-3 items-end">
-                    <div className="flex-1 w-full relative">
-                        <label className="text-xs font-medium mb-1.5 block">Name</label>
-                        <Input required value={newUserName} onChange={e => setNewUserName(e.target.value)} placeholder="Full Name" className="bg-background" />
+                <form onSubmit={handleCreateUser} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+                    <div>
+                        <label className="label-mono block mb-1.5" htmlFor="new-user-name">
+                            Name
+                        </label>
+                        <Input
+                            id="new-user-name"
+                            required
+                            value={newUserName}
+                            onChange={(e) => setNewUserName(e.target.value)}
+                            placeholder="Full Name"
+                            className="h-11 text-base bg-background"
+                        />
                     </div>
-                    <div className="flex-1 w-full">
-                        <label className="text-xs font-medium mb-1.5 block">Email</label>
-                        <Input required type="email" value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} placeholder="admin@slpost.directory" className="bg-background" />
+                    <div>
+                        <label className="label-mono block mb-1.5" htmlFor="new-user-email">
+                            Email
+                        </label>
+                        <Input
+                            id="new-user-email"
+                            required
+                            type="email"
+                            value={newUserEmail}
+                            onChange={(e) => setNewUserEmail(e.target.value)}
+                            placeholder="admin@lankapost.org"
+                            className="h-11 text-base bg-background"
+                        />
                     </div>
-                    <div className="flex-1 w-full">
-                        <label className="text-xs font-medium mb-1.5 block">Password</label>
-                        <Input required type="password" value={newUserPassword} onChange={e => setNewUserPassword(e.target.value)} placeholder="Secure Pw" className="bg-background" />
+                    <div>
+                        <label className="label-mono block mb-1.5" htmlFor="new-user-pw">
+                            Password
+                        </label>
+                        <Input
+                            id="new-user-pw"
+                            required
+                            type="password"
+                            minLength={8}
+                            value={newUserPassword}
+                            onChange={(e) => setNewUserPassword(e.target.value)}
+                            placeholder="Min 8 chars"
+                            className="h-11 text-base bg-background"
+                        />
                     </div>
-                    <div className="w-full md:w-40">
-                        <label className="text-xs font-medium mb-1.5 block">Role</label>
+                    <div>
+                        <label className="label-mono block mb-1.5" htmlFor="new-user-role">
+                            Role
+                        </label>
                         <Select value={newUserRole} onValueChange={(val) => setNewUserRole(val as Role)}>
-                            <SelectTrigger className="h-10 w-full bg-background border-input">
-                                <SelectValue placeholder="Select role" />
+                            <SelectTrigger id="new-user-role" className="h-11 w-full bg-background border-input">
+                                <SelectValue placeholder="Role" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="MODERATOR">Moderator</SelectItem>
@@ -216,191 +258,287 @@ export default function UserManagementTable({ initialUsers }: { initialUsers: Us
                             </SelectContent>
                         </Select>
                     </div>
-                    <Button type="submit" disabled={loading} className="w-full md:w-auto h-10">
-                        Create
+                    <Button type="submit" disabled={loading} className="h-11 w-full font-bold">
+                        Create User
                     </Button>
                 </form>
-            </div>
+            </section>
 
-            {/* Users Table */}
-            <div className="overflow-y-auto overflow-x-hidden max-h-[600px]">
-                {/* Desktop Table */}
-                <table className="hidden md:table w-full text-sm text-left relative">
-                    <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border/50 sticky top-0 z-10">
-                        <tr>
-                            <th className="px-6 py-4 font-medium">User</th>
-                            <th className="px-6 py-4 font-medium">Role Level</th>
-                            <th className="px-6 py-4 font-medium text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/50">
-                        {users.map((u) => (
-                            <tr key={u.id} className="hover:bg-muted/30 transition-colors">
-                                <td className="px-6 py-4">
-                                    <div className="font-medium text-foreground">{u.name}</div>
-                                    <div className="text-xs text-muted-foreground mt-0.5">{u.email}</div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <Select
-                                        value={u.role}
-                                        onValueChange={(val) => handleUpdateRole(u.id, u.role, val)}
-                                        disabled={loading}
-                                    >
-                                        <SelectTrigger className="h-8 text-xs font-medium bg-transparent border-0 shadow-none focus:ring-0 cursor-pointer hover:bg-muted/50 w-fit p-1.5 px-2 rounded-md -ml-2 text-foreground data-[state=open]:bg-muted/50">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="CONTRIBUTOR" className="text-xs">Contributor</SelectItem>
-                                            <SelectItem value="MODERATOR" className="text-xs">Moderator</SelectItem>
-                                            <SelectItem value="ADMIN" className="text-xs">Admin</SelectItem>
-                                            <SelectItem value="SUPER_ADMIN" className="text-xs">Super Admin</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                    <div className="flex items-center justify-end gap-1">
-                                        <Button
-                                            title="Reset Password"
-                                            size="sm"
-                                            variant="ghost"
-                                            className="h-8 w-8 p-0 text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                                            onClick={() => handleResetPassword(u.id, u.email)}
-                                            disabled={loading}
-                                        >
-                                            <KeyRound className="w-4 h-4" />
-                                        </Button>
-
-                                        {!u.emailVerified && (
-                                            <Button
-                                                title="Force Verify Email"
-                                                size="sm"
-                                                variant="ghost"
-                                                className="h-8 w-8 p-0 text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-600"
-                                                onClick={() => handleVerifyEmail(u.id, u.email)}
-                                                disabled={loading}
-                                            >
-                                                <MailCheck className="w-4 h-4" />
-                                            </Button>
-                                        )}
-
-                                        {u.twoFactorEnabled && (
-                                            <Button
-                                                title="Disable 2FA"
-                                                size="sm"
-                                                variant="ghost"
-                                                className="h-8 w-8 p-0 text-amber-500 hover:bg-amber-500/10 hover:text-amber-600"
-                                                onClick={() => handleReset2FA(u.id, u.email)}
-                                                disabled={loading}
-                                            >
-                                                <ShieldOff className="w-4 h-4" />
-                                            </Button>
-                                        )}
-
-                                        <Button
-                                            title="Revoke Access"
-                                            size="sm"
-                                            variant="ghost"
-                                            className="h-8 w-8 p-0 ml-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                            onClick={() => handleDeleteUser(u.id, u.email)}
-                                            disabled={loading}
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </Button>
-                                    </div>
-                                </td>
+            {/* Users List (Mobile Cards + Desktop Table) */}
+            <section className="rounded-md border-2 border-foreground bg-card overflow-hidden">
+                <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                        <thead className="border-b border-border bg-muted/50 text-xs font-mono uppercase text-muted-foreground">
+                            <tr>
+                                <th className="px-5 py-3.5">User</th>
+                                <th className="px-5 py-3.5">Role</th>
+                                <th className="px-5 py-3.5">Security</th>
+                                <th className="px-5 py-3.5 text-right">Actions</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                            {users.map((u) => (
+                                <tr key={u.id} className="hover:bg-muted/30">
+                                    <td className="px-5 py-3.5">
+                                        <p className="font-bold text-foreground">{u.name}</p>
+                                        <p className="text-xs text-muted-foreground">{u.email}</p>
+                                    </td>
+                                    <td className="px-5 py-3.5">
+                                        <Select
+                                            value={u.role}
+                                            onValueChange={(val) => void handleUpdateRole(u.id, u.role, val)}
+                                            disabled={loading}
+                                        >
+                                            <SelectTrigger className="h-10 w-40 bg-background">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="CONTRIBUTOR">Contributor</SelectItem>
+                                                <SelectItem value="MODERATOR">Moderator</SelectItem>
+                                                <SelectItem value="ADMIN">Admin</SelectItem>
+                                                <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </td>
+                                    <td className="px-5 py-3.5 font-mono text-xs">
+                                        <span>{u.twoFactorEnabled ? "2FA On" : "2FA Off"}</span>
+                                        <span> · </span>
+                                        <span>{u.emailVerified ? "Verified" : "Unverified"}</span>
+                                    </td>
+                                    <td className="px-5 py-3.5 text-right">
+                                        <div className="inline-flex items-center gap-1.5">
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                title="Reset Password"
+                                                aria-label={`Reset password for ${u.email}`}
+                                                onClick={() => {
+                                                    setResetPwUser(u);
+                                                    setTempPassword("");
+                                                }}
+                                                disabled={loading}
+                                                className="h-10 w-10 p-0"
+                                            >
+                                                <KeyRound className="w-4 h-4" aria-hidden="true" />
+                                            </Button>
+                                            {!u.emailVerified && (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    title="Force Verify Email"
+                                                    aria-label={`Force verify ${u.email}`}
+                                                    onClick={() => setConfirmAction({ type: "verifyEmail", user: u })}
+                                                    disabled={loading}
+                                                    className="h-10 w-10 p-0 text-status-open border-status-open/40"
+                                                >
+                                                    <MailCheck className="w-4 h-4" aria-hidden="true" />
+                                                </Button>
+                                            )}
+                                            {u.twoFactorEnabled && (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    title="Disable 2FA"
+                                                    aria-label={`Disable 2FA for ${u.email}`}
+                                                    onClick={() => setConfirmAction({ type: "reset2fa", user: u })}
+                                                    disabled={loading}
+                                                    className="h-10 w-10 p-0 text-status-closing border-status-closing/40"
+                                                >
+                                                    <ShieldOff className="w-4 h-4" aria-hidden="true" />
+                                                </Button>
+                                            )}
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="ghost"
+                                                title="Revoke Access"
+                                                aria-label={`Delete ${u.email}`}
+                                                onClick={() => setConfirmAction({ type: "delete", user: u })}
+                                                disabled={loading}
+                                                className="h-10 w-10 p-0 text-destructive hover:bg-destructive/10"
+                                            >
+                                                <Trash2 className="w-4 h-4" aria-hidden="true" />
+                                            </Button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
 
                 {/* Mobile Cards */}
-                <div className="md:hidden flex flex-col divide-y divide-border/50">
+                <div className="md:hidden divide-y divide-border">
                     {users.map((u) => (
-                        <div key={`mob-${u.id}`} className="p-4 flex flex-col gap-3 hover:bg-muted/30 transition-colors">
-                            <div className="flex items-start justify-between gap-2">
-                                <div className="flex items-center gap-3 min-w-0">
-                                    <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold shrink-0">
-                                        {u.name.charAt(0)}
-                                    </div>
-                                    <div className="min-w-0">
-                                        <div className="font-medium text-foreground truncate">{u.name}</div>
-                                        <div className="text-xs text-muted-foreground truncate">{u.email}</div>
-                                    </div>
-                                </div>
+                        <div key={`mob-${u.id}`} className="p-4 space-y-3">
+                            <div>
+                                <p className="font-heading text-base font-extrabold">{u.name}</p>
+                                <p className="text-xs text-muted-foreground">{u.email}</p>
+                                <p className="font-mono text-[11px] text-muted-foreground mt-1">
+                                    {u.twoFactorEnabled ? "2FA Active" : "No 2FA"} · {u.emailVerified ? "Verified" : "Unverified"}
+                                </p>
                             </div>
-                            
-                            <div className="flex flex-wrap items-center justify-between gap-3 mt-1">
+
+                            <div className="flex flex-wrap items-center gap-2">
                                 <Select
                                     value={u.role}
-                                    onValueChange={(val) => handleUpdateRole(u.id, u.role, val)}
+                                    onValueChange={(val) => void handleUpdateRole(u.id, u.role, val)}
                                     disabled={loading}
                                 >
-                                    <SelectTrigger className="h-8 text-xs font-medium bg-muted/40 border-border/50 shadow-none focus:ring-0 cursor-pointer hover:bg-muted/70 w-auto px-3 rounded-lg text-foreground data-[state=open]:bg-muted/70 flex-1 max-w-[160px]">
+                                    <SelectTrigger className="h-11 flex-1 min-w-[140px] bg-background">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="CONTRIBUTOR" className="text-xs">Contributor</SelectItem>
-                                        <SelectItem value="MODERATOR" className="text-xs">Moderator</SelectItem>
-                                        <SelectItem value="ADMIN" className="text-xs">Admin</SelectItem>
-                                        <SelectItem value="SUPER_ADMIN" className="text-xs">Super Admin</SelectItem>
+                                        <SelectItem value="CONTRIBUTOR">Contributor</SelectItem>
+                                        <SelectItem value="MODERATOR">Moderator</SelectItem>
+                                        <SelectItem value="ADMIN">Admin</SelectItem>
+                                        <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
                                     </SelectContent>
                                 </Select>
 
-                                <div className="flex items-center gap-1 shrink-0">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                        setResetPwUser(u);
+                                        setTempPassword("");
+                                    }}
+                                    aria-label={`Reset password for ${u.email}`}
+                                    className="h-11 w-11 p-0"
+                                >
+                                    <KeyRound className="w-4 h-4" aria-hidden="true" />
+                                </Button>
+
+                                {!u.emailVerified && (
                                     <Button
-                                        title="Reset Password"
+                                        type="button"
                                         size="sm"
-                                        variant="ghost"
-                                        className="h-8 w-8 p-0 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-lg border border-transparent hover:border-primary/20"
-                                        onClick={() => handleResetPassword(u.id, u.email)}
-                                        disabled={loading}
+                                        variant="outline"
+                                        onClick={() => setConfirmAction({ type: "verifyEmail", user: u })}
+                                        aria-label={`Force verify ${u.email}`}
+                                        className="h-11 w-11 p-0 text-status-open border-status-open/40"
                                     >
-                                        <KeyRound className="w-4 h-4" />
+                                        <MailCheck className="w-4 h-4" aria-hidden="true" />
                                     </Button>
+                                )}
 
-                                    {!u.emailVerified && (
-                                        <Button
-                                            title="Force Verify Email"
-                                            size="sm"
-                                            variant="ghost"
-                                            className="h-8 w-8 p-0 text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-600 rounded-lg border border-transparent hover:border-emerald-500/20"
-                                            onClick={() => handleVerifyEmail(u.id, u.email)}
-                                            disabled={loading}
-                                        >
-                                            <MailCheck className="w-4 h-4" />
-                                        </Button>
-                                    )}
-
-                                    {u.twoFactorEnabled && (
-                                        <Button
-                                            title="Disable 2FA"
-                                            size="sm"
-                                            variant="ghost"
-                                            className="h-8 w-8 p-0 text-amber-500 hover:bg-amber-500/10 hover:text-amber-600 rounded-lg border border-transparent hover:border-amber-500/20"
-                                            onClick={() => handleReset2FA(u.id, u.email)}
-                                            disabled={loading}
-                                        >
-                                            <ShieldOff className="w-4 h-4" />
-                                        </Button>
-                                    )}
-
+                                {u.twoFactorEnabled && (
                                     <Button
-                                        title="Revoke Access"
+                                        type="button"
                                         size="sm"
-                                        variant="ghost"
-                                        className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10 hover:text-destructive rounded-lg border border-transparent hover:border-destructive/20 ml-1"
-                                        onClick={() => handleDeleteUser(u.id, u.email)}
-                                        disabled={loading}
+                                        variant="outline"
+                                        onClick={() => setConfirmAction({ type: "reset2fa", user: u })}
+                                        aria-label={`Disable 2FA for ${u.email}`}
+                                        className="h-11 w-11 p-0 text-status-closing border-status-closing/40"
                                     >
-                                        <Trash2 className="w-4 h-4" />
+                                        <ShieldOff className="w-4 h-4" aria-hidden="true" />
                                     </Button>
-                                </div>
+                                )}
+
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setConfirmAction({ type: "delete", user: u })}
+                                    aria-label={`Delete ${u.email}`}
+                                    className="h-11 w-11 p-0 border border-destructive/30 text-destructive"
+                                >
+                                    <Trash2 className="w-4 h-4" aria-hidden="true" />
+                                </Button>
                             </div>
                         </div>
                     ))}
                 </div>
-            </div>
+            </section>
+
+            {/* Reset Password Sheet (replaces window.prompt) */}
+            <Sheet open={!!resetPwUser} onOpenChange={(open) => !open && setResetPwUser(null)}>
+                <SheetContent
+                    title="Reset Temporary Password"
+                    description={resetPwUser ? `Set a temporary password for ${resetPwUser.email}` : ""}
+                    bodyClassName="space-y-4"
+                    footer={
+                        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setResetPwUser(null)}
+                                className="h-11 border-2 border-foreground"
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="button"
+                                disabled={loading || tempPassword.length < 8}
+                                onClick={() => void submitResetPassword()}
+                                className="h-11 font-bold"
+                            >
+                                Apply Password
+                            </Button>
+                        </div>
+                    }
+                >
+                    <div>
+                        <label className="label-mono block mb-1.5" htmlFor="reset-temp-pw">
+                            Temporary Password (Min. 8 chars)
+                        </label>
+                        <div className="flex gap-2">
+                            <Input
+                                id="reset-temp-pw"
+                                type="text"
+                                value={tempPassword}
+                                onChange={(e) => setTempPassword(e.target.value)}
+                                placeholder="Enter or generate password"
+                                className="h-12 text-base font-mono bg-background"
+                            />
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={generateTempPassword}
+                                className="h-12 shrink-0 border-foreground font-bold gap-1.5"
+                            >
+                                <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                                <span>Generate</span>
+                            </Button>
+                        </div>
+                    </div>
+                </SheetContent>
+            </Sheet>
+
+            <ConfirmDialog
+                open={!!confirmAction}
+                onOpenChange={(open) => !open && setConfirmAction(null)}
+                title={
+                    confirmAction?.type === "delete"
+                        ? "Delete User Account"
+                        : confirmAction?.type === "reset2fa"
+                          ? "Disable Two-Factor Auth"
+                          : "Force Verify Email"
+                }
+                description={
+                    confirmAction?.type === "delete"
+                        ? `Permanently revoke access and delete ${confirmAction.user.email}?`
+                        : confirmAction?.type === "reset2fa"
+                          ? `Disable 2FA protection for ${confirmAction.user.email}?`
+                          : confirmAction
+                            ? `Mark ${confirmAction.user.email} as verified immediately?`
+                            : ""
+                }
+                confirmLabel={
+                    confirmAction?.type === "delete"
+                        ? "Delete Account"
+                        : confirmAction?.type === "reset2fa"
+                          ? "Disable 2FA"
+                          : "Verify Email"
+                }
+                destructive={confirmAction?.type === "delete"}
+                loading={loading}
+                onConfirm={executeConfirmedAction}
+            />
         </div>
     );
 }
-// End of file

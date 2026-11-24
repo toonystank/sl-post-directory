@@ -2,19 +2,19 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Image as ImageIcon, Trash2, CameraOff, ExternalLink, Maximize2, Check } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { Trash2, CameraOff, ExternalLink, Maximize2, Check } from "lucide-react";
+import { Link } from "@/navigation";
+import { Sheet, SheetContent } from "@/components/shell/Sheet";
+import { showNativeToast } from "@/components/shell/NativeToast";
+import ConfirmDialog from "@/components/admin/ConfirmDialog";
+import { cn } from "@/lib/utils";
 
-interface PhotoModerationItem {
+export interface PhotoModerationItem {
     id: string;
     url: string;
     caption: string | null;
     status: string;
-    createdAt: Date;
+    createdAt: Date | string;
     postOfficeId: string;
     postOffice: {
         name: string;
@@ -25,6 +25,7 @@ interface PhotoModerationItem {
 
 interface PhotoModerationProps {
     photos: PhotoModerationItem[];
+    onPendingCountChange?: (newPendingCount: number) => void;
 }
 
 function toPreviewSrc(rawUrl: string): string {
@@ -33,13 +34,16 @@ function toPreviewSrc(rawUrl: string): string {
     return `${base}-/preview/600x400/-/quality/smart/`;
 }
 
-export default function PhotoModeration({ photos: initialPhotos }: PhotoModerationProps) {
+export default function PhotoModeration({ photos: initialPhotos, onPendingCountChange }: PhotoModerationProps) {
     const [photos, setPhotos] = useState(initialPhotos);
+    const [filter, setFilter] = useState<"ALL" | "PENDING">("PENDING");
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [selectedPhoto, setSelectedPhoto] = useState<PhotoModerationItem | null>(null);
-    const router = useRouter();
+    const [confirmDeletePhoto, setConfirmDeletePhoto] = useState<PhotoModerationItem | null>(null);
+    const [deleting, setDeleting] = useState(false);
 
     const pendingCount = photos.filter((p) => p.status === "PENDING").length;
+    const visiblePhotos = filter === "PENDING" ? photos.filter((p) => p.status === "PENDING") : photos;
 
     const handleApprove = async (photoId: string) => {
         setProcessingId(photoId);
@@ -51,200 +55,239 @@ export default function PhotoModeration({ photos: initialPhotos }: PhotoModerati
             });
 
             if (res.ok) {
-                setPhotos((prev) => prev.map((p) => (p.id === photoId ? { ...p, status: "APPROVED" } : p)));
+                setPhotos((prev) => {
+                    const next = prev.map((p) => (p.id === photoId ? { ...p, status: "APPROVED" } : p));
+                    onPendingCountChange?.(next.filter((p) => p.status === "PENDING").length);
+                    return next;
+                });
                 setSelectedPhoto((prev) => (prev && prev.id === photoId ? { ...prev, status: "APPROVED" } : prev));
-                router.refresh();
+                showNativeToast("Photo approved");
             } else {
                 const err = (await res.json().catch(() => ({}))) as { error?: string };
-                alert(`Error: ${err.error || "Failed to approve photo."}`);
+                showNativeToast(err.error || "Failed to approve photo.");
             }
-        } catch (error) {
-            console.error("Approval failed:", error);
-            alert("A network error occurred.");
+        } catch {
+            showNativeToast("Network error approving photo.");
         } finally {
             setProcessingId(null);
         }
     };
 
-    const handleDelete = async (photoId: string) => {
-        if (!confirm("Are you sure you want to permanently delete this photo?")) return;
-
-        setProcessingId(photoId);
+    const handleDeleteConfirmed = async () => {
+        if (!confirmDeletePhoto) return;
+        const targetId = confirmDeletePhoto.id;
+        setDeleting(true);
         try {
-            const res = await fetch(`/api/admin/photos?id=${photoId}`, {
+            const res = await fetch(`/api/admin/photos?id=${targetId}`, {
                 method: "DELETE",
             });
 
             if (res.ok) {
-                setPhotos((prev) => prev.filter((p) => p.id !== photoId));
-                if (selectedPhoto?.id === photoId) setSelectedPhoto(null);
-                router.refresh();
+                setPhotos((prev) => {
+                    const next = prev.filter((p) => p.id !== targetId);
+                    onPendingCountChange?.(next.filter((p) => p.status === "PENDING").length);
+                    return next;
+                });
+                if (selectedPhoto?.id === targetId) setSelectedPhoto(null);
+                setConfirmDeletePhoto(null);
+                showNativeToast("Photo deleted");
             } else {
                 const err = (await res.json().catch(() => ({}))) as { error?: string };
-                alert(`Error: ${err.error || "Failed to delete photo."}`);
+                showNativeToast(err.error || "Failed to delete photo.");
             }
-        } catch (error) {
-            console.error("Deletion failed:", error);
-            alert("A network error occurred.");
+        } catch {
+            showNativeToast("Network error deleting photo.");
         } finally {
-            setProcessingId(null);
+            setDeleting(false);
         }
     };
 
     return (
-        <Card className="border-border/50 overflow-hidden">
-            <CardHeader className="border-b border-border/40 bg-card/80 flex flex-row items-center justify-between">
-                <CardTitle className="text-lg flex items-center gap-2">
-                    Community Photos
-                    <Badge variant="secondary" className="ml-2 rounded-full px-2 h-5 text-xs flex items-center justify-center">
-                        {photos.length}
-                    </Badge>
-                    {pendingCount > 0 && (
-                        <Badge className="ml-1 rounded-full px-2 h-5 text-xs bg-amber-500 text-white">
-                            {pendingCount} Pending
-                        </Badge>
+        <div className="space-y-4">
+            <div className="flex gap-2">
+                <button
+                    type="button"
+                    onClick={() => setFilter("PENDING")}
+                    className={cn(
+                        "tap min-h-[40px] rounded-md border px-3 text-xs font-bold",
+                        filter === "PENDING"
+                            ? "border-foreground bg-foreground text-background"
+                            : "border-border bg-card text-muted-foreground"
                     )}
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-                {photos.length === 0 ? (
-                    <div className="text-center py-16 text-muted-foreground">
-                        <CameraOff className="w-16 h-16 mx-auto mb-4 opacity-15" />
-                        <p className="text-lg font-medium mb-1">No Photos</p>
-                        <p className="text-sm">There are no community photos uploaded yet.</p>
-                    </div>
-                ) : (
-                    <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-h-[600px] overflow-y-auto">
-                        {photos.map((photo) => (
-                            <div
-                                key={photo.id}
-                                className="group relative rounded-xl border border-border/50 overflow-hidden bg-background/50 flex flex-col hover:border-primary/40 transition-all shadow-sm hover:shadow-md cursor-pointer"
-                                onClick={() => setSelectedPhoto(photo)}
-                            >
-                                <div className="aspect-video relative overflow-hidden bg-muted">
-                                    <Image
-                                        src={toPreviewSrc(photo.url)}
-                                        alt={photo.caption || "Community photo"}
-                                        fill
-                                        unoptimized={true}
-                                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                                        className="object-cover transition-transform duration-500 group-hover:scale-105"
-                                    />
-                                    <div className="absolute top-2.5 right-2.5 z-10">
-                                        <Badge
-                                            variant={photo.status === "PENDING" ? "default" : "secondary"}
-                                            className={
-                                                photo.status === "PENDING"
-                                                    ? "bg-amber-500 text-white text-[10px]"
-                                                    : "text-[10px]"
-                                            }
-                                        >
-                                            {photo.status}
-                                        </Badge>
-                                    </div>
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                        <div className="p-3 bg-black/50 backdrop-blur-sm rounded-full text-white">
-                                            <Maximize2 className="w-6 h-6" />
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="p-4 flex-1 flex flex-col justify-between">
-                                    <div>
-                                        <div className="flex items-start justify-between gap-2 mb-2">
-                                            <div>
-                                                <Link
-                                                    href={`/office/${photo.postOffice.slug}`}
-                                                    target="_blank"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="font-semibold text-sm hover:text-primary transition-colors flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-sm"
-                                                >
-                                                    {photo.postOffice.name}
-                                                    <ExternalLink className="w-3 h-3 text-muted-foreground" />
-                                                </Link>
-                                                <div className="text-xs text-muted-foreground font-mono mt-0.5">
-                                                    {photo.postOffice.postalCode}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        {photo.caption && (
-                                            <p className="text-sm text-foreground/80 mt-2 line-clamp-2 italic border-l-2 border-primary/30 pl-2">
-                                                &ldquo;{photo.caption}&rdquo;
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="text-[10px] text-muted-foreground mt-4 font-medium uppercase tracking-wider flex items-center gap-1.5">
-                                        <ImageIcon className="w-3.5 h-3.5" />
-                                        Uploaded {new Date(photo.createdAt).toLocaleDateString()}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </CardContent>
+                >
+                    Pending ({pendingCount})
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setFilter("ALL")}
+                    className={cn(
+                        "tap min-h-[40px] rounded-md border px-3 text-xs font-bold",
+                        filter === "ALL"
+                            ? "border-foreground bg-foreground text-background"
+                            : "border-border bg-card text-muted-foreground"
+                    )}
+                >
+                    Recent All ({photos.length})
+                </button>
+            </div>
 
-            <Dialog open={!!selectedPhoto} onOpenChange={(open) => !open && setSelectedPhoto(null)}>
-                <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-[90vw] lg:max-w-[80vw] p-0 overflow-hidden bg-black/95 border-border/50">
-                    <DialogHeader className="p-4 absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 to-transparent flex flex-row items-start justify-between">
-                        <div className="text-left text-white drop-shadow-md">
-                            <DialogTitle className="text-xl font-bold flex items-center gap-2">
-                                {selectedPhoto?.postOffice.name}
-                            </DialogTitle>
-                            <DialogDescription className="text-gray-300 mt-1">
-                                {selectedPhoto?.postOffice.postalCode} • Uploaded{" "}
-                                {selectedPhoto ? new Date(selectedPhoto.createdAt).toLocaleDateString() : ""}
-                            </DialogDescription>
-                        </div>
-                    </DialogHeader>
-
-                    <div className="relative w-full h-[70vh] flex items-center justify-center">
-                        {selectedPhoto && (
-                            <Image
-                                src={selectedPhoto.url}
-                                alt={selectedPhoto.caption || "Community photo"}
-                                fill
-                                unoptimized={true}
-                                className="object-contain"
-                            />
-                        )}
-                    </div>
-
-                    <div className="p-6 bg-card border-t border-border/40 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                        <div className="flex-1">
-                            {selectedPhoto?.caption ? (
-                                <p className="text-sm text-foreground/90 italic">
-                                    &ldquo;{selectedPhoto.caption}&rdquo;
-                                </p>
-                            ) : (
-                                <p className="text-sm text-muted-foreground italic">No caption provided.</p>
-                            )}
-                        </div>
-                        <div className="flex items-center gap-3 shrink-0 w-full md:w-auto">
-                            {selectedPhoto?.status === "PENDING" && (
-                                <button
-                                    type="button"
-                                    className="w-full md:w-auto px-6 py-2.5 bg-emerald-600 text-white hover:bg-emerald-700 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-bold"
-                                    disabled={processingId === selectedPhoto.id}
-                                    onClick={() => handleApprove(selectedPhoto.id)}
-                                >
-                                    <Check className="w-4 h-4" />
-                                    {processingId === selectedPhoto.id ? "Approving..." : "Approve Photo"}
-                                </button>
-                            )}
+            {visiblePhotos.length === 0 ? (
+                <div className="rounded-md border-2 border-dashed border-foreground/40 bg-card p-10 text-center text-muted-foreground">
+                    <CameraOff className="w-12 h-12 mx-auto mb-3 opacity-25" aria-hidden="true" />
+                    <p className="font-heading text-lg font-extrabold text-foreground">No Photos</p>
+                    <p className="text-sm mt-1">
+                        {filter === "PENDING" ? "No community photos awaiting review." : "No community photos uploaded yet."}
+                    </p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {visiblePhotos.map((photo) => (
+                        <article
+                            key={photo.id}
+                            className="rounded-md border-2 border-foreground bg-card overflow-hidden shadow-[3px_3px_0_0_hsl(var(--foreground))] flex flex-col"
+                        >
                             <button
                                 type="button"
-                                className="w-full md:w-auto px-6 py-2.5 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-bold shadow-lg shadow-destructive/20"
-                                disabled={processingId === selectedPhoto?.id}
-                                onClick={() => selectedPhoto && handleDelete(selectedPhoto.id)}
+                                onClick={() => setSelectedPhoto(photo)}
+                                className="relative aspect-video w-full overflow-hidden bg-muted group text-left"
                             >
-                                <Trash2 className="w-4 h-4" />
-                                {processingId === selectedPhoto?.id ? "Deleting..." : "Delete Photo"}
+                                <Image
+                                    src={toPreviewSrc(photo.url)}
+                                    alt={photo.caption || "Community photo"}
+                                    fill
+                                    unoptimized
+                                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                                    className="object-cover"
+                                />
+                                <span
+                                    className={cn(
+                                        "absolute top-2.5 right-2.5 rounded-sm border px-2 py-0.5 font-mono text-[10px] font-bold uppercase",
+                                        photo.status === "PENDING"
+                                            ? "border-foreground bg-secondary text-secondary-foreground"
+                                            : "border-status-open bg-card text-status-open"
+                                    )}
+                                >
+                                    {photo.status}
+                                </span>
+                                <span className="absolute bottom-2.5 right-2.5 rounded-sm bg-black/70 p-1.5 text-white">
+                                    <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
+                                </span>
                             </button>
+
+                            <div className="p-3.5 flex-1 flex flex-col justify-between gap-3">
+                                <div>
+                                    <Link
+                                        href={`/office/${photo.postOffice.slug}`}
+                                        target="_blank"
+                                        className="font-heading text-base font-extrabold hover:text-primary inline-flex items-center gap-1"
+                                    >
+                                        <span>{photo.postOffice.name}</span>
+                                        <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                                    </Link>
+                                    <p className="font-mono text-xs text-muted-foreground">
+                                        {photo.postOffice.postalCode} · {new Date(photo.createdAt).toLocaleDateString()}
+                                    </p>
+                                    {photo.caption && (
+                                        <p className="text-xs text-foreground/85 mt-2 border-l-2 border-primary/40 pl-2 italic">
+                                            &ldquo;{photo.caption}&rdquo;
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    {photo.status === "PENDING" && (
+                                        <button
+                                            type="button"
+                                            disabled={processingId === photo.id}
+                                            onClick={() => void handleApprove(photo.id)}
+                                            className="tap flex-1 min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-md border border-status-open bg-status-open/10 px-3 text-xs font-extrabold text-status-open hover:bg-status-open/20 disabled:opacity-50"
+                                        >
+                                            <Check className="h-4 w-4" aria-hidden="true" />
+                                            <span>{processingId === photo.id ? "Approving..." : "Approve"}</span>
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        disabled={processingId === photo.id}
+                                        onClick={() => setConfirmDeletePhoto(photo)}
+                                        aria-label="Delete photo"
+                                        className={cn(
+                                            "tap min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-md border border-destructive/40 bg-destructive/10 px-3 text-xs font-extrabold text-destructive hover:bg-destructive/20",
+                                            photo.status !== "PENDING" && "flex-1"
+                                        )}
+                                    >
+                                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                        <span>Delete</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </article>
+                    ))}
+                </div>
+            )}
+
+            {/* Photo Preview Bottom Sheet */}
+            <Sheet open={!!selectedPhoto} onOpenChange={(open) => !open && setSelectedPhoto(null)}>
+                <SheetContent
+                    title={selectedPhoto?.postOffice.name || "Community Photo"}
+                    description={selectedPhoto ? `${selectedPhoto.postOffice.postalCode} · Uploaded ${new Date(selectedPhoto.createdAt).toLocaleDateString()}` : ""}
+                    className="md:w-[680px] md:max-w-[92vw]"
+                    footer={
+                        selectedPhoto && (
+                            <div className="flex flex-col sm:flex-row gap-2">
+                                {selectedPhoto.status === "PENDING" && (
+                                    <button
+                                        type="button"
+                                        disabled={processingId === selectedPhoto.id}
+                                        onClick={() => void handleApprove(selectedPhoto.id)}
+                                        className="tap flex-1 min-h-[44px] inline-flex items-center justify-center gap-2 rounded-md border-2 border-foreground bg-status-open text-white px-4 text-sm font-bold disabled:opacity-50"
+                                    >
+                                        <Check className="h-4 w-4" aria-hidden="true" />
+                                        <span>{processingId === selectedPhoto.id ? "Approving..." : "Approve Photo"}</span>
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    disabled={processingId === selectedPhoto.id}
+                                    onClick={() => setConfirmDeletePhoto(selectedPhoto)}
+                                    className="tap flex-1 min-h-[44px] inline-flex items-center justify-center gap-2 rounded-md border-2 border-foreground bg-destructive text-destructive-foreground px-4 text-sm font-bold"
+                                >
+                                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                    <span>Delete Photo</span>
+                                </button>
+                            </div>
+                        )
+                    }
+                >
+                    {selectedPhoto && (
+                        <div className="space-y-3">
+                            <div className="relative w-full aspect-video rounded-md overflow-hidden border border-border bg-black">
+                                <Image
+                                    src={selectedPhoto.url}
+                                    alt={selectedPhoto.caption || "Community photo"}
+                                    fill
+                                    unoptimized
+                                    className="object-contain"
+                                />
+                            </div>
+                            <p className="text-sm text-foreground/90">
+                                {selectedPhoto.caption ? `"${selectedPhoto.caption}"` : "No caption provided."}
+                            </p>
                         </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
-        </Card>
+                    )}
+                </SheetContent>
+            </Sheet>
+
+            <ConfirmDialog
+                open={!!confirmDeletePhoto}
+                onOpenChange={(open) => !open && setConfirmDeletePhoto(null)}
+                title="Delete Community Photo"
+                description="Permanently delete this community photo from the database and Uploadcare storage?"
+                confirmLabel="Delete Photo"
+                destructive
+                loading={deleting}
+                onConfirm={handleDeleteConfirmed}
+            />
+        </div>
     );
 }
