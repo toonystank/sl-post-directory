@@ -401,7 +401,7 @@ export default function PostageCalculator({
     const [intlRegistered, setIntlRegistered] = useState(Boolean(initialMode === "ems" && initialRegistered));
     const [showCountryWhyNote, setShowCountryWhyNote] = useState(false);
     const [countryPickerOpen, setCountryPickerOpen] = useState(false);
-    const [breakdownExpanded, setBreakdownExpanded] = useState(false);
+    const [receiptExpanded, setReceiptExpanded] = useState(false);
 
     const [weight, setWeight] = useState<string>(defaultInitialWeight);
     const [weightUnit, setWeightUnit] = useState<"g" | "kg">("g");
@@ -422,6 +422,7 @@ export default function PostageCalculator({
     const regCheckboxId = `${uid}-registered`;
     const arCheckboxId = `${uid}-ar-receipt`;
     const intlRegCheckboxId = `${uid}-intl-registered`;
+    const receiptDetailsId = `${uid}-receipt-details`;
 
     const modeOptions: { id: Destination; label: string; icon: typeof Mail }[] = [
         { id: "ems", label: tc("modeIntl"), icon: Plane },
@@ -734,7 +735,7 @@ export default function PostageCalculator({
         setIntlServiceId("ems");
         setIntlRegistered(false);
         setShowCountryWhyNote(false);
-        setBreakdownExpanded(false);
+        setReceiptExpanded(false);
     };
 
     const handleModeChange = (mode: Destination) => {
@@ -1015,180 +1016,207 @@ export default function PostageCalculator({
                     </div>
                 </fieldset>
 
-                {/* 2. Pinned HERO PRICE RECEIPT CARD (warm-paper elevated, ABOVE Country Selector, zero nested buttons) */}
+                {/* 2. Collapsible Receipt & Info Card (collapsed by default, hides price until expanded) */}
                 <div
-                    role="status"
-                    aria-live="polite"
                     data-testid="live-receipt-banner"
                     data-active-service={activeServiceKey}
                     style={serviceStyle(activeColor)}
-                    className="svc sticky top-[54px] md:static z-20 w-full rounded-2xl bg-card border-2 border-[var(--c)] overflow-hidden shadow-[0_6px_18px_-4px_rgba(26,23,20,0.14)] dark:shadow-[0_6px_20px_-4px_rgba(0,0,0,0.45)] transition-colors duration-150"
+                    className="svc w-full"
                 >
-                    <div className={cn("h-[3px] md:h-1", bannerStripe)} aria-hidden="true" />
-                    <div className="px-3 py-1.5 md:px-4 md:py-3 space-y-1">
-                        {/* Row 1: Tappable Country Flag + Full Name pill (left, ZERO truncation) | Weight Pill (right) */}
-                        <div className="flex items-center justify-between gap-2">
-                            {destination === "ems" ? (
+                    <AnimatePresence initial={false} mode="wait">
+                        {!receiptExpanded ? (
+                            <button
+                                key="collapsed"
+                                type="button"
+                                data-testid="receipt-expand-toggle"
+                                aria-expanded={false}
+                                aria-controls={receiptDetailsId}
+                                onClick={() => {
+                                    triggerHaptic("selection");
+                                    setReceiptExpanded(true);
+                                }}
+                                className="tap w-full flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold text-muted-foreground hover:border-foreground/50 hover:text-foreground transition-colors cursor-pointer"
+                            >
+                                <span className="inline-flex items-center gap-1.5">
+                                    <Info className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                                    <span>{tc("expandMoreInfo")}</span>
+                                </span>
+                                <ChevronDown className="w-4 h-4 shrink-0" aria-hidden="true" />
+                            </button>
+                        ) : (
+                            <m.div
+                                key="expanded"
+                                initial={{ opacity: 0, y: -4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -4 }}
+                                transition={{ duration: 0.14, ease: "easeOut" }}
+                                className="rounded-2xl bg-card border-2 border-[var(--c)] overflow-hidden shadow-[0_6px_18px_-4px_rgba(26,23,20,0.14)] dark:shadow-[0_6px_20px_-4px_rgba(0,0,0,0.45)] transition-colors duration-150"
+                            >
+                                <div className={cn("h-[3px] md:h-1", bannerStripe)} aria-hidden="true" />
                                 <button
                                     type="button"
-                                    data-testid="banner-country-pill"
-                                    aria-label={tc("changeCountryAria")}
+                                    data-testid="receipt-expand-toggle"
+                                    aria-expanded={true}
+                                    aria-controls={receiptDetailsId}
                                     onClick={() => {
-                                        triggerHaptic("light");
-                                        setCountryPickerOpen(true);
+                                        triggerHaptic("selection");
+                                        setReceiptExpanded(false);
                                     }}
-                                    className="tap inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-0.5 text-[11.5px] md:text-xs font-extrabold text-foreground min-w-0 text-left hover:border-foreground/50 transition-colors cursor-pointer"
+                                    className="tap w-full flex items-center justify-between gap-2 border-b border-border/70 px-3 py-1.5 md:px-4 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                                 >
-                                    <CountryFlag
-                                        code={banner.flagCode}
-                                        decorative
-                                        className="w-4 h-3 shrink-0"
-                                    />
-                                    <span className="leading-snug">{localizedCountryName}</span>
-                                    <ChevronDown className="w-3 h-3 shrink-0 opacity-70" aria-hidden="true" />
+                                    <span className="inline-flex items-center gap-1.5 text-foreground">
+                                        <Info className="w-3.5 h-3.5 shrink-0 text-[var(--c)]" aria-hidden="true" />
+                                        <span>{tc("moreInfoToggle")}</span>
+                                    </span>
+                                    <span className="inline-flex items-center gap-1 text-[11px]">
+                                        <span>{tc("collapseMoreInfo")}</span>
+                                        <ChevronDown className="w-4 h-4 shrink-0 rotate-180" aria-hidden="true" />
+                                    </span>
                                 </button>
-                            ) : (
-                                <span
-                                    data-testid="banner-country-pill"
-                                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-0.5 text-[11.5px] md:text-xs font-extrabold text-foreground min-w-0"
+
+                                <div
+                                    id={receiptDetailsId}
+                                    role="status"
+                                    aria-live="polite"
+                                    className="px-3 py-2 md:px-4 md:py-3 space-y-1.5"
                                 >
-                                    <CountryFlag
-                                        code={banner.flagCode}
-                                        decorative
-                                        className="w-4 h-3 shrink-0"
-                                    />
-                                    <span className="leading-snug">{banner.locationPill}</span>
-                                </span>
-                            )}
-
-                            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 font-mono text-[10.5px] md:text-xs font-extrabold text-foreground shrink-0 tabular-nums">
-                                <Scale className="w-2.5 h-2.5 opacity-70" aria-hidden="true" />
-                                <span>{weightGrams > 0 ? formatWeightLabel(weightGrams) : "0 g"}</span>
-                            </span>
-                        </div>
-
-                        {/* Row 2: Solid Service Pill + Subtitle left | HUGE Tabular Price right */}
-                        <button
-                            type="button"
-                            onClick={() => {
-                                triggerHaptic("selection");
-                                setBreakdownExpanded((prev) => !prev);
-                            }}
-                            aria-expanded={breakdownExpanded}
-                            className="tap w-full flex items-end justify-between gap-2 text-left pt-0.5 cursor-pointer"
-                        >
-                            <span className="flex flex-col items-start gap-0.5 min-w-0 flex-1">
-                                <span className="flex items-center gap-1.5 min-w-0">
-                                    <span
-                                        data-testid="banner-selected-service"
-                                        style={{ backgroundColor: "var(--svc)" }}
-                                        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] md:text-[11px] font-extrabold text-white shrink-0"
-                                    >
-                                        <ServiceIcon serviceId={activeServiceKey} className="w-3 h-3 shrink-0" strokeWidth={2.5} />
-                                        <span>{banner.badgeLabel}</span>
-                                    </span>
-                                    {banner.items.length > 0 && (
-                                        <span className="lg:hidden inline-flex items-center text-muted-foreground">
-                                            <ChevronDown
-                                                className={cn(
-                                                    "w-3.5 h-3.5 transition-transform duration-150",
-                                                    breakdownExpanded && "rotate-180"
-                                                )}
-                                                aria-hidden="true"
-                                            />
-                                            <span className="sr-only">
-                                                {breakdownExpanded ? tc("hideBreakdown") : tc("tapBreakdown")}
+                                    {/* Row 1: Country Flag + Name pill | Weight Pill */}
+                                    <div className="flex items-center justify-between gap-2">
+                                        {destination === "ems" ? (
+                                            <button
+                                                type="button"
+                                                data-testid="banner-country-pill"
+                                                aria-label={tc("changeCountryAria")}
+                                                onClick={() => {
+                                                    triggerHaptic("light");
+                                                    setCountryPickerOpen(true);
+                                                }}
+                                                className="tap inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-0.5 text-[11.5px] md:text-xs font-extrabold text-foreground min-w-0 text-left hover:border-foreground/50 transition-colors cursor-pointer"
+                                            >
+                                                <CountryFlag
+                                                    code={banner.flagCode}
+                                                    decorative
+                                                    className="w-4 h-3 shrink-0"
+                                                />
+                                                <span className="leading-snug">{localizedCountryName}</span>
+                                                <ChevronDown className="w-3 h-3 shrink-0 opacity-70" aria-hidden="true" />
+                                            </button>
+                                        ) : (
+                                            <span
+                                                data-testid="banner-country-pill"
+                                                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-0.5 text-[11.5px] md:text-xs font-extrabold text-foreground min-w-0"
+                                            >
+                                                <CountryFlag
+                                                    code={banner.flagCode}
+                                                    decorative
+                                                    className="w-4 h-3 shrink-0"
+                                                />
+                                                <span className="leading-snug">{banner.locationPill}</span>
                                             </span>
-                                        </span>
-                                    )}
-                                </span>
-                                {banner.error ? (
-                                    <span className="flex items-center gap-1 font-mono text-[10.5px] md:text-xs font-semibold text-destructive w-full truncate">
-                                        <AlertTriangle className="w-3 h-3 shrink-0" aria-hidden="true" />
-                                        <span className="truncate">{banner.error}</span>
-                                    </span>
-                                ) : (
-                                    <span className="text-[10.5px] md:text-xs font-medium text-muted-foreground truncate w-full">
-                                        {banner.subtitle}
-                                    </span>
-                                )}
-                            </span>
-
-                            <span className="flex items-center gap-2 shrink-0">
-                                <span className="flex flex-col items-end">
-                                    <span className="inline-flex items-center gap-1 font-mono text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground leading-none mb-0.5">
-                                        <span>{tc("total")}</span>
-                                        <span>·</span>
-                                        <span data-testid="banner-currency-indicator">
-                                            {CURRENCY_META[currency].symbol} {currency}
-                                        </span>
-                                    </span>
-                                    <m.span
-                                        key={`${activeServiceKey}-${currency}-${banner.total ?? "err"}`}
-                                        initial={{ opacity: 0.65, y: 3 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ duration: 0.16, ease: "easeOut" }}
-                                        data-testid="banner-total-price"
-                                        className={cn(
-                                            "block font-mono text-[22px] sm:text-2xl md:text-3xl font-black tabular-nums leading-none tracking-tight",
-                                            banner.error ? "text-muted-foreground" : "text-[var(--c)]"
                                         )}
-                                    >
-                                        {priceParts
-                                            ? currency === "USD"
-                                                ? `${priceParts.symbol}${priceParts.value}`
-                                                : `${priceParts.symbol} ${priceParts.value}`
-                                            : "—"}
-                                    </m.span>
-                                    {currency === "USD" && banner.total !== null && (
-                                        <span className="block font-mono text-[9.5px] font-medium text-muted-foreground tabular-nums leading-none mt-0.5">
-                                            {tc("lkrEquivalent", { amount: banner.total.toLocaleString() })}
-                                        </span>
-                                    )}
-                                </span>
-                                <Postmark
-                                    code={currency}
-                                    date={currency === "USD" ? `1$≈${Math.round(lkrPerUsd)}` : "17 NOV 26"}
-                                    size="sm"
-                                    tone="red"
-                                    rotate={-10}
-                                    className="hidden md:block shrink-0"
-                                />
-                            </span>
-                        </button>
 
-                        {/* Expandable Fee Breakdown Strip (always open on lg+, toggleable on mobile) */}
-                        <div
-                            className={cn(
-                                "border-t border-dashed border-border pt-1.5 mt-1 flex-wrap items-center justify-between gap-x-2.5 gap-y-0.5 font-mono text-[10.5px] md:text-xs",
-                                breakdownExpanded ? "flex" : "hidden lg:flex"
-                            )}
-                        >
-                            {banner.items.length > 0 ? (
-                                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-muted-foreground">
-                                    {banner.items.map((item) => (
-                                        <span key={item.label}>
-                                            {item.label}{" "}
-                                            <strong className="text-foreground font-bold">{item.value}</strong>
+                                        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 font-mono text-[10.5px] md:text-xs font-extrabold text-foreground shrink-0 tabular-nums">
+                                            <Scale className="w-2.5 h-2.5 opacity-70" aria-hidden="true" />
+                                            <span>{weightGrams > 0 ? formatWeightLabel(weightGrams) : "0 g"}</span>
                                         </span>
-                                    ))}
+                                    </div>
+
+                                    {/* Row 2: Solid Service Pill + Subtitle left | HUGE Tabular Price right */}
+                                    <div className="w-full flex items-end justify-between gap-2 text-left pt-0.5">
+                                        <span className="flex flex-col items-start gap-0.5 min-w-0 flex-1">
+                                            <span
+                                                data-testid="banner-selected-service"
+                                                style={{ backgroundColor: "var(--svc)" }}
+                                                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] md:text-[11px] font-extrabold text-white shrink-0"
+                                            >
+                                                <ServiceIcon serviceId={activeServiceKey} className="w-3 h-3 shrink-0" strokeWidth={2.5} />
+                                                <span>{banner.badgeLabel}</span>
+                                            </span>
+                                            {banner.error ? (
+                                                <span className="flex items-center gap-1 font-mono text-[10.5px] md:text-xs font-semibold text-destructive w-full truncate">
+                                                    <AlertTriangle className="w-3 h-3 shrink-0" aria-hidden="true" />
+                                                    <span className="truncate">{banner.error}</span>
+                                                </span>
+                                            ) : (
+                                                <span className="text-[10.5px] md:text-xs font-medium text-muted-foreground truncate w-full">
+                                                    {banner.subtitle}
+                                                </span>
+                                            )}
+                                        </span>
+
+                                        <span className="flex items-center gap-2 shrink-0">
+                                            <span className="flex flex-col items-end">
+                                                <span className="inline-flex items-center gap-1 font-mono text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground leading-none mb-0.5">
+                                                    <span>{tc("total")}</span>
+                                                    <span>·</span>
+                                                    <span data-testid="banner-currency-indicator">
+                                                        {CURRENCY_META[currency].symbol} {currency}
+                                                    </span>
+                                                </span>
+                                                <m.span
+                                                    key={`${activeServiceKey}-${currency}-${banner.total ?? "err"}`}
+                                                    initial={{ opacity: 0.65, y: 3 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    transition={{ duration: 0.16, ease: "easeOut" }}
+                                                    data-testid="banner-total-price"
+                                                    className={cn(
+                                                        "block font-mono text-[22px] sm:text-2xl md:text-3xl font-black tabular-nums leading-none tracking-tight",
+                                                        banner.error ? "text-muted-foreground" : "text-[var(--c)]"
+                                                    )}
+                                                >
+                                                    {priceParts
+                                                        ? currency === "USD"
+                                                            ? `${priceParts.symbol}${priceParts.value}`
+                                                            : `${priceParts.symbol} ${priceParts.value}`
+                                                        : "—"}
+                                                </m.span>
+                                                {currency === "USD" && banner.total !== null && (
+                                                    <span className="block font-mono text-[9.5px] font-medium text-muted-foreground tabular-nums leading-none mt-0.5">
+                                                        {tc("lkrEquivalent", { amount: banner.total.toLocaleString() })}
+                                                    </span>
+                                                )}
+                                            </span>
+                                            <Postmark
+                                                code={currency}
+                                                date={currency === "USD" ? `1$≈${Math.round(lkrPerUsd)}` : "17 NOV 26"}
+                                                size="sm"
+                                                tone="red"
+                                                rotate={-10}
+                                                className="hidden md:block shrink-0"
+                                            />
+                                        </span>
+                                    </div>
+
+                                    {/* Fee Breakdown Strip */}
+                                    <div className="border-t border-dashed border-border pt-1.5 mt-1 flex flex-wrap items-center justify-between gap-x-2.5 gap-y-0.5 font-mono text-[10.5px] md:text-xs">
+                                        {banner.items.length > 0 ? (
+                                            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-muted-foreground">
+                                                {banner.items.map((item) => (
+                                                    <span key={item.label}>
+                                                        {item.label}{" "}
+                                                        <strong className="text-foreground font-bold">{item.value}</strong>
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <span className="text-muted-foreground leading-snug">
+                                                {banner.footerNote ??
+                                                    (weightGrams <= 0 ? tc("enterValidWeight") : tc("adjustWeight"))}
+                                            </span>
+                                        )}
+                                        <span className="font-semibold text-foreground flex items-center gap-2">
+                                            {currency === "USD" && (
+                                                <span className="text-[10px] text-muted-foreground font-medium">
+                                                    {tc("exchangeRateNote", { rate: lkrPerUsd.toFixed(0) })}
+                                                </span>
+                                            )}
+                                            {banner.rightFooter && <span>{banner.rightFooter}</span>}
+                                        </span>
+                                    </div>
                                 </div>
-                            ) : (
-                                <span className="text-muted-foreground leading-snug">
-                                    {banner.footerNote ??
-                                        (weightGrams <= 0 ? tc("enterValidWeight") : tc("adjustWeight"))}
-                                </span>
-                            )}
-                            <span className="font-semibold text-foreground flex items-center gap-2">
-                                {currency === "USD" && (
-                                    <span className="text-[10px] text-muted-foreground font-medium">
-                                        {tc("exchangeRateNote", { rate: lkrPerUsd.toFixed(0) })}
-                                    </span>
-                                )}
-                                {banner.rightFooter && <span>{banner.rightFooter}</span>}
-                            </span>
-                        </div>
-                    </div>
+                            </m.div>
+                        )}
+                    </AnimatePresence>
                 </div>
 
                 {/* 3. Unified Compact Input Card: Full-Width Country Selector (Intl) / Amount (COD) + Editable Weight Bar */}

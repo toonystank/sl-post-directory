@@ -309,7 +309,10 @@
     "changeCountryAria": "Change destination country",
     "switchWeightUnitAria": "Switch weight unit between grams and kilograms",
     "weightLimitLabel": "Service Weight Limit",
-    "netPayoutShort": "Net Payout"
+    "netPayoutShort": "Net Payout",
+    "moreInfoToggle": "More info",
+    "expandMoreInfo": "Expand for more info",
+    "collapseMoreInfo": "Hide info"
   },
   "Blog": {
     "kicker": "News, Alerts & Reference",

@@ -309,7 +309,10 @@
     "changeCountryAria": "ගමනාන්ත රට වෙනස් කරන්න",
     "switchWeightUnitAria": "බර ඒකකය ග්‍රෑම් සහ කිලෝග්‍රෑම් අතර මාරු කරන්න",
     "weightLimitLabel": "සේවා බර සීමාව",
-    "netPayoutShort": "ශුද්ධ මුදල"
+    "netPayoutShort": "ශුද්ධ මුදල",
+    "moreInfoToggle": "වැඩි විස්තර",
+    "expandMoreInfo": "වැඩි විස්තර බලන්න",
+    "collapseMoreInfo": "විස්තර සඟවන්න"
   },
   "Blog": {
     "kicker": "පුවත්, නිවේදන සහ මාර්ගෝපදේශ",

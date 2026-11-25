@@ -309,7 +309,10 @@
     "changeCountryAria": "செல்லும் நாட்டை மாற்று",
     "switchWeightUnitAria": "எடை அலகை கிராம் / கிலோகிராம் இடையே மாற்று",
     "weightLimitLabel": "சேவை எடை வரம்பு",
-    "netPayoutShort": "நிகர தொகை"
+    "netPayoutShort": "நிகர தொகை",
+    "moreInfoToggle": "மேலும் தகவல்",
+    "expandMoreInfo": "மேலும் தகவலுக்கு விரிக்கவும்",
+    "collapseMoreInfo": "தகவலை மறை"
   },
   "Blog": {
     "kicker": "செய்திகள், அறிவிப்புகள் & வழிகாட்டிகள்",
