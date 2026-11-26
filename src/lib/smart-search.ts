@@ -18,6 +18,14 @@ import {
     getBarcodePrefixLabel,
 } from "./tracking/classifier";
 import type { BarcodeClassification } from "./tracking/types";
+import {
+    computeMailRoute,
+    parseRouteQueryPair,
+    resolveOfficeForRoute,
+    type ComputedMailRoute,
+    type RoutingOfficeNode,
+} from "./mail-routing";
+import { parseSingleSidedRouteQuery } from "./staff-station";
 
 export interface SmartQuoteItem {
     serviceId: string;
@@ -83,6 +91,18 @@ export interface TrackingIntent {
     serviceHint: string;
     hasExplicitWeight: false;
     trackHref: string;
+}
+
+export interface RouteIntent {
+    kind: "route";
+    originQuery: string;
+    destQuery: string;
+    origin: RoutingOfficeNode;
+    dest: RoutingOfficeNode;
+    originFuzzy: boolean;
+    destFuzzy: boolean;
+    route: ComputedMailRoute;
+    routingHref: string;
 }
 
 export type SmartSearchIntent =
@@ -756,6 +776,77 @@ export function parseSmartSearchIntent(
 export const SMART_WEIGHT_CHIPS = [100, 250, 500, 1000, 2000, 5000, 10000];
 
 /**
+ * Resolves a natural route query such as "kandy to jafna", "20000 to 40000", or
+ * (when a staff Duty Station is set) single-sided queries like "to jafna" / "-> 40000"
+ * against the loaded Sri Lanka Post routing graph, while guarding international
+ * rate queries like "colombo to taiwan" or "to uk 1kg".
+ */
+export function resolveSmartRouteIntent(
+    rawQuery: string,
+    nodes: RoutingOfficeNode[],
+    defaultOriginSlug?: string | null,
+    config: RateConfig = DEFAULT_RATE_CONFIG
+): RouteIntent | null {
+    if (nodes.length === 0) return null;
+
+    const pair = parseRouteQueryPair(rawQuery);
+    if (pair) {
+        // Do not hijack international rate queries like "colombo to taiwan" or "kandy to uk"
+        if (matchSmartCountry(pair.destQuery, config)) {
+            return null;
+        }
+
+        const originMatch = resolveOfficeForRoute(pair.originQuery, nodes);
+        const destMatch = resolveOfficeForRoute(pair.destQuery, nodes);
+        if (!originMatch || !destMatch) return null;
+
+        const route = computeMailRoute(originMatch.office, destMatch.office, nodes);
+        return {
+            kind: "route",
+            originQuery: pair.originQuery,
+            destQuery: pair.destQuery,
+            origin: originMatch.office,
+            dest: destMatch.office,
+            originFuzzy: originMatch.isFuzzyMatch,
+            destFuzzy: destMatch.isFuzzyMatch,
+            route,
+            routingHref: `/routing?from=${encodeURIComponent(originMatch.office.slug)}&to=${encodeURIComponent(destMatch.office.slug)}`,
+        };
+    }
+
+    if (!defaultOriginSlug) return null;
+    const singleDest = parseSingleSidedRouteQuery(rawQuery);
+    if (!singleDest) return null;
+
+    // Never hijack weight or international queries such as "to uk 1kg" or "to taiwan"
+    if (
+        extractWeightFromQuery(singleDest).weightGrams !== null ||
+        matchSmartCountry(singleDest, config)
+    ) {
+        return null;
+    }
+
+    const originNode = nodes.find((n) => n.slug === defaultOriginSlug);
+    if (!originNode) return null;
+
+    const destMatch = resolveOfficeForRoute(singleDest, nodes);
+    if (!destMatch || destMatch.office.id === originNode.id) return null;
+
+    const route = computeMailRoute(originNode, destMatch.office, nodes);
+    return {
+        kind: "route",
+        originQuery: originNode.name,
+        destQuery: singleDest,
+        origin: originNode,
+        dest: destMatch.office,
+        originFuzzy: false,
+        destFuzzy: destMatch.isFuzzyMatch,
+        route,
+        routingHref: `/routing?from=${encodeURIComponent(originNode.slug)}&to=${encodeURIComponent(destMatch.office.slug)}`,
+    };
+}
+
+/**
  * Returns 12 localized cycling search bar placeholder examples showcasing
  * post offices, postcodes, areas, international country + weight rates,
  * COD calculations, and upcoming tracking.
@@ -764,6 +855,7 @@ export function getSearchCyclingExamples(locale: string = "en"): string[] {
     if (locale === "si") {
         return [
             'විදේශ ගාස්තු: "Taiwan 5kg"',
+            'මාර්ග සෙවුම: "Kandy to Jaffna"',
             'කාර්යාල: "Nuwara Eliya", "22200"',
             'COD ගාස්තු: "COD 5000 1kg"',
             'විදේශ පාර්සල්: "Australia 2kg"',
@@ -780,6 +872,7 @@ export function getSearchCyclingExamples(locale: string = "en"): string[] {
     if (locale === "ta") {
         return [
             'வெளிநாட்டு கட்டணம்: "Taiwan 5kg"',
+            'வழி தேடல்: "Kandy to Jaffna"',
             'நிலையம்: "Nuwara Eliya", "22200"',
             'COD கட்டணம்: "COD 5000 1kg"',
             'வெளிநாட்டு பார்சல்: "Australia 2kg"',
@@ -795,6 +888,7 @@ export function getSearchCyclingExamples(locale: string = "en"): string[] {
     }
     return [
         'Try "Taiwan 5kg" · overseas rates',
+        'Mail route: "Kandy to Jaffna"',
         'Office or code: "Nuwara Eliya", "22200"',
         'Calculate COD: "COD 5000 1kg"',
         'Send abroad: "Australia 2kg", "UK 250g"',

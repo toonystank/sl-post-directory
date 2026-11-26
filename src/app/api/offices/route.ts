@@ -7,7 +7,19 @@ import { NextRequest, NextResponse } from "next/server";
 
 const FIELD_SELECT = {
     where: {
-        name: { in: ["Type", "Phone", "Telephone", "Division", "Delivery", "Is24Hour", "Working Hours"] },
+        name: {
+            in: [
+                "Type",
+                "Phone",
+                "Telephone",
+                "Division",
+                "Delivery",
+                "Is24Hour",
+                "Working Hours",
+                "Short Code",
+                "Grade",
+            ],
+        },
     },
     select: { name: true, value: true },
 };
@@ -17,9 +29,18 @@ const OFFICE_SELECT = {
     slug: true,
     name: true,
     postalCode: true,
+    operatingHours: true,
     services: true,
     rmsc: true,
-    controllingOffice: { select: { id: true, slug: true, name: true } },
+    controllingOffice: {
+        select: {
+            id: true,
+            slug: true,
+            name: true,
+            postalCode: true,
+            fields: { where: { name: "Short Code" }, select: { value: true } },
+        },
+    },
     controlledOffices: { select: { id: true, slug: true, name: true, postalCode: true } },
     fields: FIELD_SELECT,
 };
@@ -28,6 +49,14 @@ const OFFICES_CACHE_CONTROL = "public, max-age=60, s-maxage=3600, stale-while-re
 
 interface OfficePayload {
     postalCode: string;
+    controllingOffice?: {
+        id: string;
+        slug: string;
+        name: string;
+        postalCode?: string;
+        shortCode?: string;
+        fields?: { value: string }[];
+    } | null;
     controlledOffices?: { id: string; slug: string; name: string; postalCode: string }[];
     fields?: { name: string; value: string }[];
     [key: string]: unknown;
@@ -37,6 +66,18 @@ function normalizeOfficePayload<T extends OfficePayload>(office: T): T {
     return {
         ...office,
         postalCode: normalizePostalCode(office.postalCode),
+        controllingOffice: office.controllingOffice
+            ? {
+                  id: office.controllingOffice.id,
+                  slug: office.controllingOffice.slug,
+                  name: office.controllingOffice.name,
+                  postalCode: normalizePostalCode(office.controllingOffice.postalCode),
+                  shortCode:
+                      office.controllingOffice.shortCode ||
+                      office.controllingOffice.fields?.[0]?.value ||
+                      undefined,
+              }
+            : null,
         controlledOffices: office.controlledOffices?.map((child) => ({
             ...child,
             postalCode: normalizePostalCode(child.postalCode),
@@ -58,6 +99,10 @@ export async function GET(request: NextRequest) {
     const division = (searchParams.get("division") || "").slice(0, 80);
     const officeType = (searchParams.get("type") || "").slice(0, 80);
     const is24Hour = searchParams.get("is24Hour") === "1" || searchParams.get("is24Hour") === "true";
+    const rawDelivery = searchParams.get("delivery");
+    const delivery: "yes" | "no" | null =
+        rawDelivery === "yes" || rawDelivery === "no" ? rawDelivery : null;
+    const rmsc = (searchParams.get("rmsc") || "").slice(0, 80);
 
     const { cursor, limit } = clampPagination(
         searchParams.get("cursor"),
@@ -68,7 +113,19 @@ export async function GET(request: NextRequest) {
 
     if (!hasDatabaseUrl) {
         return NextResponse.json(
-            queryLocalOffices({ q: query, letter, mode, service, division, officeType, is24Hour, cursor, limit }),
+            queryLocalOffices({
+                q: query,
+                letter,
+                mode,
+                service,
+                division,
+                officeType,
+                is24Hour,
+                delivery,
+                rmsc,
+                cursor,
+                limit,
+            }),
             {
                 status: 200,
                 headers: {
@@ -97,14 +154,25 @@ export async function GET(request: NextRequest) {
                 });
             }
             if (officeType) {
-                conditions.push({
-                    fields: {
-                        some: {
-                            name: "Type",
-                            value: { equals: officeType, mode: "insensitive" as const },
+                if (officeType.toLowerCase() === "supra post office") {
+                    conditions.push({
+                        fields: {
+                            some: {
+                                name: "Grade",
+                                value: { contains: "Supra", mode: "insensitive" as const },
+                            },
                         },
-                    },
-                });
+                    });
+                } else {
+                    conditions.push({
+                        fields: {
+                            some: {
+                                name: "Type",
+                                value: { equals: officeType, mode: "insensitive" as const },
+                            },
+                        },
+                    });
+                }
             }
             if (is24Hour) {
                 conditions.push({
@@ -114,6 +182,21 @@ export async function GET(request: NextRequest) {
                             value: "true",
                         },
                     },
+                });
+            }
+            if (delivery) {
+                conditions.push({
+                    fields: {
+                        some: {
+                            name: "Delivery",
+                            value: { equals: delivery === "yes" ? "Yes" : "No", mode: "insensitive" as const },
+                        },
+                    },
+                });
+            }
+            if (rmsc) {
+                conditions.push({
+                    rmsc: { contains: rmsc, mode: "insensitive" as const },
                 });
             }
             return conditions;
@@ -129,7 +212,7 @@ export async function GET(request: NextRequest) {
                 : primaryTerm;
 
             const whereClauses: string[] = [
-                `(similarity(p.name, $1) > 0.15 OR p.name ILIKE $1 || '%' OR p.name ILIKE '%' || $1 || '%' OR p."postalCode" ILIKE '%' || $1 || '%' OR (p."postalCode" ~ '^[0-9]+$' AND LPAD(p."postalCode", 5, '0') ILIKE '%' || $1 || '%') OR p."postalCode" = $4)`,
+                `(similarity(p.name, $1) > 0.15 OR p.name ILIKE $1 || '%' OR p.name ILIKE '%' || $1 || '%' OR p."postalCode" ILIKE '%' || $1 || '%' OR (p."postalCode" ~ '^[0-9]+$' AND LPAD(p."postalCode", 5, '0') ILIKE '%' || $1 || '%') OR p."postalCode" = $4 OR EXISTS (SELECT 1 FROM "PostOfficeField" sc WHERE sc."postOfficeId" = p.id AND sc.name = 'Short Code' AND sc.value ILIKE $1 || '%'))`,
             ];
             let paramIndex = 5;
             const extraParams: string[] = [strippedDigits];
@@ -155,11 +238,17 @@ export async function GET(request: NextRequest) {
             }
 
             if (officeType) {
-                whereClauses.push(
-                    `EXISTS (SELECT 1 FROM "PostOfficeField" f WHERE f."postOfficeId" = p.id AND f.name = 'Type' AND LOWER(f.value) = LOWER($${paramIndex}))`
-                );
-                extraParams.push(officeType);
-                paramIndex++;
+                if (officeType.toLowerCase() === "supra post office") {
+                    whereClauses.push(
+                        `EXISTS (SELECT 1 FROM "PostOfficeField" f WHERE f."postOfficeId" = p.id AND f.name = 'Grade' AND LOWER(f.value) LIKE '%supra%')`
+                    );
+                } else {
+                    whereClauses.push(
+                        `EXISTS (SELECT 1 FROM "PostOfficeField" f WHERE f."postOfficeId" = p.id AND f.name = 'Type' AND LOWER(f.value) = LOWER($${paramIndex}))`
+                    );
+                    extraParams.push(officeType);
+                    paramIndex++;
+                }
             }
 
             if (is24Hour) {
@@ -168,13 +257,27 @@ export async function GET(request: NextRequest) {
                 );
             }
 
+            if (delivery) {
+                whereClauses.push(
+                    `EXISTS (SELECT 1 FROM "PostOfficeField" f WHERE f."postOfficeId" = p.id AND f.name = 'Delivery' AND LOWER(f.value) = $${paramIndex})`
+                );
+                extraParams.push(delivery === "yes" ? "yes" : "no");
+                paramIndex++;
+            }
+
+            if (rmsc) {
+                whereClauses.push(`p.rmsc ILIKE '%' || $${paramIndex} || '%'`);
+                extraParams.push(rmsc);
+                paramIndex++;
+            }
+
             const whereSQL = whereClauses.join(" AND ");
 
             const rankedQuery = `
                 SELECT p.id, similarity(p.name, $1) as sim,
                     CASE
-                        WHEN LOWER(p.name) = LOWER($1) OR (p."postalCode" ~ '^[0-9]+$' AND LPAD(p."postalCode", 5, '0') = LPAD($1, 5, '0')) OR p."postalCode" = $4 THEN 0
-                        WHEN LOWER(p.name) LIKE LOWER($1) || '%' OR (p."postalCode" ~ '^[0-9]+$' AND LPAD(p."postalCode", 5, '0') LIKE $1 || '%') THEN 1
+                        WHEN LOWER(p.name) = LOWER($1) OR (p."postalCode" ~ '^[0-9]+$' AND LPAD(p."postalCode", 5, '0') = LPAD($1, 5, '0')) OR p."postalCode" = $4 OR EXISTS (SELECT 1 FROM "PostOfficeField" sc WHERE sc."postOfficeId" = p.id AND sc.name = 'Short Code' AND LOWER(sc.value) = LOWER($1)) THEN 0
+                        WHEN LOWER(p.name) LIKE LOWER($1) || '%' OR (p."postalCode" ~ '^[0-9]+$' AND LPAD(p."postalCode", 5, '0') LIKE $1 || '%') OR EXISTS (SELECT 1 FROM "PostOfficeField" sc WHERE sc."postOfficeId" = p.id AND sc.name = 'Short Code' AND sc.value ILIKE $1 || '%') THEN 1
                         WHEN LOWER(p.name) LIKE '%' || LOWER($1) || '%' THEN 2
                         ELSE 3
                     END as rank
@@ -231,6 +334,14 @@ export async function GET(request: NextRequest) {
                         OR: [
                             { name: { contains: query, mode: "insensitive" as const } },
                             { postalCode: { contains: primaryTerm, mode: "insensitive" as const } },
+                            {
+                                fields: {
+                                    some: {
+                                        name: "Short Code",
+                                        value: { startsWith: primaryTerm, mode: "insensitive" as const },
+                                    },
+                                },
+                            },
                             ...(strippedDigits !== primaryTerm
                                 ? [{ postalCode: { equals: strippedDigits } }]
                                 : []),
@@ -307,7 +418,19 @@ export async function GET(request: NextRequest) {
         );
     } catch {
         return NextResponse.json(
-            queryLocalOffices({ q: query, letter, mode, service, division, officeType, is24Hour, cursor, limit }),
+            queryLocalOffices({
+                q: query,
+                letter,
+                mode,
+                service,
+                division,
+                officeType,
+                is24Hour,
+                delivery,
+                rmsc,
+                cursor,
+                limit,
+            }),
             {
                 status: 200,
                 headers: {

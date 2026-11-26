@@ -24,6 +24,8 @@ interface MobileFiltersProps {
     handleOfficeTypeFilter: (officeType: string | null) => void;
     only24Hour: boolean;
     handleToggle24Hour: () => void;
+    activeDelivery: "yes" | "no" | null;
+    handleDeliveryFilter: (delivery: "yes" | "no" | null) => void;
     handlePopularSearch: (term: string) => void;
     onClear: () => void;
     total: number;
@@ -45,6 +47,8 @@ export default function MobileFilters({
     handleOfficeTypeFilter,
     only24Hour,
     handleToggle24Hour,
+    activeDelivery,
+    handleDeliveryFilter,
     handlePopularSearch,
     onClear,
     total,
@@ -52,7 +56,7 @@ export default function MobileFilters({
     const t = useTranslations("Search");
     const tf = useTranslations("Filters");
     const hasSheetFilters = Boolean(
-        activeLetter || activeService || activeDivision || activeOfficeType || only24Hour
+        activeLetter || activeService || activeDivision || activeOfficeType || only24Hour || activeDelivery
     );
 
     return (
@@ -120,6 +124,37 @@ export default function MobileFilters({
                         </div>
                     </section>
                 )}
+
+                <section className="mb-5">
+                    <h3 className="label-mono mb-2">{tf("deliveryStatus")}</h3>
+                    <div className="grid grid-cols-3 gap-2">
+                        {(
+                            [
+                                { val: null, label: tf("deliveryAll") },
+                                { val: "yes", label: tf("deliveryYes") },
+                                { val: "no", label: tf("deliveryNo") },
+                            ] as const
+                        ).map((opt) => {
+                            const active = activeDelivery === opt.val;
+                            return (
+                                <button
+                                    key={opt.label}
+                                    type="button"
+                                    onClick={() => handleDeliveryFilter(opt.val)}
+                                    aria-pressed={active}
+                                    className={cn(
+                                        "tap rounded-lg border-[1.5px] px-2.5 py-2 text-xs font-bold transition-colors",
+                                        active
+                                            ? "border-foreground bg-foreground text-background"
+                                            : "border-foreground/50 bg-card hover:bg-secondary/30"
+                                    )}
+                                >
+                                    {opt.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </section>
 
                 <section className="mb-5">
                     <button

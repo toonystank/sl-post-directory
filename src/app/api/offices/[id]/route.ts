@@ -35,6 +35,26 @@ export async function GET(
                 where: { id },
                 include: {
                     fields: true,
+                    controllingOffice: {
+                        select: {
+                            id: true,
+                            slug: true,
+                            name: true,
+                            postalCode: true,
+                            rmsc: true,
+                            fields: { where: { name: { in: ["Short Code", "Phone", "Telephone", "Delivery"] } } },
+                        },
+                    },
+                    controlledOffices: {
+                        orderBy: { name: "asc" },
+                        select: {
+                            id: true,
+                            slug: true,
+                            name: true,
+                            postalCode: true,
+                            fields: { where: { name: { in: ["Short Code", "Delivery", "Type"] } } },
+                        },
+                    },
                 },
             })) ?? getLocalOfficeById(id);
 

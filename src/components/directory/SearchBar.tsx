@@ -15,6 +15,8 @@ import {
     ArrowRight,
     Scale,
     Camera,
+    Route,
+    AlertTriangle,
 } from "lucide-react";
 import { m, AnimatePresence } from "motion/react";
 import { Link, useRouter } from "@/navigation";
@@ -23,14 +25,18 @@ import CountryFlag from "@/components/brand/CountryFlag";
 import HomeSmartSearchComposer from "./HomeSmartSearchComposer";
 import HomeTrackingDrawerCard from "@/components/tracking/HomeTrackingDrawerCard";
 import { useCurrency } from "@/context/CurrencyContext";
+import { useStaffStation } from "@/context/StaffStationContext";
 import { formatCurrencyAmount } from "@/lib/currency";
 import {
     SMART_WEIGHT_CHIPS,
     formatWeightLabel,
     getSearchCyclingExamples,
     parseSmartSearchIntent,
+    resolveSmartRouteIntent,
     type SmartSearchIntent,
 } from "@/lib/smart-search";
+import { parseRouteQueryPair } from "@/lib/mail-routing";
+import { parseSingleSidedRouteQuery, toStaffStation } from "@/lib/staff-station";
 import { searchOfflineOfficesCache } from "@/lib/pwa";
 import {
     ensureLocalOfficeIndex,
@@ -86,6 +92,7 @@ export default function SearchBar({
     const locale = useLocale();
     const router = useRouter();
     const { currency, lkrPerUsd } = useCurrency();
+    const { station, setStation } = useStaffStation();
 
     const [suggestions, setSuggestions] = useState<RichAutocompleteSuggestion[]>([]);
     const [showDropdown, setShowDropdown] = useState(false);
@@ -95,6 +102,7 @@ export default function SearchBar({
     const [exampleIndex, setExampleIndex] = useState(0);
     const [weightOverrideGrams, setWeightOverrideGrams] = useState<number | null>(null);
     const [searchHistory, setSearchHistory] = useState<string[]>([]);
+    const [indexVersion, setIndexVersion] = useState(0);
 
     const suggestionCache = useRef<Record<string, RichAutocompleteSuggestion[]>>({});
     const suggestDebounce = useRef<NodeJS.Timeout | null>(null);
@@ -183,6 +191,31 @@ export default function SearchBar({
         if (!enableSmartHomeSearch || !query.trim()) return null;
         return parseSmartSearchIntent(query, locale, weightOverrideGrams);
     }, [enableSmartHomeSearch, query, locale, weightOverrideGrams]);
+
+    // Hydrate the compact index immediately when the user types a route query like "kandy to jafna" or "to jafna"
+    useEffect(() => {
+        const isPair = Boolean(parseRouteQueryPair(query));
+        const isSingleStaffRoute = Boolean(station && parseSingleSidedRouteQuery(query));
+        if (!isPair && !isSingleStaffRoute) return;
+        if (getLoadedOfficeIndexSync()) return;
+        let cancelled = false;
+        void ensureLocalOfficeIndex().then((engine) => {
+            if (!cancelled && engine) {
+                setIndexVersion((v) => v + 1);
+            }
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [query, station]);
+
+    const routeIntent = useMemo(() => {
+        if (!query.trim()) return null;
+        const engine = getLoadedOfficeIndexSync();
+        if (!engine) return null;
+        void indexVersion;
+        return resolveSmartRouteIntent(query, engine.getRoutingNodes(), station?.slug);
+    }, [query, indexVersion, station?.slug]);
 
     const effectiveAutocompleteMode: "name" | "division" | "all" = enableSmartHomeSearch ? "all" : searchMode;
 
@@ -398,7 +431,7 @@ export default function SearchBar({
                 80
             );
         },
-        [effectiveAutocompleteMode, fetchSuggestions, isActive, onQueryChange, scrollSearchBarToTop]
+        [effectiveAutocompleteMode, fetchSuggestions, onQueryChange, scrollSearchBarToTop]
     );
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -421,6 +454,9 @@ export default function SearchBar({
     };
 
     const visibleSuggestions = React.useMemo(() => {
+        if (routeIntent) {
+            return [];
+        }
         if (!enableSmartHomeSearch || !smartIntent) {
             return suggestions;
         }
@@ -431,11 +467,38 @@ export default function SearchBar({
         }
         const qLower = query.trim().toLowerCase();
         return suggestions.filter((s) => s.label.toLowerCase().includes(qLower)).slice(0, 2);
-    }, [enableSmartHomeSearch, smartIntent, suggestions, query]);
+    }, [enableSmartHomeSearch, routeIntent, smartIntent, suggestions, query]);
 
     const handleSubmit = () => {
         recordHistory(query);
         closeForNavigation();
+        if (routeIntent) {
+            setStation(toStaffStation(routeIntent.origin));
+            triggerHaptic("light");
+            router.push(routeIntent.routingHref);
+            return;
+        }
+        if (parseRouteQueryPair(query) || (station && parseSingleSidedRouteQuery(query))) {
+            void ensureLocalOfficeIndex().then((engine) => {
+                if (!engine) {
+                    onSubmit();
+                    return;
+                }
+                const resolved = resolveSmartRouteIntent(
+                    query,
+                    engine.getRoutingNodes(),
+                    station?.slug
+                );
+                if (resolved) {
+                    setStation(toStaffStation(resolved.origin));
+                    triggerHaptic("light");
+                    router.push(resolved.routingHref);
+                } else {
+                    onSubmit();
+                }
+            });
+            return;
+        }
         // If on Home Page and user typed a clear rate query (like "thaiwan 5kg") with no matching post offices, jump straight to the SEO rate page / calculator
         if (enableSmartHomeSearch && smartIntent && visibleSuggestions.length === 0) {
             navigateToSmartCalculator(smartIntent);
@@ -477,7 +540,7 @@ export default function SearchBar({
 
     const hasDropdownContent =
         Boolean(query.trim()) &&
-        (Boolean(smartIntent) || visibleSuggestions.length > 0);
+        (Boolean(routeIntent) || Boolean(smartIntent) || visibleSuggestions.length > 0);
     const open = showDropdown && isActive && hasDropdownContent;
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -551,10 +614,79 @@ export default function SearchBar({
         }
     };
 
+    const routePreviewCard: React.ReactNode = routeIntent ? (
+        <div
+            data-testid="smart-route-preview"
+            className="rounded-lg border-2 border-foreground bg-card p-3 space-y-2.5"
+        >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        <Route className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
+                        <span className="font-heading text-sm sm:text-base font-extrabold text-foreground">
+                            {routeIntent.origin.name}
+                            {routeIntent.origin.shortCode ? ` [${routeIntent.origin.shortCode}]` : ""}
+                            {" → "}
+                            {routeIntent.dest.name}
+                            {routeIntent.dest.shortCode ? ` [${routeIntent.dest.shortCode}]` : ""}
+                        </span>
+                    </div>
+                    <p className="font-mono text-[11px] text-muted-foreground mt-0.5">
+                        {routeIntent.origin.postalCode || "—"} → {routeIntent.dest.postalCode || "—"} ·{" "}
+                        {routeIntent.route.scopeLabel}
+                    </p>
+                </div>
+                <span className="inline-flex shrink-0 items-center rounded-full bg-primary/15 px-2.5 py-0.5 font-mono text-[10px] font-bold text-primary">
+                    {t("smartPreviewRoute")}
+                </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1 text-[11px] font-medium">
+                {routeIntent.route.steps.map((step, i) => (
+                    <React.Fragment key={`${step.role}-${i}`}>
+                        <span className="rounded border border-foreground/30 bg-background px-1.5 py-0.5">
+                            {step.title}
+                        </span>
+                        {i < routeIntent.route.steps.length - 1 && (
+                            <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" aria-hidden="true" />
+                        )}
+                    </React.Fragment>
+                ))}
+            </div>
+
+            {routeIntent.route.bagLabel.deliveryWarning && (
+                <p className="flex items-start gap-1.5 rounded bg-amber-500/10 px-2.5 py-1.5 text-[11px] font-medium text-amber-900 dark:text-amber-200">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" aria-hidden="true" />
+                    <span>{routeIntent.route.bagLabel.deliveryWarning}</span>
+                </p>
+            )}
+
+            <Link
+                href={routeIntent.routingHref}
+                data-testid="smart-route-open-hub"
+                onClick={() => {
+                    setStation(toStaffStation(routeIntent.origin));
+                    recordHistory(query);
+                    closeForNavigation();
+                }}
+                className="tap inline-flex w-full items-center justify-center gap-1.5 rounded-md border-2 border-foreground bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-[0_2px_0_0_hsl(var(--foreground))] hover:opacity-95"
+            >
+                <span>
+                    {t("smartOpenRoute", {
+                        from: routeIntent.origin.name,
+                        to: routeIntent.dest.name,
+                    })}
+                </span>
+                <ArrowRight className="h-3.5 w-3.5 shrink-0" />
+            </Link>
+        </div>
+    ) : null;
+
     const inlineSmartPreview: React.ReactNode =
-        enableSmartHomeSearch && smartIntent ? (
+        enableSmartHomeSearch && (routePreviewCard || smartIntent) ? (
             <>
-                {smartIntent.kind === "tracking" && (
+                {routePreviewCard}
+                {!routePreviewCard && smartIntent?.kind === "tracking" && (
                     <HomeTrackingDrawerCard
                         intent={smartIntent}
                         onCloseDrawer={() => {
@@ -564,7 +696,7 @@ export default function SearchBar({
                     />
                 )}
 
-                {smartIntent.kind === "international" && (
+                {!routePreviewCard && smartIntent?.kind === "international" && (
                     <div
                         data-testid="smart-rate-preview-intl"
                         className="rounded-lg border-2 border-foreground par-avion-stripe p-[3px] sm:p-1"
@@ -709,7 +841,7 @@ export default function SearchBar({
                     </div>
                 )}
 
-                {smartIntent.kind === "cod" && (
+                {!routePreviewCard && smartIntent?.kind === "cod" && (
                     <div
                         data-testid="smart-rate-preview-cod"
                         className="rounded-lg border-2 border-foreground bg-[#15803D]/10 dark:bg-emerald-500/15 p-3 space-y-2.5"
@@ -775,7 +907,7 @@ export default function SearchBar({
                     </div>
                 )}
 
-                {smartIntent.kind === "domestic" && (
+                {!routePreviewCard && smartIntent?.kind === "domestic" && (
                     <div
                         data-testid="smart-rate-preview-domestic"
                         className="rounded-lg border-2 border-foreground bg-primary/5 dark:bg-primary/15 p-3 space-y-2.5"
@@ -1030,11 +1162,11 @@ export default function SearchBar({
                 </form>
             )}
 
-            {/* Standard Overlay Autocomplete Dropdown for /browse Page */}
+            {/* Standard Overlay Autocomplete / Route Preview Dropdown for /browse Page */}
             {!enableSmartHomeSearch && (
                 <AnimatePresence>
-                    {open && suggestions.length > 0 && (
-                        <m.ul
+                    {open && (routePreviewCard || suggestions.length > 0) && (
+                        <m.div
                             id={listId}
                             role="listbox"
                             initial={{ opacity: 0, y: -4, scale: 0.99 }}
@@ -1043,48 +1175,54 @@ export default function SearchBar({
                             transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
                             className="absolute left-0 right-0 top-full z-[60] mt-1.5 overflow-hidden rounded-md border-2 border-foreground bg-card py-1 shadow-[4px_4px_0_0_hsl(var(--foreground))]"
                         >
-                            {suggestions.map((s, i) => (
-                                <li
-                                    key={`${s.label}-${s.postalCode ?? i}`}
-                                    id={`${listId}-${i}`}
-                                    role="option"
-                                    aria-selected={highlight === i}
-                                >
-                                    <button
-                                        type="button"
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        onClick={() => handleSuggestClick(s)}
-                                        className={cn(
-                                            "flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left text-[0.95rem] last:border-0",
-                                            highlight === i ? "bg-secondary/30" : "hover:bg-muted"
-                                        )}
-                                    >
-                                        {searchMode === "name" ? (
-                                            <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                        ) : (
-                                            <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                        )}
-                                        <span className="min-w-0 flex-1">
-                                            <span className="block truncate font-medium">{s.queryValue}</span>
-                                            {s.division && searchMode === "name" && (
-                                                <span className="block text-xs text-muted-foreground truncate">
-                                                    {s.division}
+                            {routePreviewCard ? (
+                                <div className="p-2">{routePreviewCard}</div>
+                            ) : (
+                                <ul>
+                                    {suggestions.map((s, i) => (
+                                        <li
+                                            key={`${s.label}-${s.postalCode ?? i}`}
+                                            id={`${listId}-${i}`}
+                                            role="option"
+                                            aria-selected={highlight === i}
+                                        >
+                                            <button
+                                                type="button"
+                                                onMouseDown={(e) => e.preventDefault()}
+                                                onClick={() => handleSuggestClick(s)}
+                                                className={cn(
+                                                    "flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left text-[0.95rem] last:border-0",
+                                                    highlight === i ? "bg-secondary/30" : "hover:bg-muted"
+                                                )}
+                                            >
+                                                {searchMode === "name" ? (
+                                                    <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                ) : (
+                                                    <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                )}
+                                                <span className="min-w-0 flex-1">
+                                                    <span className="block truncate font-medium">{s.queryValue}</span>
+                                                    {s.division && searchMode === "name" && (
+                                                        <span className="block text-xs text-muted-foreground truncate">
+                                                            {s.division}
+                                                        </span>
+                                                    )}
                                                 </span>
-                                            )}
-                                        </span>
-                                        {s.postalCode && (
-                                            <span className="shrink-0 rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-xs font-bold">
-                                                {s.postalCode}
-                                            </span>
-                                        )}
-                                        <CornerDownLeft
-                                            className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60"
-                                            aria-hidden="true"
-                                        />
-                                    </button>
-                                </li>
-                            ))}
-                        </m.ul>
+                                                {s.postalCode && (
+                                                    <span className="shrink-0 rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-xs font-bold">
+                                                        {s.postalCode}
+                                                    </span>
+                                                )}
+                                                <CornerDownLeft
+                                                    className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60"
+                                                    aria-hidden="true"
+                                                />
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </m.div>
                     )}
                 </AnimatePresence>
             )}

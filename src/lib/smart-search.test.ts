@@ -5,8 +5,10 @@ import {
     getSearchCyclingExamples,
     matchSmartCountry,
     parseSmartSearchIntent,
+    resolveSmartRouteIntent,
     SMART_WEIGHT_CHIPS,
 } from "./smart-search";
+import type { RoutingOfficeNode } from "./mail-routing";
 
 test("matchSmartCountry matches exact names, aliases, and fuzzy typos like 'thaiwan'", () => {
     const exact = matchSmartCountry("Taiwan");
@@ -113,4 +115,67 @@ test("getSearchCyclingExamples returns rich localized cycling examples including
         assert.ok(examples.some((ex) => ex.includes("BD070817564LK")));
     }
     assert.ok(SMART_WEIGHT_CHIPS.includes(5000));
+});
+
+test("resolveSmartRouteIntent resolves 'kandy to jafna' and guards international country targets", () => {
+    const nodes: RoutingOfficeNode[] = [
+        {
+            id: "kd",
+            slug: "kandy-20000",
+            name: "Kandy",
+            postalCode: "20000",
+            shortCode: "KY",
+            type: "Post Office",
+            grade: "Supra",
+            division: "Kandy (North)",
+            delivery: "Yes",
+            rmsc: "Kandy RMSC",
+        },
+        {
+            id: "ja",
+            slug: "jaffna-40000",
+            name: "Jaffna",
+            postalCode: "40000",
+            shortCode: "JA",
+            type: "Post Office",
+            grade: "Supra",
+            division: "Jaffna",
+            delivery: "Yes",
+            rmsc: "JAFFNA TPO",
+        },
+        {
+            id: "co",
+            slug: "colombo-gpo-00100",
+            name: "Colombo G. P. O.",
+            postalCode: "00100",
+            shortCode: "GPO",
+            type: "Post Office",
+            grade: "Supra",
+            division: "Colombo",
+            delivery: "No",
+            rmsc: "Colombo CME",
+        },
+    ];
+
+    const route = resolveSmartRouteIntent("kandy to jafna", nodes);
+    assert.ok(route);
+    assert.equal(route.origin.slug, "kandy-20000");
+    assert.equal(route.dest.slug, "jaffna-40000");
+    assert.equal(route.destFuzzy, true);
+    assert.equal(route.routingHref, "/routing?from=kandy-20000&to=jaffna-40000");
+
+    // International destination must NOT be hijacked by domestic routing
+    assert.equal(resolveSmartRouteIntent("kandy to taiwan", nodes), null);
+    assert.equal(resolveSmartRouteIntent("colombo to uk", nodes), null);
+    assert.equal(resolveSmartRouteIntent("Kandy", nodes), null);
+
+    // Single-sided staff query ("to jafna") uses defaultOriginSlug only when set
+    assert.equal(resolveSmartRouteIntent("to jafna", nodes), null);
+    const staffRoute = resolveSmartRouteIntent("to jafna", nodes, "kandy-20000");
+    assert.ok(staffRoute);
+    assert.equal(staffRoute.origin.slug, "kandy-20000");
+    assert.equal(staffRoute.dest.slug, "jaffna-40000");
+    assert.equal(staffRoute.routingHref, "/routing?from=kandy-20000&to=jaffna-40000");
+    assert.equal(resolveSmartRouteIntent("to taiwan", nodes, "kandy-20000"), null);
+    assert.equal(resolveSmartRouteIntent("to uk 1kg", nodes, "kandy-20000"), null);
 });

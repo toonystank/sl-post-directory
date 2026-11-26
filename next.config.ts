@@ -49,6 +49,7 @@ const nextConfig: NextConfig = {
     },
     experimental: {
         optimizePackageImports: ["lucide-react", "radix-ui"],
+        turbopackFileSystemCacheForDev: false,
     },
     async headers() {
         return [

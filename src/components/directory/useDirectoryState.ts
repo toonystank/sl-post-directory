@@ -14,6 +14,7 @@ export interface DirectoryExtraFilters {
     division?: string | null;
     officeType?: string | null;
     is24Hour?: boolean;
+    delivery?: "yes" | "no" | null;
 }
 
 export interface InitialDirectoryData {
@@ -34,9 +35,12 @@ export function useDirectoryState(initialData?: InitialDirectoryData) {
     const urlDivision = searchParams.get("division") || null;
     const urlOfficeType = searchParams.get("type") || null;
     const urlIs24Hour = searchParams.get("is24Hour") === "1" || searchParams.get("is24Hour") === "true";
+    const rawUrlDelivery = searchParams.get("delivery");
+    const urlDelivery: "yes" | "no" | null =
+        rawUrlDelivery === "yes" || rawUrlDelivery === "no" ? rawUrlDelivery : null;
 
     const hasUrlFilters = Boolean(
-        urlQuery || urlLetter || urlService || urlDivision || urlOfficeType || urlIs24Hour
+        urlQuery || urlLetter || urlService || urlDivision || urlOfficeType || urlIs24Hour || urlDelivery
     );
 
     const syncEngineAtInit = getLoadedOfficeIndexSync();
@@ -49,6 +53,7 @@ export function useDirectoryState(initialData?: InitialDirectoryData) {
               division: urlDivision,
               officeType: urlOfficeType,
               is24Hour: urlIs24Hour,
+              delivery: urlDelivery,
               cursor: 0,
               limit: PAGE_LIMIT,
           })
@@ -63,6 +68,7 @@ export function useDirectoryState(initialData?: InitialDirectoryData) {
     const [activeDivision, setActiveDivision] = useState<string | null>(urlDivision);
     const [activeOfficeType, setActiveOfficeType] = useState<string | null>(urlOfficeType);
     const [only24Hour, setOnly24Hour] = useState<boolean>(urlIs24Hour);
+    const [activeDelivery, setActiveDelivery] = useState<"yes" | "no" | null>(urlDelivery);
 
     const [availableDivisions, setAvailableDivisions] = useState<string[]>(
         () => syncEngineAtInit?.divisions ?? initialData?.divisions ?? []
@@ -88,6 +94,7 @@ export function useDirectoryState(initialData?: InitialDirectoryData) {
         division: string | null;
         officeType: string | null;
         is24Hour: boolean;
+        delivery: "yes" | "no" | null;
     } | null>(
         syncInitialResult
             ? {
@@ -98,6 +105,7 @@ export function useDirectoryState(initialData?: InitialDirectoryData) {
                   division: urlDivision,
                   officeType: urlOfficeType,
                   is24Hour: urlIs24Hour,
+                  delivery: urlDelivery,
               }
             : null
     );
@@ -118,6 +126,7 @@ export function useDirectoryState(initialData?: InitialDirectoryData) {
             if (extra.division) params.set("division", extra.division);
             if (extra.officeType) params.set("type", extra.officeType);
             if (extra.is24Hour) params.set("is24Hour", "1");
+            if (extra.delivery) params.set("delivery", extra.delivery);
             const paramString = params.toString();
             const newUrl = paramString ? `/browse?${paramString}` : "/browse";
             router.replace(newUrl, { scroll: false });
@@ -153,6 +162,7 @@ export function useDirectoryState(initialData?: InitialDirectoryData) {
             const division = extra.division ?? null;
             const officeType = extra.officeType ?? null;
             const is24Hour = Boolean(extra.is24Hour);
+            const delivery = extra.delivery ?? null;
 
             if (!append) {
                 activeAbortRef.current?.abort();
@@ -167,6 +177,7 @@ export function useDirectoryState(initialData?: InitialDirectoryData) {
                     division,
                     officeType,
                     is24Hour,
+                    delivery,
                 };
             }
 
@@ -185,6 +196,7 @@ export function useDirectoryState(initialData?: InitialDirectoryData) {
                     division,
                     officeType,
                     is24Hour,
+                    delivery,
                     cursor,
                     limit: PAGE_LIMIT,
                 });
@@ -217,6 +229,7 @@ export function useDirectoryState(initialData?: InitialDirectoryData) {
                         division,
                         officeType,
                         is24Hour,
+                        delivery,
                         cursor,
                         limit: PAGE_LIMIT,
                     });
@@ -232,6 +245,7 @@ export function useDirectoryState(initialData?: InitialDirectoryData) {
                 if (division) params.set("division", division);
                 if (officeType) params.set("type", officeType);
                 if (is24Hour) params.set("is24Hour", "1");
+                if (delivery) params.set("delivery", delivery);
                 params.set("mode", mode);
                 params.set("cursor", cursor.toString());
                 params.set("limit", String(PAGE_LIMIT));
@@ -293,6 +307,7 @@ export function useDirectoryState(initialData?: InitialDirectoryData) {
         setActiveDivision(urlDivision);
         setActiveOfficeType(urlOfficeType);
         setOnly24Hour(urlIs24Hour);
+        setActiveDelivery(urlDelivery);
 
         const last = lastFetchedRef.current;
         if (
@@ -303,7 +318,8 @@ export function useDirectoryState(initialData?: InitialDirectoryData) {
             last.service === urlService &&
             last.division === urlDivision &&
             last.officeType === urlOfficeType &&
-            last.is24Hour === urlIs24Hour
+            last.is24Hour === urlIs24Hour &&
+            last.delivery === urlDelivery
         ) {
             return;
         }
@@ -320,6 +336,7 @@ export function useDirectoryState(initialData?: InitialDirectoryData) {
                 division: urlDivision,
                 officeType: urlOfficeType,
                 is24Hour: urlIs24Hour,
+                delivery: urlDelivery,
             };
             const localRes = syncEngine.query({
                 q: urlQuery,
@@ -329,6 +346,7 @@ export function useDirectoryState(initialData?: InitialDirectoryData) {
                 division: urlDivision,
                 officeType: urlOfficeType,
                 is24Hour: urlIs24Hour,
+                delivery: urlDelivery,
                 cursor: 0,
                 limit: PAGE_LIMIT,
             });
@@ -340,6 +358,7 @@ export function useDirectoryState(initialData?: InitialDirectoryData) {
             division: urlDivision,
             officeType: urlOfficeType,
             is24Hour: urlIs24Hour,
+            delivery: urlDelivery,
         });
     }, [
         urlQuery,
@@ -349,6 +368,7 @@ export function useDirectoryState(initialData?: InitialDirectoryData) {
         urlDivision,
         urlOfficeType,
         urlIs24Hour,
+        urlDelivery,
         fetchOffices,
         applySearchResponse,
     ]);
@@ -385,6 +405,8 @@ export function useDirectoryState(initialData?: InitialDirectoryData) {
         setActiveOfficeType,
         only24Hour,
         setOnly24Hour,
+        activeDelivery,
+        setActiveDelivery,
         availableDivisions,
         availableTypes,
         offices,

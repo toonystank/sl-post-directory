@@ -9,7 +9,7 @@ import {
 const IDB_NAME = "sl-post-directory-index-db";
 const IDB_VERSION = 1;
 const IDB_STORE = "index";
-const IDB_KEY = "compact-offices-v1";
+const IDB_KEY = "compact-offices-v4";
 const REVALIDATE_INTERVAL_MS = 1000 * 60 * 60; // 1 hour
 const IDB_TIMEOUT_MS = 1200;
 

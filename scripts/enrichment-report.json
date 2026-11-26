@@ -1,0 +1,51 @@
+{
+  "generatedAt": "2026-11-26T13:07:21.774Z",
+  "sources": {
+    "backup": 4024,
+    "postageLk": 4035,
+    "slpostGovLk": 3253,
+    "osm": 693,
+    "addedFromPostageLk": 13,
+    "addedRmscs": 9,
+    "addedOsmApos": 3,
+    "matchedCoords": 316
+  },
+  "before": {
+    "total": 4024,
+    "withPhone": 538,
+    "withFax": 152,
+    "withPostcode": 2325,
+    "unpaddedPostcode": 51,
+    "withShortCode": 717,
+    "withDelivery": 565,
+    "withGrade": 0,
+    "withControlling": 2989,
+    "withRmsc": 369,
+    "withCoords": 0,
+    "withNonDefaultHours": 0,
+    "byType": {
+      "Sub Post office": 3370,
+      "Post office": 654
+    }
+  },
+  "after": {
+    "total": 4036,
+    "withPhone": 3741,
+    "withFax": 236,
+    "withPostcode": 2487,
+    "unpaddedPostcode": 0,
+    "withShortCode": 1507,
+    "withDelivery": 4034,
+    "withGrade": 589,
+    "withControlling": 3375,
+    "withRmsc": 4036,
+    "withCoords": 319,
+    "withNonDefaultHours": 4036,
+    "byType": {
+      "Sub Post Office": 3366,
+      "Post Office": 658,
+      "Agency Post Office": 3,
+      "RMSC / Sorting Hub": 9
+    }
+  }
+}

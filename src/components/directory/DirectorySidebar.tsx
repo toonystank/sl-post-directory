@@ -24,6 +24,8 @@ interface DirectorySidebarProps {
     handleOfficeTypeFilter: (officeType: string | null) => void;
     only24Hour: boolean;
     handleToggle24Hour: () => void;
+    activeDelivery: "yes" | "no" | null;
+    handleDeliveryFilter: (delivery: "yes" | "no" | null) => void;
     handlePopularSearch: (term: string) => void;
 }
 
@@ -68,6 +70,8 @@ export default function DirectorySidebar({
     handleOfficeTypeFilter,
     only24Hour,
     handleToggle24Hour,
+    activeDelivery,
+    handleDeliveryFilter,
     handlePopularSearch,
 }: DirectorySidebarProps) {
     const t = useTranslations("Search");
@@ -158,6 +162,43 @@ export default function DirectorySidebar({
                         </div>
                     </section>
                 )}
+
+                <section>
+                    <SectionHeading
+                        clearLabel={t("clear")}
+                        onClear={() => handleDeliveryFilter(null)}
+                        show={Boolean(activeDelivery)}
+                    >
+                        {tf("deliveryStatus")}
+                    </SectionHeading>
+                    <div className="grid grid-cols-3 gap-1.5">
+                        {(
+                            [
+                                { val: null, label: tf("deliveryAll") },
+                                { val: "yes", label: tf("deliveryYes") },
+                                { val: "no", label: tf("deliveryNo") },
+                            ] as const
+                        ).map((opt) => {
+                            const active = activeDelivery === opt.val;
+                            return (
+                                <button
+                                    key={opt.label}
+                                    type="button"
+                                    onClick={() => handleDeliveryFilter(opt.val)}
+                                    aria-pressed={active}
+                                    className={cn(
+                                        "tap rounded-md border-[1.5px] px-2 py-1.5 text-xs font-semibold transition-colors",
+                                        active
+                                            ? "border-foreground bg-foreground text-background"
+                                            : "border-foreground/50 bg-card hover:bg-secondary/30"
+                                    )}
+                                >
+                                    {opt.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </section>
 
                 <section>
                     <button

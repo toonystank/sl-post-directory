@@ -218,3 +218,47 @@ test("LocalOfficeSearchEngine resolves Sinhala/Tamil aliases and exposes cached 
     assert.equal(dict.findByPostalCode("20000")[0]?.name, "Kandy");
     assert.equal(dict.findExact("colombo")[0]?.name, "Colombo GPO");
 });
+
+test("LocalOfficeSearchEngine supports Short Code search, Delivery/Supra filters, and routing graph reconstruction", () => {
+    const routingRecords: OfficeIndexSourceRecord[] = [
+        {
+            id: "aw",
+            slug: "avissawella",
+            name: "Avissawella",
+            postalCode: "10700",
+            rmsc: "Colombo CME",
+            fields: [
+                { name: "Type", value: "Post Office" },
+                { name: "Division", value: "Colombo (North)" },
+                { name: "Short Code", value: "AW" },
+                { name: "Delivery", value: "Yes" },
+                { name: "Grade", value: "Supra" },
+            ],
+        },
+        {
+            id: "dg",
+            slug: "daigala",
+            name: "Daigala",
+            postalCode: "10705",
+            rmsc: "Colombo CME",
+            controllingOfficeId: "aw",
+            fields: [
+                { name: "Type", value: "Sub Post Office" },
+                { name: "Division", value: "Colombo (North)" },
+                { name: "Delivery", value: "No" },
+            ],
+        },
+    ];
+
+    const engine = new LocalOfficeSearchEngine(encodeOfficeIndex(routingRecords));
+    assert.equal(engine.query({ q: "AW" }).offices[0]?.slug, "avissawella");
+    assert.equal(engine.query({ delivery: "yes" }).total, 1);
+    assert.equal(engine.query({ delivery: "no" }).offices[0]?.slug, "daigala");
+    assert.equal(engine.query({ officeType: "Supra Post Office" }).offices[0]?.slug, "avissawella");
+
+    const nodes = engine.getRoutingNodes();
+    const daigalaNode = nodes.find((n) => n.slug === "daigala");
+    assert.equal(daigalaNode?.controllingOfficeSlug, "avissawella");
+    assert.equal(daigalaNode?.controllingOfficeShortCode, "AW");
+    assert.equal(daigalaNode?.rmsc, "Colombo CME");
+});

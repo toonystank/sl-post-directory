@@ -4,6 +4,7 @@ import "../globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import AuthProvider from "@/context/AuthContext";
 import { CurrencyProvider } from "@/context/CurrencyContext";
+import { StaffStationProvider } from "@/context/StaffStationContext";
 import Navbar from "@/components/Navbar";
 import BottomTabBar from "@/components/shell/BottomTabBar";
 import NativeAppBridge from "@/components/shell/NativeAppBridge";
@@ -234,30 +235,32 @@ export default async function RootLayout({
                 <InstantLocaleProvider initialLocale={locale} initialMessages={initialMessages}>
                     <AuthProvider>
                         <CurrencyProvider>
-                            <AdManager>
-                                <ThemeProvider
-                                    attribute="class"
-                                    defaultTheme="system"
-                                    enableSystem
-                                    disableTransitionOnChange
-                                >
-                                    <MotionProvider>
-                                        <PWAProvider>
-                                            <NativeAppBridge />
-                                            <ServiceWorkerRegister />
-                                            <Navbar />
-                                            <main className="flex-1 pb-tabbar">
-                                                {children}
-                                            </main>
-                                            <InstallPrompt />
-                                            <SiteFooter />
-                                            <AdBanner position="sticky-bottom" />
-                                            <NativeToast />
-                                            <BottomTabBar />
-                                        </PWAProvider>
-                                    </MotionProvider>
-                                </ThemeProvider>
-                            </AdManager>
+                            <StaffStationProvider>
+                                <AdManager>
+                                    <ThemeProvider
+                                        attribute="class"
+                                        defaultTheme="system"
+                                        enableSystem
+                                        disableTransitionOnChange
+                                    >
+                                        <MotionProvider>
+                                            <PWAProvider>
+                                                <NativeAppBridge />
+                                                <ServiceWorkerRegister />
+                                                <Navbar />
+                                                <main className="flex-1 pb-tabbar">
+                                                    {children}
+                                                </main>
+                                                <InstallPrompt />
+                                                <SiteFooter />
+                                                <AdBanner position="sticky-bottom" />
+                                                <NativeToast />
+                                                <BottomTabBar />
+                                            </PWAProvider>
+                                        </MotionProvider>
+                                    </ThemeProvider>
+                                </AdManager>
+                            </StaffStationProvider>
                         </CurrencyProvider>
                     </AuthProvider>
                 </InstantLocaleProvider>

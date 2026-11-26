@@ -54,3 +54,6 @@ test_out.txt
 
 # Database files
 *.db
+
+# Harvest cache
+scripts/cache/

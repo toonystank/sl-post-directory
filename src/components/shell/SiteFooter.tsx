@@ -30,6 +30,7 @@ export default function SiteFooter() {
                     <ul className="space-y-2 font-medium">
                         <li><Link href="/" className="hover:text-primary">{tNav("directory")}</Link></li>
                         <li><Link href="/browse" className="hover:text-primary">{t("browse")}</Link></li>
+                        <li><Link href="/routing" className="hover:text-primary">{tNav("routing")}</Link></li>
                         <li><Link href="/calculator" className="hover:text-primary">{tNav("calculator")}</Link></li>
                         <li><Link href="/rates" className="hover:text-primary">Postage Rate Tables</Link></li>
                         <li><Link href="/blog" className="hover:text-primary">{tNav("blog")}</Link></li>

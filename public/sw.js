@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v10";
+const CACHE_VERSION = "v11";
 const STATIC_CACHE = `sl-post-static-${CACHE_VERSION}`;
 const PAGES_CACHE = `sl-post-pages-${CACHE_VERSION}`;
 const RSC_CACHE = `sl-post-rsc-${CACHE_VERSION}`;
@@ -176,7 +176,7 @@ self.addEventListener("activate", (event) => {
           const isStaleVersion = !ALL_CACHES.includes(cacheName);
           const isDevStale =
             IS_DEV_HOST &&
-            (cacheName === STATIC_CACHE || cacheName === PAGES_CACHE || cacheName === RSC_CACHE);
+            (cacheName === STATIC_CACHE || cacheName === PAGES_CACHE || cacheName === RSC_CACHE || cacheName === API_CACHE);
           if (isStaleVersion || isDevStale) {
             if (isStaleVersion) purgedLegacy = true;
             return caches.delete(cacheName);
@@ -277,11 +277,12 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // On dev hosts (localhost / ais-dev-*), NEVER cache or intercept Next.js chunks, HTML navigations,
-  // or RSC payloads so Turbopack rebuilds always load fresh matching module factories.
+  // On dev hosts (localhost / ais-dev-*), NEVER cache or intercept Next.js chunks, API responses,
+  // HTML navigations, or RSC payloads so local rebuilds/data edits reflect immediately.
   if (
     IS_DEV_HOST &&
     (url.pathname.startsWith("/_next/") ||
+      url.pathname.startsWith("/api/") ||
       request.mode === "navigate" ||
       request.headers.get("RSC") === "1" ||
       url.searchParams.has("_rsc"))

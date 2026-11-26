@@ -19,11 +19,16 @@ import {
     Download,
     RefreshCw,
     CheckCircle2,
+    Route,
+    Pin,
+    PinOff,
 } from "lucide-react";
 import { Sheet, SheetContent } from "./Sheet";
 import { useCurrency } from "@/context/CurrencyContext";
 import { useInstantLocale } from "@/context/InstantLocaleContext";
 import { usePWA } from "@/context/PWAContext";
+import { useStaffStation } from "@/context/StaffStationContext";
+import StaffStationPicker from "@/components/staff/StaffStationPicker";
 import { CURRENCY_META, type Currency } from "@/lib/currency";
 import { triggerHaptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
@@ -58,9 +63,12 @@ export default function MoreSheet({ open, onOpenChange }: MoreSheetProps) {
     const t = useTranslations("More");
     const tNav = useTranslations("Nav");
     const tInstall = useTranslations("Install");
+    const tStaff = useTranslations("Staff");
     const { locale, setLocale } = useInstantLocale();
     const { theme, setTheme } = useTheme();
     const { currency, setCurrency } = useCurrency();
+    const { station, hydrated: stationHydrated, clearStation } = useStaffStation();
+    const [stationOpen, setStationOpen] = React.useState(false);
     const {
         isInstalled,
         isCachingLocalAssets,
@@ -254,10 +262,83 @@ export default function MoreSheet({ open, onOpenChange }: MoreSheetProps) {
                     </div>
                 </section>
 
+                {/* Postal Staff (Optional Duty Station) */}
+                <section className="mb-5 rounded-2xl border border-border bg-card p-3.5 shadow-[var(--shadow-elev-1)] space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <Pin className="h-3.5 w-3.5 text-primary shrink-0" aria-hidden="true" />
+                            <h3 className="label-mono truncate">{tStaff("sectionTitle")}</h3>
+                        </div>
+                        {!stationHydrated || !station ? (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    triggerHaptic("light");
+                                    setStationOpen((v) => !v);
+                                }}
+                                className="tap rounded-lg border border-border bg-background px-2.5 py-1 text-xs font-semibold hover:bg-muted shrink-0"
+                            >
+                                {stationOpen ? tInstall("close") : tStaff("setStation")}
+                            </button>
+                        ) : (
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        triggerHaptic("light");
+                                        setStationOpen((v) => !v);
+                                    }}
+                                    className="tap rounded-lg border border-border bg-background px-2.5 py-1 text-xs font-semibold hover:bg-muted"
+                                >
+                                    {tStaff("changeStation")}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        triggerHaptic("light");
+                                        clearStation();
+                                        setStationOpen(false);
+                                    }}
+                                    aria-label={tStaff("clearStation")}
+                                    className="tap rounded-lg border border-border bg-background p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                >
+                                    <PinOff className="h-3.5 w-3.5" aria-hidden="true" />
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {stationHydrated && station ? (
+                        <div className="rounded-xl border border-emerald-700/30 bg-emerald-500/10 px-3 py-2 text-xs">
+                            <p className="font-bold text-foreground truncate">
+                                {station.name}
+                                {station.shortCode ? ` [${station.shortCode}]` : ""}
+                            </p>
+                            <p className="font-mono text-[11px] text-muted-foreground truncate mt-0.5">
+                                {station.postalCode || "—"}
+                                {station.division ? ` · ${station.division}` : ""}
+                            </p>
+                        </div>
+                    ) : (
+                        <p className="text-xs text-muted-foreground">{tStaff("optionalHint")}</p>
+                    )}
+
+                    {stationOpen && (
+                        <StaffStationPicker
+                            compact
+                            defaultOpen
+                            onSelected={() => setStationOpen(false)}
+                        />
+                    )}
+                </section>
+
                 {/* Account & Quick Links */}
                 <section className="mb-5">
                     <h3 className="label-mono mb-2 px-1">{t("account")}</h3>
                     <div className="rounded-2xl border border-border bg-card divide-y divide-border/70 overflow-hidden shadow-[var(--shadow-elev-1)]">
+                        <Link href="/routing" onClick={close} className="tap flex items-center gap-3 px-3.5 py-3 font-medium hover:bg-muted/60">
+                            <Route className="h-5 w-5 text-primary" /> {tNav("routing")}
+                        </Link>
                         <Link href="/blog" onClick={close} className="tap flex items-center gap-3 px-3.5 py-3 font-medium hover:bg-muted/60">
                             <BookOpen className="h-5 w-5 text-muted-foreground" /> {tNav("blog")}
                         </Link>
