@@ -72,6 +72,7 @@
     │   ├── shell/             # BottomTabBar, MoreSheet, SiteFooter, PWA bridges
     │   └── tracking/          # TrackerClient, camera scanner, OCR drawer
     ├── content/blog/          # Fallback Markdown guides
+    ├── data/                  # Local offline fallback dataset when DATABASE_URL is unset
     ├── i18n/                  # next-intl routing & request config
     ├── lib/                   # Prisma client, rate calculator, OCR/tracking parsers, security, validations
     └── proxy.ts               # Locale redirect & security header middleware

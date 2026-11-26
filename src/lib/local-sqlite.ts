@@ -171,12 +171,12 @@ function toDisplayCase(raw: string): string {
 }
 
 /**
- * Fallback loader from bundled `data10.json` + `scraped_codes.json` when neither
+ * Fallback loader from bundled `src/data/offices-fallback.json` + `src/data/postal-codes-fallback.json` when neither
  * Postgres (`DATABASE_URL`) nor `prisma/dev.db` is available in local development.
  */
 function loadOfficesFromBundledJson(): LocalOfficeRecord[] {
-    const data10Path = path.join(process.cwd(), "data10.json");
-    const scrapedPath = path.join(process.cwd(), "scraped_codes.json");
+    const data10Path = path.join(process.cwd(), "src", "data", "offices-fallback.json");
+    const scrapedPath = path.join(process.cwd(), "src", "data", "postal-codes-fallback.json");
 
     let scrapedMap: Record<string, string> = {};
     if (fs.existsSync(scrapedPath)) {
@@ -333,7 +333,7 @@ function loadOfficesFromBundledJson(): LocalOfficeRecord[] {
 
 /**
  * Loads and caches all Sri Lankan post offices from `prisma/dev.db`
- * (or falls back to bundled `data10.json` + `scraped_codes.json`),
+ * (or falls back to bundled `src/data/offices-fallback.json` + `src/data/postal-codes-fallback.json`),
  * with precomputed lowercase indices for O(1) id/slug lookup and sub-ms filtering.
  */
 export function loadLocalOffices(): LocalOfficeRecord[] {
