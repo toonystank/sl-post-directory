@@ -148,8 +148,18 @@ export const adminCreateUserSchema = z.object({
     role: roleSchema,
 });
 
-export const adminUpdateRoleSchema = z.object({
-    role: roleSchema,
+export const adminUpdateRoleSchema = z
+    .object({
+        role: roleSchema.optional(),
+        mailRoutingBetaEnabled: z.boolean().optional(),
+    })
+    .refine(
+        (data) => data.role !== undefined || data.mailRoutingBetaEnabled !== undefined,
+        "At least one field (role or mailRoutingBetaEnabled) is required"
+    );
+
+export const userBetaFeaturesSchema = z.object({
+    mailRoutingBetaEnabled: z.boolean(),
 });
 
 // Public Review Payload

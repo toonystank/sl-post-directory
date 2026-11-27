@@ -92,7 +92,7 @@ export default function SearchBar({
     const locale = useLocale();
     const router = useRouter();
     const { currency, lkrPerUsd } = useCurrency();
-    const { station, setStation } = useStaffStation();
+    const { station, setStation, mailRoutingEnabled } = useStaffStation();
 
     const [suggestions, setSuggestions] = useState<RichAutocompleteSuggestion[]>([]);
     const [showDropdown, setShowDropdown] = useState(false);
@@ -153,8 +153,8 @@ export default function SearchBar({
     }, [enableSmartHomeSearch]);
 
     const cyclingExamples = useMemo(
-        () => getSearchCyclingExamples(locale),
-        [locale]
+        () => getSearchCyclingExamples(locale, mailRoutingEnabled),
+        [locale, mailRoutingEnabled]
     );
 
     // Cycle example placeholder texts cleanly while resting; pause immediately when active or typing
@@ -194,6 +194,7 @@ export default function SearchBar({
 
     // Hydrate the compact index immediately when the user types a route query like "kandy to jafna" or "to jafna"
     useEffect(() => {
+        if (!mailRoutingEnabled) return;
         const isPair = Boolean(parseRouteQueryPair(query));
         const isSingleStaffRoute = Boolean(station && parseSingleSidedRouteQuery(query));
         if (!isPair && !isSingleStaffRoute) return;
@@ -207,15 +208,15 @@ export default function SearchBar({
         return () => {
             cancelled = true;
         };
-    }, [query, station]);
+    }, [mailRoutingEnabled, query, station]);
 
     const routeIntent = useMemo(() => {
-        if (!query.trim()) return null;
+        if (!mailRoutingEnabled || !query.trim()) return null;
         const engine = getLoadedOfficeIndexSync();
         if (!engine) return null;
         void indexVersion;
         return resolveSmartRouteIntent(query, engine.getRoutingNodes(), station?.slug);
-    }, [query, indexVersion, station?.slug]);
+    }, [mailRoutingEnabled, query, indexVersion, station?.slug]);
 
     const effectiveAutocompleteMode: "name" | "division" | "all" = enableSmartHomeSearch ? "all" : searchMode;
 
@@ -472,13 +473,16 @@ export default function SearchBar({
     const handleSubmit = () => {
         recordHistory(query);
         closeForNavigation();
-        if (routeIntent) {
+        if (mailRoutingEnabled && routeIntent) {
             setStation(toStaffStation(routeIntent.origin));
             triggerHaptic("light");
             router.push(routeIntent.routingHref);
             return;
         }
-        if (parseRouteQueryPair(query) || (station && parseSingleSidedRouteQuery(query))) {
+        if (
+            mailRoutingEnabled &&
+            (parseRouteQueryPair(query) || (station && parseSingleSidedRouteQuery(query)))
+        ) {
             void ensureLocalOfficeIndex().then((engine) => {
                 if (!engine) {
                     onSubmit();

@@ -35,13 +35,15 @@ export default function StaffNetworkPanel({ office }: StaffNetworkPanelProps) {
     const t = useTranslations("Office");
     const tStaff = useTranslations("Staff");
     const tRouting = useTranslations("Routing");
-    const { station, hydrated, setStation, clearStation } = useStaffStation();
+    const { station, hydrated, mailRoutingEnabled, setStation, clearStation } = useStaffStation();
     const [route, setRoute] = React.useState<ComputedMailRoute | null>(null);
     const [loadingRoute, setLoadingRoute] = React.useState(false);
     const [copied, setCopied] = React.useState(false);
 
-    const isCurrentStation = hydrated && station?.slug === office.slug;
-    const hasDifferentStation = Boolean(hydrated && station && station.slug !== office.slug);
+    const isCurrentStation = mailRoutingEnabled && hydrated && station?.slug === office.slug;
+    const hasDifferentStation = Boolean(
+        mailRoutingEnabled && hydrated && station && station.slug !== office.slug
+    );
 
     React.useEffect(() => {
         if (!hasDifferentStation || !station) {
@@ -106,38 +108,43 @@ export default function StaffNetworkPanel({ office }: StaffNetworkPanelProps) {
                     </h2>
                     <p className="text-sm text-muted-foreground mt-1">{t("networkLede")}</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    <Button
-                        type="button"
-                        variant={isCurrentStation ? "secondary" : "outline"}
-                        size="sm"
-                        onClick={handleToggleStation}
-                        className={
-                            isCurrentStation
-                                ? "border-emerald-700/60 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300"
-                                : undefined
-                        }
-                    >
-                        {isCurrentStation ? (
-                            <>
-                                <Check className="h-4 w-4 mr-1.5" aria-hidden="true" />
-                                <span>{tStaff("pinnedStation")}</span>
-                                <PinOff className="h-3.5 w-3.5 ml-1.5 opacity-70" aria-hidden="true" />
-                            </>
-                        ) : (
-                            <>
-                                <Pin className="h-4 w-4 mr-1.5" aria-hidden="true" />
-                                <span>{tStaff("pinAsStation")}</span>
-                            </>
-                        )}
-                    </Button>
-                    <Button asChild variant="outline" size="sm">
-                        <Link href={routingHref}>
-                            <Route className="h-4 w-4 mr-1.5" aria-hidden="true" />
-                            {t("openInRouteFinder")}
-                        </Link>
-                    </Button>
-                </div>
+                {mailRoutingEnabled && (
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        <Button
+                            type="button"
+                            variant={isCurrentStation ? "secondary" : "outline"}
+                            size="sm"
+                            onClick={handleToggleStation}
+                            className={
+                                isCurrentStation
+                                    ? "border-emerald-700/60 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300"
+                                    : undefined
+                            }
+                        >
+                            {isCurrentStation ? (
+                                <>
+                                    <Check className="h-4 w-4 mr-1.5" aria-hidden="true" />
+                                    <span>{tStaff("pinnedStation")}</span>
+                                    <PinOff className="h-3.5 w-3.5 ml-1.5 opacity-70" aria-hidden="true" />
+                                </>
+                            ) : (
+                                <>
+                                    <Pin className="h-4 w-4 mr-1.5" aria-hidden="true" />
+                                    <span>{tStaff("pinAsStation")}</span>
+                                </>
+                            )}
+                        </Button>
+                        <Button asChild variant="outline" size="sm">
+                            <Link href={routingHref}>
+                                <Route className="h-4 w-4 mr-1.5" aria-hidden="true" />
+                                <span>{t("openInRouteFinder")}</span>
+                                <span className="ml-1.5 rounded bg-amber-500/20 px-1 py-px font-mono text-[9px] font-extrabold uppercase text-amber-900 dark:text-amber-300">
+                                    Beta
+                                </span>
+                            </Link>
+                        </Button>
+                    </div>
+                )}
             </div>
 
             {hasDifferentStation && station && (

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth-guard";
 import { verifySameOrigin } from "@/lib/csrf";
 import { prisma } from "@/lib/prisma";
@@ -21,40 +22,91 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         const parsed = adminUpdateRoleSchema.safeParse(body);
         if (!parsed.success) {
             return NextResponse.json(
-                { error: parsed.error.issues[0]?.message || "Invalid role" },
+                { error: parsed.error.issues[0]?.message || "Invalid update payload" },
                 { status: 400 }
             );
         }
-        const { role } = parsed.data;
+        const { role, mailRoutingBetaEnabled } = parsed.data;
 
-        const targetUser = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true } });
+        const targetUser = await prisma.user.findUnique({
+            where: { id },
+            select: { id: true, role: true, mailRoutingBetaEnabled: true },
+        });
         if (!targetUser) {
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
-        // Prevent modifying the user's own role to avoid accidental lockouts
-        if (targetUser.id === auth.user.id) {
+        // Prevent modifying the user's own active role to avoid accidental lockouts,
+        // while allowing beta feature toggles on any account including self.
+        if (role !== undefined && role !== targetUser.role && targetUser.id === auth.user.id) {
             return NextResponse.json({ error: "Cannot modify your own active role." }, { status: 400 });
+        }
+
+        const updateData: { role?: string; mailRoutingBetaEnabled?: boolean } = {};
+        if (role !== undefined) updateData.role = role;
+        if (mailRoutingBetaEnabled !== undefined) {
+            updateData.mailRoutingBetaEnabled = mailRoutingBetaEnabled;
         }
 
         const updatedUser = await prisma.user.update({
             where: { id },
-            data: { role },
-            select: { id: true, name: true, email: true, role: true }
-        });
-
-        await prisma.actionLog.create({
-            data: {
-                userId: auth.user.id,
-                action: "UPDATED_USER_ROLE",
-                details: JSON.stringify({ targetUserId: id, previousRole: targetUser.role, newRole: role }),
+            data: updateData,
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                mailRoutingBetaEnabled: true,
             },
         });
 
-        return NextResponse.json({ success: true, user: updatedUser }, { headers: { "Cache-Control": "no-store" } });
+        const logs: Promise<unknown>[] = [];
+        if (role !== undefined && role !== targetUser.role) {
+            logs.push(
+                prisma.actionLog.create({
+                    data: {
+                        userId: auth.user.id,
+                        action: "UPDATED_USER_ROLE",
+                        details: JSON.stringify({
+                            targetUserId: id,
+                            previousRole: targetUser.role,
+                            newRole: role,
+                        }),
+                    },
+                })
+            );
+        }
+        if (
+            mailRoutingBetaEnabled !== undefined &&
+            mailRoutingBetaEnabled !== targetUser.mailRoutingBetaEnabled
+        ) {
+            logs.push(
+                prisma.actionLog.create({
+                    data: {
+                        userId: auth.user.id,
+                        action: "UPDATED_USER_BETA_FEATURES",
+                        details: JSON.stringify({
+                            targetUserId: id,
+                            mailRoutingBetaEnabled,
+                        }),
+                    },
+                })
+            );
+        }
+        if (logs.length > 0) {
+            await Promise.all(logs);
+        }
 
+        if (mailRoutingBetaEnabled !== undefined) {
+            revalidatePath("/routing");
+        }
+
+        return NextResponse.json(
+            { success: true, user: updatedUser },
+            { headers: { "Cache-Control": "no-store" } }
+        );
     } catch (error: unknown) {
-        console.error("Super Admin Edit User Role Error:", error);
+        console.error("Super Admin Edit User Error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

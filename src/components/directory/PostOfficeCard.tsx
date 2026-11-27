@@ -42,7 +42,7 @@ const PostOfficeCard = React.memo(function PostOfficeCard({ office }: PostOffice
     const tActions = useTranslations("Actions");
     const tOffice = useTranslations("Office");
     const tStaff = useTranslations("Staff");
-    const { station, hydrated } = useStaffStation();
+    const { station, hydrated, mailRoutingEnabled } = useStaffStation();
     const isMyStation = hydrated && station?.slug === office.slug;
 
     const fieldMap = Object.fromEntries(office.fields.map((f) => [f.name, f.value]));
@@ -260,13 +260,15 @@ const PostOfficeCard = React.memo(function PostOfficeCard({ office }: PostOffice
                     </a>
                 )}
 
-                <Link
-                    href={buildRoutingHref(office.slug, hydrated ? station : null)}
-                    className="tap flex h-10 items-center justify-center gap-1.5 px-2 text-foreground hover:bg-secondary/35 transition-colors"
-                >
-                    <Route className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
-                    <span>{tOffice("routeAction")}</span>
-                </Link>
+                {mailRoutingEnabled && (
+                    <Link
+                        href={buildRoutingHref(office.slug, hydrated ? station : null)}
+                        className="tap flex h-10 items-center justify-center gap-1.5 px-2 text-foreground hover:bg-secondary/35 transition-colors"
+                    >
+                        <Route className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                        <span>{tOffice("routeAction")}</span>
+                    </Link>
+                )}
 
                 <Link
                     href={`/office/${office.slug}`}

@@ -34,6 +34,7 @@ import StatusDot from "@/components/brand/StatusDot";
 import PhotoGallery from "@/components/office/PhotoGallery";
 import ControlledOfficesList, { type ControlledOfficeItem } from "@/components/office/ControlledOfficesList";
 import StaffNetworkPanel from "@/components/office/StaffNetworkPanel";
+import RmscHubLabel from "@/components/office/RmscHubLabel";
 import ReviewSection from "@/components/ReviewSection";
 import { PhotoUploadClient } from "./PhotoUploadClient";
 import OfficeActions from "./OfficeActions";
@@ -657,13 +658,7 @@ export default async function OfficeDetails({
                     <div className="flex items-center justify-between gap-4 py-3.5">
                         <dt className="label-mono">{t("rmsc")}</dt>
                         <dd className="text-right">
-                            <Link
-                                href={`/routing?tab=hubs&hub=${encodeURIComponent(effectiveRmsc)}`}
-                                className="inline-flex items-center gap-1.5 font-mono text-sm font-semibold text-primary hover:underline"
-                            >
-                                <span>{effectiveRmsc}</span>
-                                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                            </Link>
+                            <RmscHubLabel rmsc={effectiveRmsc} variant="detail" />
                         </dd>
                     </div>
 
@@ -719,12 +714,7 @@ export default async function OfficeDetails({
                                 <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
                             </>
                         )}
-                        <Link
-                            href={`/routing?tab=hubs&hub=${encodeURIComponent(effectiveRmsc)}`}
-                            className="rounded border border-primary/40 bg-primary/10 px-2 py-1 font-mono text-xs font-bold text-primary hover:bg-primary/20"
-                        >
-                            {effectiveRmsc}
-                        </Link>
+                        <RmscHubLabel rmsc={effectiveRmsc} variant="chain" />
                         {controllingOffice && (
                             <>
                                 <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />

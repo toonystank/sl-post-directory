@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { UserPlus, Trash2, KeyRound, ShieldOff, MailCheck, RefreshCw } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { UserPlus, Trash2, KeyRound, ShieldOff, MailCheck, RefreshCw, Route } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent } from "@/components/shell/Sheet";
 import { showNativeToast } from "@/components/shell/NativeToast";
 import ConfirmDialog from "@/components/admin/ConfirmDialog";
+import { cn } from "@/lib/utils";
 
 type Role = "SUPER_ADMIN" | "ADMIN" | "MODERATOR" | "CONTRIBUTOR";
 
@@ -18,9 +20,11 @@ interface UserData {
     role: string;
     twoFactorEnabled?: boolean;
     emailVerified?: Date | null;
+    mailRoutingBetaEnabled?: boolean;
 }
 
 export default function UserManagementTable({ initialUsers }: { initialUsers: UserData[] }) {
+    const { data: session, update } = useSession();
     const [users, setUsers] = useState<UserData[]>(initialUsers);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -91,6 +95,38 @@ export default function UserManagementTable({ initialUsers }: { initialUsers: Us
             } else {
                 const err = (await res.json().catch(() => ({}))) as { error?: string };
                 setError(err.error || "Failed to update role.");
+            }
+        } catch {
+            setError("Network error occurred.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleToggleMailRouting = async (userId: string, nextValue: boolean) => {
+        setLoading(true);
+        setError("");
+        try {
+            const res = await fetch(`/api/admin/users/${userId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ mailRoutingBetaEnabled: nextValue }),
+            });
+            if (res.ok) {
+                setUsers((prev) =>
+                    prev.map((u) => (u.id === userId ? { ...u, mailRoutingBetaEnabled: nextValue } : u))
+                );
+                if ((session?.user as { id?: string } | undefined)?.id === userId) {
+                    await update();
+                }
+                showNativeToast(
+                    nextValue
+                        ? "Mail Routing Beta enabled for user"
+                        : "Mail Routing Beta disabled for user"
+                );
+            } else {
+                const err = (await res.json().catch(() => ({}))) as { error?: string };
+                setError(err.error || "Failed to update Mail Routing Beta access.");
             }
         } catch {
             setError("Network error occurred.");
@@ -275,6 +311,7 @@ export default function UserManagementTable({ initialUsers }: { initialUsers: Us
                                 <th className="px-5 py-3.5">User</th>
                                 <th className="px-5 py-3.5">Role</th>
                                 <th className="px-5 py-3.5">Security</th>
+                                <th className="px-5 py-3.5">Mail Route (Beta)</th>
                                 <th className="px-5 py-3.5 text-right">Actions</th>
                             </tr>
                         </thead>
@@ -306,6 +343,30 @@ export default function UserManagementTable({ initialUsers }: { initialUsers: Us
                                         <span>{u.twoFactorEnabled ? "2FA On" : "2FA Off"}</span>
                                         <span> · </span>
                                         <span>{u.emailVerified ? "Verified" : "Unverified"}</span>
+                                    </td>
+                                    <td className="px-5 py-3.5">
+                                        <button
+                                            type="button"
+                                            role="switch"
+                                            aria-checked={Boolean(u.mailRoutingBetaEnabled)}
+                                            aria-label={`Toggle Mail Routing Beta for ${u.email}`}
+                                            disabled={loading}
+                                            onClick={() =>
+                                                void handleToggleMailRouting(
+                                                    u.id,
+                                                    !u.mailRoutingBetaEnabled
+                                                )
+                                            }
+                                            className={cn(
+                                                "tap inline-flex items-center gap-2 rounded-full border border-foreground/40 px-2.5 py-1 text-xs font-bold transition-colors disabled:opacity-50",
+                                                u.mailRoutingBetaEnabled
+                                                    ? "bg-emerald-500/15 text-emerald-900 dark:text-emerald-300 border-emerald-700/50"
+                                                    : "bg-muted text-muted-foreground"
+                                            )}
+                                        >
+                                            <Route className="w-3.5 h-3.5" aria-hidden="true" />
+                                            <span>{u.mailRoutingBetaEnabled ? "Enabled" : "Off"}</span>
+                                        </button>
                                     </td>
                                     <td className="px-5 py-3.5 text-right">
                                         <div className="inline-flex items-center gap-1.5">
@@ -382,6 +443,31 @@ export default function UserManagementTable({ initialUsers }: { initialUsers: Us
                                 <p className="font-mono text-[11px] text-muted-foreground mt-1">
                                     {u.twoFactorEnabled ? "2FA Active" : "No 2FA"} · {u.emailVerified ? "Verified" : "Unverified"}
                                 </p>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs">
+                                <span className="inline-flex items-center gap-1.5 font-semibold">
+                                    <Route className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
+                                    <span>Mail Route (Beta)</span>
+                                </span>
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={Boolean(u.mailRoutingBetaEnabled)}
+                                    aria-label={`Toggle Mail Routing Beta for ${u.email}`}
+                                    disabled={loading}
+                                    onClick={() =>
+                                        void handleToggleMailRouting(u.id, !u.mailRoutingBetaEnabled)
+                                    }
+                                    className={cn(
+                                        "tap inline-flex items-center gap-1.5 rounded-full border border-foreground/40 px-2.5 py-1 font-mono text-[11px] font-bold transition-colors disabled:opacity-50",
+                                        u.mailRoutingBetaEnabled
+                                            ? "bg-emerald-500/15 text-emerald-900 dark:text-emerald-300 border-emerald-700/50"
+                                            : "bg-muted text-muted-foreground"
+                                    )}
+                                >
+                                    <span>{u.mailRoutingBetaEnabled ? "Enabled" : "Off"}</span>
+                                </button>
                             </div>
 
                             <div className="flex flex-wrap items-center gap-2">

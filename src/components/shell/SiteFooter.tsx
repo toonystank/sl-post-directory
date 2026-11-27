@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/navigation";
 import StampLogo from "@/components/brand/StampLogo";
 import { stripLocalePrefix } from "@/lib/locale";
+import { useStaffStation } from "@/context/StaffStationContext";
 
 const HIDDEN_ON = ["/login", "/register", "/dashboard"];
 
@@ -12,6 +13,7 @@ export default function SiteFooter() {
     const pathname = stripLocalePrefix(usePathname() || "/");
     const t = useTranslations("Footer");
     const tNav = useTranslations("Nav");
+    const { mailRoutingEnabled } = useStaffStation();
 
     if (HIDDEN_ON.some((p) => pathname.startsWith(p))) {
         return null;
@@ -30,7 +32,16 @@ export default function SiteFooter() {
                     <ul className="space-y-2 font-medium">
                         <li><Link href="/" className="hover:text-primary">{tNav("directory")}</Link></li>
                         <li><Link href="/browse" className="hover:text-primary">{t("browse")}</Link></li>
-                        <li><Link href="/routing" className="hover:text-primary">{tNav("routing")}</Link></li>
+                        {mailRoutingEnabled && (
+                            <li>
+                                <Link href="/routing" className="inline-flex items-center gap-1.5 hover:text-primary">
+                                    <span>{tNav("routing")}</span>
+                                    <span className="rounded bg-amber-500/20 px-1 py-px font-mono text-[9px] font-extrabold uppercase text-amber-900 dark:text-amber-300">
+                                        Beta
+                                    </span>
+                                </Link>
+                            </li>
+                        )}
                         <li><Link href="/calculator" className="hover:text-primary">{tNav("calculator")}</Link></li>
                         <li><Link href="/rates" className="hover:text-primary">Postage Rate Tables</Link></li>
                         <li><Link href="/blog" className="hover:text-primary">{tNav("blog")}</Link></li>

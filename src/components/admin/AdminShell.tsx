@@ -59,8 +59,8 @@ const ROUTE_TITLES: Array<{ match: (p: string) => boolean; title: string }> = [
     { match: (p) => p.startsWith("/dashboard/variables"), title: "Variables" },
     { match: (p) => p.startsWith("/dashboard/users"), title: "Users & Roles" },
     { match: (p) => p.startsWith("/dashboard/activity"), title: "Activity Log" },
-    { match: (p) => p.startsWith("/dashboard/profile") || p.startsWith("/dashboard/settings"), title: "Profile & 2FA" },
-    { match: (p) => p.startsWith("/dashboard/system"), title: "System & Ads" },
+    { match: (p) => p.startsWith("/dashboard/profile") || p.startsWith("/dashboard/settings"), title: "Profile & Beta" },
+    { match: (p) => p.startsWith("/dashboard/system"), title: "System & Features" },
 ];
 
 export default function AdminShell({ user, queueBadge, children }: AdminShellProps) {
@@ -103,7 +103,7 @@ export default function AdminShell({ user, queueBadge, children }: AdminShellPro
         : [
               { href: "/dashboard", label: "My Contributions", icon: LayoutDashboard, active: pathname === "/dashboard" },
               { href: "/dashboard/offices", label: "Search Directory", icon: Building2, active: pathname.startsWith("/dashboard/offices") },
-              { href: "/dashboard/profile", label: "Profile & 2FA", icon: UserCheck, active: pathname.startsWith("/dashboard/profile") },
+              { href: "/dashboard/profile", label: "Profile & Beta", icon: UserCheck, active: pathname.startsWith("/dashboard/profile") },
           ];
 
     const secondaryLinks = isModeratorPlus
@@ -118,9 +118,9 @@ export default function AdminShell({ user, queueBadge, children }: AdminShellPro
                   ? [{ href: "/dashboard/users", label: "Users & Roles", icon: Users, active: pathname.startsWith("/dashboard/users") }]
                   : []),
               { href: "/dashboard/activity", label: "Activity Log", icon: Clock, active: pathname.startsWith("/dashboard/activity") },
-              { href: "/dashboard/profile", label: "Profile & 2FA", icon: UserCheck, active: pathname.startsWith("/dashboard/profile") },
+              { href: "/dashboard/profile", label: "Profile & Beta", icon: UserCheck, active: pathname.startsWith("/dashboard/profile") },
               ...(isSuperAdmin
-                  ? [{ href: "/dashboard/system", label: "System & Backups", icon: Settings, active: pathname.startsWith("/dashboard/system") }]
+                  ? [{ href: "/dashboard/system", label: "System & Features", icon: Settings, active: pathname.startsWith("/dashboard/system") }]
                   : []),
           ]
         : [];

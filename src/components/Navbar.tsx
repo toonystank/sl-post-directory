@@ -37,7 +37,7 @@ export default function Navbar() {
     const tStaff = useTranslations("Staff");
     const { locale, setLocale, prefetchLocale } = useInstantLocale();
     const { isInstalled, canNativePrompt, isIOS, triggerInstall, isOfflineFallbackPage } = usePWA();
-    const { station, hydrated: stationHydrated } = useStaffStation();
+    const { station, hydrated: stationHydrated, mailRoutingEnabled } = useStaffStation();
     const [scrolled, setScrolled] = React.useState(false);
     const [hasMounted, setHasMounted] = React.useState(false);
     const [stationSheetOpen, setStationSheetOpen] = React.useState(false);
@@ -100,13 +100,15 @@ export default function Navbar() {
         : "";
 
     const navItems = [
-        { href: "/", label: t("home"), active: isHome, soon: false },
-        { href: "/calculator", label: t("calculator"), active: !isOfflineFallback && (pathname.startsWith("/calculator") || pathname.startsWith("/rates")), soon: false },
-        { href: "/browse", label: t("browse"), active: !isOfflineFallback && (pathname.startsWith("/browse") || pathname.startsWith("/office") || pathname.startsWith("/district")), soon: false },
-        { href: "/routing", label: t("routing"), active: !isOfflineFallback && pathname.startsWith("/routing"), soon: false },
-        { href: "/track", label: t("track"), active: !isOfflineFallback && pathname.startsWith("/track"), soon: false },
-        { href: "/blog", label: t("blog"), active: !isOfflineFallback && pathname.startsWith("/blog"), soon: false },
-        ...(isAdmin ? [{ href: "/dashboard", label: t("dashboard"), active: !isOfflineFallback && pathname.startsWith("/dashboard"), soon: false }] : []),
+        { href: "/", label: t("home"), active: isHome, soon: false, beta: false },
+        { href: "/calculator", label: t("calculator"), active: !isOfflineFallback && (pathname.startsWith("/calculator") || pathname.startsWith("/rates")), soon: false, beta: false },
+        { href: "/browse", label: t("browse"), active: !isOfflineFallback && (pathname.startsWith("/browse") || pathname.startsWith("/office") || pathname.startsWith("/district")), soon: false, beta: false },
+        ...(mailRoutingEnabled
+            ? [{ href: "/routing", label: t("routing"), active: !isOfflineFallback && pathname.startsWith("/routing"), soon: false, beta: true }]
+            : []),
+        { href: "/track", label: t("track"), active: !isOfflineFallback && pathname.startsWith("/track"), soon: false, beta: false },
+        { href: "/blog", label: t("blog"), active: !isOfflineFallback && pathname.startsWith("/blog"), soon: false, beta: false },
+        ...(isAdmin ? [{ href: "/dashboard", label: t("dashboard"), active: !isOfflineFallback && pathname.startsWith("/dashboard"), soon: false, beta: false }] : []),
     ];
 
     const goBack = () => {
@@ -234,6 +236,11 @@ export default function Navbar() {
                                 )}
                             >
                                 <span>{item.label}</span>
+                                {item.beta && (
+                                    <span className="hidden lg:inline-flex rounded bg-amber-500/20 px-1 py-px font-mono text-[9px] font-extrabold uppercase tracking-tight text-amber-900 dark:text-amber-300">
+                                        Beta
+                                    </span>
+                                )}
                                 {item.soon && (
                                     <span className="hidden xl:inline-flex rounded bg-secondary/70 px-1 py-px font-mono text-[9px] font-bold uppercase tracking-tight text-secondary-foreground">
                                         Soon

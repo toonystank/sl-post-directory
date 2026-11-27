@@ -14,6 +14,8 @@ const RATE_VARIABLE_KEYS = [
 
 interface PublicConfigPayload {
     adsEnabled: boolean;
+    mailRoutingBetaAvailable: boolean;
+    mailRoutingSelfOptIn: boolean;
     rateVariables: { key: string; value: string }[];
 }
 
@@ -35,6 +37,8 @@ export async function GET() {
 
     const fallback: PublicConfigPayload = {
         adsEnabled: true,
+        mailRoutingBetaAvailable: true,
+        mailRoutingSelfOptIn: true,
         rateVariables: [],
     };
 
@@ -50,7 +54,11 @@ export async function GET() {
         const [settings, variables] = await Promise.all([
             prisma.siteSettings.findUnique({
                 where: { id: "default" },
-                select: { adsEnabled: true },
+                select: {
+                    adsEnabled: true,
+                    mailRoutingBetaAvailable: true,
+                    mailRoutingSelfOptIn: true,
+                },
             }),
             prisma.siteVariable.findMany({
                 where: { key: { in: RATE_VARIABLE_KEYS } },
@@ -61,6 +69,8 @@ export async function GET() {
 
         const data: PublicConfigPayload = {
             adsEnabled: settings?.adsEnabled ?? true,
+            mailRoutingBetaAvailable: settings?.mailRoutingBetaAvailable ?? true,
+            mailRoutingSelfOptIn: settings?.mailRoutingSelfOptIn ?? true,
             rateVariables: variables,
         };
         setPublicConfigCache({ data, builtAt: Date.now() });

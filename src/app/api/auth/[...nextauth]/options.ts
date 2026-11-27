@@ -22,6 +22,7 @@ interface AuthenticatedUser {
     email: string;
     role: string;
     pwv: string;
+    mailRoutingBetaEnabled: boolean;
 }
 
 export const authOptions: AuthOptions = {
@@ -119,6 +120,7 @@ export const authOptions: AuthOptions = {
                     email: user.email,
                     role: user.role,
                     pwv: computePasswordVersion(user.passwordHash),
+                    mailRoutingBetaEnabled: Boolean(user.mailRoutingBetaEnabled),
                 };
             },
         }),
@@ -135,6 +137,26 @@ export const authOptions: AuthOptions = {
                 token.role = authUser.role;
                 token.id = authUser.id;
                 token.pwv = authUser.pwv;
+                token.mailRoutingBetaEnabled = Boolean(authUser.mailRoutingBetaEnabled);
+                if (hasDatabaseUrl) {
+                    try {
+                        const settings = await prisma.siteSettings.findUnique({
+                            where: { id: "default" },
+                            select: {
+                                mailRoutingBetaAvailable: true,
+                                mailRoutingSelfOptIn: true,
+                            },
+                        });
+                        token.mailRoutingBetaAvailable = settings?.mailRoutingBetaAvailable ?? true;
+                        token.mailRoutingSelfOptIn = settings?.mailRoutingSelfOptIn ?? true;
+                    } catch {
+                        token.mailRoutingBetaAvailable = true;
+                        token.mailRoutingSelfOptIn = true;
+                    }
+                } else {
+                    token.mailRoutingBetaAvailable = false;
+                    token.mailRoutingSelfOptIn = false;
+                }
                 token.revoked = false;
                 return token;
             }
@@ -147,16 +169,26 @@ export const authOptions: AuthOptions = {
 
             if (hasDatabaseUrl && userId) {
                 try {
-                    const dbUser = await prisma.user.findUnique({
-                        where: { id: userId },
-                        select: {
-                            role: true,
-                            name: true,
-                            email: true,
-                            passwordHash: true,
-                            emailVerified: true,
-                        },
-                    });
+                    const [dbUser, settings] = await Promise.all([
+                        prisma.user.findUnique({
+                            where: { id: userId },
+                            select: {
+                                role: true,
+                                name: true,
+                                email: true,
+                                passwordHash: true,
+                                emailVerified: true,
+                                mailRoutingBetaEnabled: true,
+                            },
+                        }),
+                        prisma.siteSettings.findUnique({
+                            where: { id: "default" },
+                            select: {
+                                mailRoutingBetaAvailable: true,
+                                mailRoutingSelfOptIn: true,
+                            },
+                        }),
+                    ]);
 
                     const isUnverifiedContributor =
                         dbUser?.role === "CONTRIBUTOR" && !dbUser.emailVerified;
@@ -171,11 +203,17 @@ export const authOptions: AuthOptions = {
                         delete token.email;
                         delete token.name;
                         delete token.pwv;
+                        delete token.mailRoutingBetaEnabled;
+                        delete token.mailRoutingBetaAvailable;
+                        delete token.mailRoutingSelfOptIn;
                         token.revoked = true;
                     } else {
                         token.role = dbUser.role;
                         token.name = dbUser.name;
                         token.email = dbUser.email;
+                        token.mailRoutingBetaEnabled = Boolean(dbUser.mailRoutingBetaEnabled);
+                        token.mailRoutingBetaAvailable = settings?.mailRoutingBetaAvailable ?? true;
+                        token.mailRoutingSelfOptIn = settings?.mailRoutingSelfOptIn ?? true;
                         if (typeof token.pwv !== "string") {
                             token.pwv = computePasswordVersion(dbUser.passwordHash);
                         }
@@ -192,6 +230,9 @@ export const authOptions: AuthOptions = {
                         delete token.email;
                         delete token.name;
                         delete token.pwv;
+                        delete token.mailRoutingBetaEnabled;
+                        delete token.mailRoutingBetaAvailable;
+                        delete token.mailRoutingSelfOptIn;
                         token.revoked = true;
                     }
                 }
@@ -205,9 +246,18 @@ export const authOptions: AuthOptions = {
                 return session;
             }
             if (session.user) {
-                const sessionUser = session.user as { role?: unknown; id?: unknown };
+                const sessionUser = session.user as {
+                    role?: unknown;
+                    id?: unknown;
+                    mailRoutingBetaEnabled?: unknown;
+                    mailRoutingBetaAvailable?: unknown;
+                    mailRoutingSelfOptIn?: unknown;
+                };
                 sessionUser.role = token.role;
                 sessionUser.id = token.id;
+                sessionUser.mailRoutingBetaEnabled = Boolean(token.mailRoutingBetaEnabled);
+                sessionUser.mailRoutingBetaAvailable = token.mailRoutingBetaAvailable !== false;
+                sessionUser.mailRoutingSelfOptIn = token.mailRoutingSelfOptIn !== false;
             }
             return session;
         },

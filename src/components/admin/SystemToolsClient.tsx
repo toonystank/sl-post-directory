@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { showNativeToast } from "@/components/shell/NativeToast";
 import ConfirmDialog from "./ConfirmDialog";
 import AdToggle from "@/app/[locale]/dashboard/AdToggle";
+import MailRoutingBetaToggle from "@/app/[locale]/dashboard/MailRoutingBetaToggle";
 
 export default function SystemToolsClient() {
     const [migrating, setMigrating] = React.useState(false);
@@ -43,6 +44,8 @@ export default function SystemToolsClient() {
             </header>
 
             <AdToggle />
+
+            <MailRoutingBetaToggle />
 
             <section className="rounded-md border-2 border-foreground bg-card p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-[3px_3px_0_0_hsl(var(--foreground))]">
                 <div className="flex items-start gap-3">

@@ -851,11 +851,14 @@ export function resolveSmartRouteIntent(
  * post offices, postcodes, areas, international country + weight rates,
  * COD calculations, and upcoming tracking.
  */
-export function getSearchCyclingExamples(locale: string = "en"): string[] {
+export function getSearchCyclingExamples(
+    locale: string = "en",
+    includeRoutingExample: boolean = false
+): string[] {
     if (locale === "si") {
         return [
             'විදේශ ගාස්තු: "Taiwan 5kg"',
-            'මාර්ග සෙවුම: "Kandy to Jaffna"',
+            ...(includeRoutingExample ? ['මාර්ග සෙවුම: "Kandy to Jaffna"'] : []),
             'කාර්යාල: "Nuwara Eliya", "22200"',
             'COD ගාස්තු: "COD 5000 1kg"',
             'විදේශ පාර්සල්: "Australia 2kg"',
@@ -872,7 +875,7 @@ export function getSearchCyclingExamples(locale: string = "en"): string[] {
     if (locale === "ta") {
         return [
             'வெளிநாட்டு கட்டணம்: "Taiwan 5kg"',
-            'வழி தேடல்: "Kandy to Jaffna"',
+            ...(includeRoutingExample ? ['வழி தேடல்: "Kandy to Jaffna"'] : []),
             'நிலையம்: "Nuwara Eliya", "22200"',
             'COD கட்டணம்: "COD 5000 1kg"',
             'வெளிநாட்டு பார்சல்: "Australia 2kg"',
@@ -888,7 +891,7 @@ export function getSearchCyclingExamples(locale: string = "en"): string[] {
     }
     return [
         'Try "Taiwan 5kg" · overseas rates',
-        'Mail route: "Kandy to Jaffna"',
+        ...(includeRoutingExample ? ['Mail route: "Kandy to Jaffna"'] : []),
         'Office or code: "Nuwara Eliya", "22200"',
         'Calculate COD: "COD 5000 1kg"',
         'Send abroad: "Australia 2kg", "UK 250g"',

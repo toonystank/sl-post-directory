@@ -555,7 +555,17 @@
     "tabGuideShort": "Guide",
     "tabQuizShort": "Quiz",
     "quickRoutes": "Quick",
-    "shareRoute": "Share"
+    "shareRoute": "Share",
+    "betaBadge": "Beta Feature",
+    "betaNotice": "Beta preview — verify critical mail dispatches against official Sri Lanka Post circulars.",
+    "betaGateTitle": "Mail Routing Hub (Beta)",
+    "betaGateSignInBody": "Mail Routing & Forwarding is currently in private Beta and disabled for public visitors. Sign in and enable it from your Profile if you want to test it.",
+    "betaGateEnableBody": "Mail Routing Beta is disabled for your account by default. You can opt in anytime from Profile → Beta Features.",
+    "betaGatePausedBody": "Mail Routing Beta is currently paused globally by an administrator while reported issues are resolved.",
+    "betaGateInviteOnlyBody": "Mail Routing Beta is currently restricted to admin-approved accounts. Ask an administrator to enable access for your user profile.",
+    "betaGateSignInCta": "Sign In to Access Beta",
+    "betaGateEnableCta": "Enable in Profile Settings",
+    "betaGateBackCta": "Back to Directory"
   },
   "Staff": {
     "sectionTitle": "Postal Staff",

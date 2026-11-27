@@ -8,6 +8,8 @@ import type { CompactOfficeIndex } from "./office-index";
 export interface PublicConfigCacheEntry {
     data: {
         adsEnabled: boolean;
+        mailRoutingBetaAvailable: boolean;
+        mailRoutingSelfOptIn: boolean;
         rateVariables: { key: string; value: string }[];
     };
     builtAt: number;

@@ -51,6 +51,7 @@ export async function POST(req: Request) {
                 name: true,
                 email: true,
                 role: true,
+                mailRoutingBetaEnabled: true,
             },
         });
 

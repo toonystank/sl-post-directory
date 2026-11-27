@@ -475,10 +475,19 @@ export default function RoutingHubClient() {
             <header className="rounded-xl border-2 border-foreground bg-card overflow-hidden shadow-[0_3px_0_0_hsl(var(--foreground))]">
                 <div className="airmail-stripe h-1.5 sm:h-2" aria-hidden="true" />
                 <div className="p-4 sm:p-6 md:p-7">
-                    <p className="label-mono text-primary mb-1 text-[10px] sm:text-xs">{t("kicker")}</p>
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <p className="label-mono text-primary text-[10px] sm:text-xs">{t("kicker")}</p>
+                        <span className="inline-flex items-center rounded border border-amber-700/50 bg-amber-500/15 px-1.5 py-0.5 font-mono text-[10px] font-extrabold uppercase tracking-wider text-amber-900 dark:text-amber-300">
+                            {t("betaBadge")}
+                        </span>
+                    </div>
                     <h1 className="display text-2xl sm:text-4xl md:text-5xl">{t("title")}</h1>
                     <p className="mt-1.5 text-xs sm:text-sm md:text-base text-muted-foreground max-w-2xl">
                         {t("subtitle")}
+                    </p>
+                    <p className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-amber-700/35 bg-amber-500/10 px-2.5 py-1 text-[11px] sm:text-xs font-medium text-amber-950 dark:text-amber-200">
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <span>{t("betaNotice")}</span>
                     </p>
                 </div>
             </header>

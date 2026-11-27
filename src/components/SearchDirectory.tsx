@@ -34,7 +34,7 @@ export default function SearchDirectory({
     const tBrowse = useTranslations("Browse");
     const tInstall = useTranslations("Install");
     const tStaff = useTranslations("Staff");
-    const { station, hydrated: stationHydrated, clearStation } = useStaffStation();
+    const { station, hydrated: stationHydrated, mailRoutingEnabled, clearStation } = useStaffStation();
     const serviceLabel = useServiceLabel();
 
     const {
@@ -373,13 +373,18 @@ export default function SearchDirectory({
                                 24h
                             </button>
 
-                            <Link
-                                href="/routing"
-                                className="tap shrink-0 inline-flex h-9 items-center gap-1.5 rounded-full border-[1.5px] border-primary/60 bg-primary/10 px-3 text-xs font-bold text-primary"
-                            >
-                                <Route className="h-3.5 w-3.5" aria-hidden="true" />
-                                <span>Mail Route</span>
-                            </Link>
+                            {mailRoutingEnabled && (
+                                <Link
+                                    href="/routing"
+                                    className="tap shrink-0 inline-flex h-9 items-center gap-1.5 rounded-full border-[1.5px] border-primary/60 bg-primary/10 px-3 text-xs font-bold text-primary"
+                                >
+                                    <Route className="h-3.5 w-3.5" aria-hidden="true" />
+                                    <span>Mail Route</span>
+                                    <span className="rounded bg-amber-500/20 px-1 py-px font-mono text-[9px] font-extrabold uppercase text-amber-900 dark:text-amber-300">
+                                        Beta
+                                    </span>
+                                </Link>
+                            )}
                         </div>
 
                         <div

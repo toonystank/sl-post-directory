@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useMailRoutingBeta } from "@/hooks/useMailRoutingBeta";
 import {
     parseStaffStation,
     serializeStaffStation,
@@ -13,6 +14,7 @@ export type { StaffStation } from "@/lib/staff-station";
 interface StaffStationContextValue {
     station: StaffStation | null;
     hydrated: boolean;
+    mailRoutingEnabled: boolean;
     setStation: (station: StaffStation) => void;
     clearStation: () => void;
 }
@@ -20,17 +22,20 @@ interface StaffStationContextValue {
 const StaffStationContext = React.createContext<StaffStationContextValue>({
     station: null,
     hydrated: false,
+    mailRoutingEnabled: false,
     setStation: () => {},
     clearStation: () => {},
 });
 
 /**
- * Hydration-safe global provider for a postal employee's current Duty Station.
- * Initial render always leaves `station = null` until localStorage hydrates on mount
- * so public visitors see zero visual difference and SSR never mismatches.
+ * Hydration-safe global provider for a postal employee's current Duty Station
+ * and Mail Routing (Beta) gate.
+ * Exposes `station = null` and `mailRoutingEnabled = false` unless the signed-in user
+ * has opted into Mail Routing Beta and it is globally available.
  */
 export function StaffStationProvider({ children }: { children: React.ReactNode }) {
-    const [station, setStationState] = React.useState<StaffStation | null>(null);
+    const { enabled: mailRoutingEnabled } = useMailRoutingBeta();
+    const [rawStation, setStationState] = React.useState<StaffStation | null>(null);
     const [hydrated, setHydrated] = React.useState(false);
 
     React.useEffect(() => {
@@ -72,9 +77,11 @@ export function StaffStationProvider({ children }: { children: React.ReactNode }
         }
     }, []);
 
+    const station = mailRoutingEnabled ? rawStation : null;
+
     const value = React.useMemo(
-        () => ({ station, hydrated, setStation, clearStation }),
-        [station, hydrated, setStation, clearStation]
+        () => ({ station, hydrated, mailRoutingEnabled, setStation, clearStation }),
+        [station, hydrated, mailRoutingEnabled, setStation, clearStation]
     );
 
     return (
