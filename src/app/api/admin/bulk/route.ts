@@ -1,18 +1,21 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireRole } from "@/lib/auth-guard";
+import { verifySameOrigin } from "@/lib/csrf";
 import { prisma } from "@/lib/prisma";
 import { invalidateOfficeIndexCache } from "@/lib/server-caches";
 import { adminBulkSchema } from "@/lib/validations";
 
 export async function POST(req: Request) {
     try {
-        const session = await getServerSession(authOptions);
-        const user = session?.user as { role?: string } | undefined;
+        const csrf = verifySameOrigin(req);
+        if (!csrf.ok) {
+            return NextResponse.json({ error: csrf.error }, { status: 403 });
+        }
 
-        if (!session || (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN")) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const auth = await requireRole(["ADMIN", "SUPER_ADMIN"]);
+        if (!auth.ok) {
+            return auth.response;
         }
 
         const body = await req.json();

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isUploadcareImageUrl, normalizeUploadcareImageUrl } from "./security";
+import { isSafeExternalHttpUrl, isUploadcareImageUrl, normalizeUploadcareImageUrl } from "./security";
 
 // Shared Schemas
 export const emailSchema = z.string().trim().email("Invalid email address").max(100);
@@ -111,12 +111,8 @@ const optionalSourceUrlSchema = z
     .optional()
     .refine((val) => {
         if (!val) return true;
-        try {
-            return new URL(val).protocol === "https:";
-        } catch {
-            return false;
-        }
-    }, "Official source URL must start with https://")
+        return isSafeExternalHttpUrl(val);
+    }, "Official source URL must be a valid public https:// URL")
     .transform((val) => {
         if (val === undefined) return undefined;
         return val && val.length > 0 ? val : null;
@@ -176,6 +172,7 @@ export const photoUploadSchema = z.object({
         .transform(normalizeUploadcareImageUrl),
     caption: z.string().trim().max(200).optional().default(""),
     turnstileToken: turnstileTokenSchema,
+    uploadTicket: z.string().trim().min(10).max(512).optional(),
 });
 
 // 6-digit TOTP token validation
@@ -183,3 +180,66 @@ export const totpTokenSchema = z
     .string()
     .trim()
     .regex(/^\d{6}$/, "Verification code must be 6 digits");
+
+// Password & 2FA management payloads
+export const changePasswordSchema = z.object({
+    currentPassword: z.string().min(1, "Current password is required").max(100),
+    newPassword: passwordSchema,
+});
+
+export const disable2faSchema = z.object({
+    password: z.string().min(1, "Password required to disable 2FA").max(100),
+});
+
+// Admin moderation & variable schemas
+export const moderateRequestSchema = z.object({
+    requestId: z.string().trim().min(1, "Request ID is required").max(64),
+    action: z.enum(["APPROVE", "REJECT", "MORE_INFO"]),
+});
+
+export const reviewModerationSchema = z.object({
+    reviewId: z.string().trim().min(1, "Review ID is required").max(64),
+    action: z.enum(["APPROVE", "REJECT"]),
+});
+
+export const photoApprovalSchema = z.object({
+    id: z.string().trim().min(1, "Photo ID is required").max(64),
+});
+
+const FORBIDDEN_VARIABLE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+export const siteVariableSchema = z.object({
+    key: z
+        .string()
+        .trim()
+        .min(1, "Key is required")
+        .max(80, "Key is too long")
+        .regex(/^[a-zA-Z0-9_.-]+$/, "Key may only contain letters, numbers, '.', '-', or '_'")
+        .refine((k) => !FORBIDDEN_VARIABLE_KEYS.has(k), "Invalid variable key"),
+    value: z.string().trim().min(1, "Value is required").max(20_000, "Value is too large"),
+    description: z.string().trim().max(300).optional(),
+});
+
+/**
+ * Safely extracts and validates bounded `field_*` custom fields from dynamic form payloads.
+ */
+export function extractValidatedDynamicFields(
+    data: Record<string, unknown>,
+    maxFields = 50
+): Array<{ name: string; value: string }> {
+    const extracted: Array<{ name: string; value: string }> = [];
+    for (const [key, rawValue] of Object.entries(data)) {
+        if (!key.startsWith("field_") || typeof rawValue !== "string") continue;
+        const name = key.slice("field_".length).trim();
+        const value = rawValue.trim();
+        if (!name || !value) continue;
+        if (name.length > 60 || value.length > 300) {
+            throw new Error("Custom field name or value exceeds maximum allowed length");
+        }
+        extracted.push({ name, value });
+        if (extracted.length > maxFields) {
+            throw new Error(`Too many custom fields (maximum ${maxFields})`);
+        }
+    }
+    return extracted;
+}

@@ -85,7 +85,7 @@ export default async function ProfileSettingsPage() {
                         <div className="p-5 sm:p-6">
                             <TwoFactorAuthManager
                                 enabled={user.twoFactorEnabled}
-                                backupCodes={user.backupCodes}
+                                backupCodeCount={user.backupCodes.length}
                             />
                         </div>
                     </div>

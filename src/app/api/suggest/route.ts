@@ -5,17 +5,28 @@ import bcrypt from "bcrypt";
 import crypto from "node:crypto";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/options";
-import { checkRateLimit, rateLimiters } from "@/lib/rate-limiter";
+import { checkRateLimit, rateLimiters, rateLimitHeaders } from "@/lib/rate-limiter";
 import { verifyTurnstile } from "@/lib/turnstile";
-import { suggestSchema, suggestAddSchema } from "@/lib/validations";
+import { verifySameOrigin } from "@/lib/csrf";
+import { suggestSchema, suggestAddSchema, extractValidatedDynamicFields } from "@/lib/validations";
+
+const DUMMY_BCRYPT_HASH = "$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
 
 export async function POST(req: Request) {
     try {
+        const csrf = verifySameOrigin(req);
+        if (!csrf.ok) {
+            return NextResponse.json({ error: csrf.error }, { status: 403 });
+        }
+
         // Enforce Rate Limit: Max 15 suggestions per hour per IP
         const rateLimit = await checkRateLimit(req, rateLimiters.suggest);
 
         if (rateLimit.isRateLimited) {
-            return NextResponse.json({ error: "Rate limit exceeded. Try again later." }, { status: 429 });
+            return NextResponse.json(
+                { error: "Rate limit exceeded. Try again later." },
+                { status: 429, headers: rateLimitHeaders(rateLimit) }
+            );
         }
 
         const body = (await req.json()) as Record<string, unknown>;
@@ -37,13 +48,24 @@ export async function POST(req: Request) {
         const officeId = isAddRequest ? null : typeof data.officeId === "string" ? data.officeId : null;
 
         const submitterName = typeof data.submitterName === "string" ? data.submitterName : undefined;
-        const submitterEmail = typeof data.submitterEmail === "string" ? data.submitterEmail : undefined;
+        const submitterEmailRaw = typeof data.submitterEmail === "string" ? data.submitterEmail : undefined;
+        const submitterEmail = submitterEmailRaw?.trim().toLowerCase();
         const submitterPassword = typeof data.submitterPassword === "string" ? data.submitterPassword : undefined;
         const turnstileToken = typeof data.turnstileToken === "string" ? data.turnstileToken : null;
         const name = typeof data.name === "string" ? data.name : undefined;
         const postalCode = typeof data.postalCode === "string" ? data.postalCode : undefined;
         const newFieldName = typeof data.newFieldName === "string" ? data.newFieldName : undefined;
         const newFieldValue = typeof data.newFieldValue === "string" ? data.newFieldValue : undefined;
+
+        let validatedDynamicFields: Array<{ name: string; value: string }>;
+        try {
+            validatedDynamicFields = extractValidatedDynamicFields(data, 50);
+        } catch (fieldErr) {
+            return NextResponse.json(
+                { error: fieldErr instanceof Error ? fieldErr.message : "Invalid custom fields" },
+                { status: 400 }
+            );
+        }
 
         const captcha = await verifyTurnstile(turnstileToken);
         if (!captcha.ok) {
@@ -67,12 +89,14 @@ export async function POST(req: Request) {
                 return NextResponse.json({ error: "Name, email, and password are required to create an account." }, { status: 400 });
             }
 
-            const existingUser = await prisma.user.findUnique({
-                where: { email: submitterEmail },
+            const existingUser = await prisma.user.findFirst({
+                where: { email: { equals: submitterEmail, mode: "insensitive" } },
+                select: { id: true },
             });
 
             if (existingUser) {
-                // Generic error to prevent user enumeration
+                // Equalize timing and return generic error to prevent email enumeration
+                await bcrypt.compare(submitterPassword, DUMMY_BCRYPT_HASH);
                 return NextResponse.json({ error: "Please log in to submit suggestions." }, { status: 400 });
             }
 
@@ -114,17 +138,10 @@ export async function POST(req: Request) {
         } = {
             name,
             postalCode,
-            fields: [],
+            fields: [...validatedDynamicFields],
         };
 
-        for (const [key, value] of Object.entries(data)) {
-            if (key.startsWith("field_") && key !== "type" && key !== "reason" && typeof value === "string") {
-                const fieldName = key.replace("field_", "");
-                changes.fields.push({ name: fieldName, value });
-            }
-        }
-
-        if (newFieldName && newFieldValue) {
+        if (newFieldName && newFieldValue && changes.fields.length < 50) {
             changes.fields.push({ name: newFieldName, value: newFieldValue });
         }
 

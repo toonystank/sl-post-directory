@@ -37,32 +37,58 @@ test("InMemorySlidingWindow bounds bucket map size via oldest-bucket eviction", 
     assert.equal(limiter.size, 3);
 });
 
-test("getClientIp prefers Vercel/Cloudflare/Netlify proxy headers cleanly", () => {
+test("getClientIp enforces strict platform-aware header trust and rejects spoofing", () => {
     const reqVercel = new Request("https://example.com", {
         headers: {
             "x-vercel-forwarded-for": "203.0.113.9, 10.0.0.1",
             "x-forwarded-for": "198.51.100.2",
+            "cf-connecting-ip": "198.51.100.42",
         },
     });
-    assert.equal(getClientIp(reqVercel), "203.0.113.9");
+    assert.equal(getClientIp(reqVercel, { VERCEL: "1" }), "10.0.0.1");
 
     const reqCf = new Request("https://example.com", {
         headers: {
             "cf-connecting-ip": "198.51.100.42",
+            "x-vercel-forwarded-for": "203.0.113.99",
         },
     });
-    assert.equal(getClientIp(reqCf), "198.51.100.42");
+    assert.equal(
+        getClientIp(reqCf, { TRUST_CLOUDFLARE_HEADERS: "true" }),
+        "198.51.100.42"
+    );
 
     const reqNetlify = new Request("https://example.com", {
         headers: {
             "x-nf-client-connection-ip": "203.0.113.77",
-            "x-forwarded-for": "198.51.100.99",
+            "x-vercel-forwarded-for": "198.51.100.88",
+            "cf-connecting-ip": "198.51.100.99",
+            "x-forwarded-for": "198.51.100.11",
         },
     });
-    assert.equal(getClientIp(reqNetlify), "203.0.113.77");
+    assert.equal(getClientIp(reqNetlify, { NETLIFY: "true" }), "203.0.113.77");
+
+    // On generic/untrusted env, spoofed platform headers are ignored in favor of x-real-ip / rightmost x-forwarded-for
+    assert.equal(getClientIp(reqNetlify, {}), "198.51.100.11");
+
+    // IPv4-mapped IPv6 addresses normalize to IPv4
+    const reqMapped = new Request("https://example.com", {
+        headers: {
+            "x-nf-client-connection-ip": "::ffff:203.0.113.5",
+        },
+    });
+    assert.equal(getClientIp(reqMapped, { NETLIFY: "true" }), "203.0.113.5");
+
+    // Invalid IP syntax is rejected
+    const reqInvalid = new Request("https://example.com", {
+        headers: {
+            "x-real-ip": "spoofed-bucket-key",
+        },
+    });
+    assert.equal(getClientIp(reqInvalid, {}), "unknown");
 
     const reqFallback = new Request("https://example.com");
-    assert.equal(getClientIp(reqFallback), "unknown");
+    assert.equal(getClientIp(reqFallback, {}), "unknown");
 });
 
 test("rateLimitHeaders includes Retry-After only when rate-limited", () => {

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { getServerSession } from "next-auth";
 import { Prisma } from "@prisma/client";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireRole } from "@/lib/auth-guard";
+import { verifySameOrigin } from "@/lib/csrf";
 import { prisma } from "@/lib/prisma";
 import { sanitizeRichHtml } from "@/lib/sanitize-html";
 import { blogPostInputSchema } from "@/lib/validations";
@@ -22,11 +22,9 @@ function revalidateBlogRoutes(slug?: string) {
 }
 
 export async function GET(req: NextRequest) {
-    const session = await getServerSession(authOptions);
-    const userRole = (session?.user as { role?: string } | undefined)?.role;
-
-    if (!session || !userRole || !["SUPER_ADMIN", "ADMIN", "MODERATOR"].includes(userRole)) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN", "MODERATOR"]);
+    if (!auth.ok) {
+        return auth.response;
     }
 
     const searchParams = req.nextUrl.searchParams;
@@ -93,11 +91,14 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-    const session = await getServerSession(authOptions);
-    const userRole = (session?.user as { role?: string } | undefined)?.role;
+    const csrf = verifySameOrigin(req);
+    if (!csrf.ok) {
+        return NextResponse.json({ error: csrf.error }, { status: 403 });
+    }
 
-    if (!session || !userRole || !["SUPER_ADMIN", "ADMIN", "MODERATOR"].includes(userRole)) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN", "MODERATOR"]);
+    if (!auth.ok) {
+        return auth.response;
     }
 
     try {
@@ -152,7 +153,7 @@ export async function POST(req: NextRequest) {
                 coverCaption: coverCaption?.trim() || null,
                 featured,
                 sourceUrl: sourceUrl ?? null,
-                author: author || session.user?.name || "Admin",
+                author: author || auth.user.name || "Admin",
                 readingTime,
             },
         });

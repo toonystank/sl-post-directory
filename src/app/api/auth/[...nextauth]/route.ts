@@ -7,7 +7,14 @@ const handler = NextAuth(authOptions);
 
 // Custom POST handler to wrap NextAuth credentials login with rate limiting
 export async function POST(req: NextRequest, ctx: unknown) {
-    if (req.nextUrl.pathname.includes("/callback/credentials")) {
+    let normalizedPath = req.nextUrl.pathname.toLowerCase();
+    try {
+        normalizedPath = decodeURIComponent(req.nextUrl.pathname).toLowerCase();
+    } catch {
+        // Keep raw lowercased path on malformed percent-encoding
+    }
+
+    if (normalizedPath.includes("/callback/credentials")) {
         const rateLimit = await checkRateLimit(req, rateLimiters.login);
 
         if (rateLimit.isRateLimited) {

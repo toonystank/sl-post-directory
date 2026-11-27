@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { cache } from "react";
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
+import { sanitizeRichHtml } from "@/lib/sanitize-html";
 import type { BlogPost } from "@prisma/client";
 
 // Keep this type for backward compatibility where needed, 
@@ -80,7 +81,16 @@ export function markdownToHtml(markdown: string): string {
     html = html.replace(/^## (.+)$/gm, '<h2 class="text-2xl font-bold mt-10 mb-4 text-foreground">$1</h2>');
     html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-primary hover:underline" target="_blank" rel="noopener noreferrer">$1</a>');
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label: string, href: string) => {
+        const trimmed = href.trim();
+        const isSafe =
+            trimmed.startsWith("/") ||
+            trimmed.startsWith("#") ||
+            /^https?:\/\//i.test(trimmed);
+        if (!isSafe) return label;
+        const safeHref = trimmed.replace(/"/g, "&quot;");
+        return `<a href="${safeHref}" class="text-primary hover:underline" target="_blank" rel="noopener noreferrer">${label}</a>`;
+    });
     html = html.replace(/^- (.+)$/gm, '<li class="ml-4 mb-1">$1</li>');
     html = html.replace(/(<li[^>]*>.*<\/li>\n?)+/g, (match) => `<ul class="list-disc pl-6 my-4 space-y-1 text-muted-foreground">${match}</ul>`);
     
@@ -96,7 +106,7 @@ export function markdownToHtml(markdown: string): string {
         })
         .join("\n");
 
-    return html;
+    return sanitizeRichHtml(html);
 }
 
 // --- LOCAL MARKDOWN FALLBACK & DATABASE FETCHING LOGIC ---
@@ -173,16 +183,16 @@ export async function getAllPosts(): Promise<BlogPost[]> {
 
 export const getPostBySlug = cache(async function getPostBySlug(slug: string): Promise<BlogPost | null> {
     if (!hasDatabaseUrl) {
-        return getLocalMarkdownPosts().find((post) => post.slug === slug) ?? null;
+        return getLocalMarkdownPosts().find((post) => post.slug === slug && post.published) ?? null;
     }
 
     try {
-        const post = await prisma.blogPost.findUnique({
-            where: { slug },
+        const post = await prisma.blogPost.findFirst({
+            where: { slug, published: true },
         });
-        return post ?? getLocalMarkdownPosts().find((p) => p.slug === slug) ?? null;
+        return post ?? getLocalMarkdownPosts().find((p) => p.slug === slug && p.published) ?? null;
     } catch {
-        return getLocalMarkdownPosts().find((post) => post.slug === slug) ?? null;
+        return getLocalMarkdownPosts().find((post) => post.slug === slug && post.published) ?? null;
     }
 });
 

@@ -1,17 +1,20 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireRole } from "@/lib/auth-guard";
+import { verifySameOrigin } from "@/lib/csrf";
 import { prisma } from "@/lib/prisma";
 import { passwordSchema } from "@/lib/validations";
 import bcrypt from "bcrypt";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const session = await getServerSession(authOptions);
-        const currentUser = session?.user as { role?: string } | undefined;
+        const csrf = verifySameOrigin(req);
+        if (!csrf.ok) {
+            return NextResponse.json({ error: csrf.error }, { status: 403 });
+        }
 
-        if (!session || currentUser?.role !== "SUPER_ADMIN") {
-            return NextResponse.json({ error: "Unauthorized access" }, { status: 403 });
+        const auth = await requireRole(["SUPER_ADMIN"]);
+        if (!auth.ok) {
+            return auth.response;
         }
 
         const body = await req.json();
@@ -32,8 +35,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             select: { email: true },
         });
 
-        return NextResponse.json({ success: true, message: `Password reset successfully for ${updatedUser.email}` });
-    } catch (error) {
+        await prisma.actionLog.create({
+            data: {
+                userId: auth.user.id,
+                action: "ADMIN_RESET_PASSWORD",
+                details: JSON.stringify({ targetUserId: id }),
+            },
+        });
+
+        return NextResponse.json(
+            { success: true, message: `Password reset successfully for ${updatedUser.email}` },
+            { headers: { "Cache-Control": "no-store" } }
+        );
+    } catch (error: unknown) {
+        if (typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "P2025") {
+            return NextResponse.json({ error: "User not found" }, { status: 404 });
+        }
         console.error("Admin Password Reset Error:", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }

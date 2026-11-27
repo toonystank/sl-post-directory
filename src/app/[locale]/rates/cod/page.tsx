@@ -6,6 +6,7 @@ import {
     formatWeightLabel,
 } from "@/lib/postage-rates";
 import { formatLkrPlain } from "@/lib/rates-seo";
+import { safeJsonLd } from "@/lib/security";
 import { buildLocalizedAlternates, buildLocalizedUrl } from "@/lib/site";
 import PostageCalculator from "@/components/PostageCalculator";
 
@@ -68,12 +69,7 @@ export default async function CodRatesPage({
         <article className="container mx-auto max-w-5xl px-4 py-5 md:py-10 space-y-8">
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{
-                    __html: JSON.stringify(breadcrumbJsonLd)
-                        .replace(/</g, "\\u003c")
-                        .replace(/>/g, "\\u003e")
-                        .replace(/&/g, "\\u0026"),
-                }}
+                dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbJsonLd) }}
             />
 
             <header className="rounded-xl border-2 border-foreground bg-card overflow-hidden shadow-[4px_4px_0_0_hsl(var(--foreground))]">

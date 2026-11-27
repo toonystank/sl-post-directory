@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { getPostBySlug } from "@/lib/blog";
 import { sanitizeRichHtml } from "@/lib/sanitize-html";
-import { safeJsonLd } from "@/lib/security";
+import { isSafeExternalHttpUrl, safeJsonLd } from "@/lib/security";
 import { getVariablesMap, replacePlaceholders } from "@/lib/variables";
 import {
     buildLocalizedAlternates,
@@ -196,7 +196,7 @@ export default async function BlogArticlePage({
                 dangerouslySetInnerHTML={{ __html: htmlContent }}
             />
 
-            {post.sourceUrl && (
+            {post.sourceUrl && isSafeExternalHttpUrl(post.sourceUrl) && (
                 <div className="mt-8 rounded-md border-2 border-foreground bg-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="min-w-0">
                         <p className="label-mono">{t("officialSource")}</p>

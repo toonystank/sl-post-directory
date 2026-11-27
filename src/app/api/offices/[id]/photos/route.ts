@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import { verifySameOrigin } from "@/lib/csrf";
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
-import { checkRateLimit, rateLimiters, rateLimitHeaders } from "@/lib/rate-limiter";
+import { checkRateLimit, getClientIp, rateLimiters, rateLimitHeaders } from "@/lib/rate-limiter";
+import { extractUploadcareUuid } from "@/lib/security";
 import { verifyTurnstile } from "@/lib/turnstile";
+import { verifyAndStoreUploadcareFile, verifyUploadTicket } from "@/lib/uploadcare";
 import { photoUploadSchema } from "@/lib/validations";
 
 export async function POST(
@@ -9,6 +12,11 @@ export async function POST(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const csrf = verifySameOrigin(req);
+        if (!csrf.ok) {
+            return NextResponse.json({ error: csrf.error }, { status: 403 });
+        }
+
         const rateLimit = await checkRateLimit(req, rateLimiters.photos);
         if (rateLimit.isRateLimited) {
             return NextResponse.json(
@@ -36,11 +44,15 @@ export async function POST(
             );
         }
 
-        const { url, caption, turnstileToken } = parsed.data;
+        const { url, caption, turnstileToken, uploadTicket } = parsed.data;
+        const ip = getClientIp(req);
+        const ticketValid = uploadTicket ? verifyUploadTicket(uploadTicket, { officeId, ip }) : false;
 
-        const captcha = await verifyTurnstile(turnstileToken);
-        if (!captcha.ok) {
-            return NextResponse.json({ error: captcha.error }, { status: captcha.status });
+        if (!ticketValid) {
+            const captcha = await verifyTurnstile(turnstileToken);
+            if (!captcha.ok) {
+                return NextResponse.json({ error: captcha.error }, { status: captcha.status });
+            }
         }
 
         const office = await prisma.postOffice.findUnique({
@@ -50,6 +62,16 @@ export async function POST(
 
         if (!office) {
             return NextResponse.json({ error: "Post office not found" }, { status: 404 });
+        }
+
+        const fileUuid = extractUploadcareUuid(url);
+        if (!fileUuid) {
+            return NextResponse.json({ error: "Invalid Uploadcare photo URL" }, { status: 400 });
+        }
+
+        const verification = await verifyAndStoreUploadcareFile(fileUuid);
+        if (!verification.ok) {
+            return NextResponse.json({ error: verification.error }, { status: verification.status });
         }
 
         const photo = await prisma.communityPhoto.create({

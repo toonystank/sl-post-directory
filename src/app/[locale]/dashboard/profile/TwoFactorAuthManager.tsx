@@ -10,19 +10,18 @@ import Image from "next/image";
 
 interface TwoFactorAuthManagerProps {
     enabled: boolean;
-    backupCodes: string[];
+    backupCodeCount: number;
 }
 
 export default function TwoFactorAuthManager({
     enabled,
-    backupCodes: initialBackupCodes,
+    backupCodeCount: initialBackupCodeCount,
 }: TwoFactorAuthManagerProps) {
     const [is2FAEnabled, setIs2FAEnabled] = useState(enabled);
-    const [backupCodes, setBackupCodes] = useState<string[]>(initialBackupCodes);
+    const [backupCodeCount, setBackupCodeCount] = useState<number>(initialBackupCodeCount);
 
     const [setupStep, setSetupStep] = useState<"idle" | "qr" | "backup">("idle");
     const [qrCodeUrl, setQrCodeUrl] = useState("");
-    const [secret, setSecret] = useState("");
     const [newBackupCodes, setNewBackupCodes] = useState<string[]>([]);
     const [tokenInput, setTokenInput] = useState("");
     const [loading, setLoading] = useState(false);
@@ -38,14 +37,12 @@ export default function TwoFactorAuthManager({
             const res = await fetch("/api/user/2fa/setup", { method: "POST" });
             const data = (await res.json()) as {
                 qrCodeUrl: string;
-                secret: string;
                 backupCodes: string[];
                 error?: string;
             };
 
             if (res.ok) {
                 setQrCodeUrl(data.qrCodeUrl);
-                setSecret(data.secret);
                 setNewBackupCodes(data.backupCodes);
                 setSetupStep("qr");
             } else {
@@ -67,15 +64,13 @@ export default function TwoFactorAuthManager({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     token: tokenInput,
-                    secret,
-                    backupCodes: newBackupCodes,
                 }),
             });
             const data = (await res.json()) as { error?: string };
 
             if (res.ok) {
                 setIs2FAEnabled(true);
-                setBackupCodes(newBackupCodes);
+                setBackupCodeCount(newBackupCodes.length);
                 setSetupStep("backup");
                 showNativeToast("2FA enabled");
             } else {
@@ -101,7 +96,8 @@ export default function TwoFactorAuthManager({
 
             if (res.ok) {
                 setIs2FAEnabled(false);
-                setBackupCodes([]);
+                setBackupCodeCount(0);
+                setNewBackupCodes([]);
                 setIsDisableSheetOpen(false);
                 setDisablePassword("");
                 setSetupStep("idle");
@@ -142,10 +138,10 @@ export default function TwoFactorAuthManager({
                         <h3 className="font-heading text-base font-extrabold">Recovery Backup Codes</h3>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                        You have <strong className="text-foreground">{backupCodes.length}</strong> backup code
-                        {backupCodes.length === 1 ? "" : "s"} remaining. Each alphanumeric code works once on the Sign-In 2FA screen.
+                        You have <strong className="text-foreground">{backupCodeCount}</strong> backup code
+                        {backupCodeCount === 1 ? "" : "s"} remaining. Each alphanumeric code works once on the Sign-In 2FA screen.
                     </p>
-                    {backupCodes.length < 5 && (
+                    {backupCodeCount < 5 && (
                         <p className="text-xs font-semibold text-status-closing">
                             Running low on recovery codes — disable and re-enable 2FA to generate a fresh batch.
                         </p>
@@ -262,7 +258,7 @@ export default function TwoFactorAuthManager({
                                 Store these recovery codes safely. Each code works once if you lose your authenticator app.
                             </p>
                             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                                {backupCodes.map((code, i) => (
+                                {newBackupCodes.map((code, i) => (
                                     <div
                                         key={i}
                                         className="rounded-sm border border-foreground/40 bg-background p-2 text-center font-mono text-xs font-bold tracking-wider"
@@ -276,7 +272,8 @@ export default function TwoFactorAuthManager({
                                 variant="outline"
                                 className="w-full h-11 border-2 border-foreground font-bold"
                                 onClick={() => {
-                                    copyToClipboard(backupCodes.join("\n"), "Backup codes copied");
+                                    copyToClipboard(newBackupCodes.join("\n"), "Backup codes copied");
+                                    setNewBackupCodes([]);
                                     setSetupStep("idle");
                                 }}
                             >
@@ -304,25 +301,10 @@ export default function TwoFactorAuthManager({
 
                 <div className="space-y-5 flex-1 w-full">
                     <div className="space-y-2">
-                        <p className="label-mono">Step 1 · Scan QR or Enter Key</p>
+                        <p className="label-mono">Step 1 · Scan QR Code</p>
                         <p className="text-sm text-muted-foreground">
-                            Scan using Google Authenticator, Authy, or 1Password:
+                            Scan this QR code using Google Authenticator, Authy, or 1Password:
                         </p>
-                        <div className="flex items-center gap-2">
-                            <code className="rounded-sm border border-border bg-muted px-2.5 py-1.5 font-mono text-xs break-all">
-                                {secret}
-                            </code>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-10 w-10 p-0 shrink-0"
-                                aria-label="Copy secret key"
-                                onClick={() => copyToClipboard(secret, "Secret key copied")}
-                            >
-                                <Copy className="w-4 h-4" aria-hidden="true" />
-                            </Button>
-                        </div>
                     </div>
 
                     <div className="space-y-2">

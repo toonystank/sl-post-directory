@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifySameOrigin } from "@/lib/csrf";
 import { checkRateLimit, rateLimitHeaders, rateLimiters } from "@/lib/rate-limiter";
 import { signUpstreamSessionCookie } from "@/lib/tracking/session-token";
 import type { SlpCaptchaApiResponse } from "@/lib/tracking/types";
@@ -7,6 +8,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const SLP_CAPTCHA_URL = "https://slpmail.slpost.gov.lk/track/captcha.php";
+const MAX_CAPTCHA_BYTES = 256_000;
 const BROWSER_UA =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
@@ -24,6 +26,14 @@ function detectImageMime(buf: Buffer): string {
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse<SlpCaptchaApiResponse>> {
+    const csrf = verifySameOrigin(req);
+    if (!csrf.ok) {
+        return NextResponse.json(
+            { success: false, error: csrf.error },
+            { status: 403, headers: { "Cache-Control": "no-store" } }
+        );
+    }
+
     const rl = await checkRateLimit(req, rateLimiters.tracking);
     const headers = {
         ...rateLimitHeaders(rl),
@@ -46,6 +56,7 @@ export async function GET(req: NextRequest): Promise<NextResponse<SlpCaptchaApiR
                 Referer: "https://slpmail.slpost.gov.lk/track/",
             },
             cache: "no-store",
+            redirect: "error",
             signal: AbortSignal.timeout(12000),
         });
 
@@ -69,7 +80,7 @@ export async function GET(req: NextRequest): Promise<NextResponse<SlpCaptchaApiR
 
         const arrayBuf = await res.arrayBuffer();
         const buf = Buffer.from(arrayBuf);
-        if (buf.length < 50) {
+        if (buf.length < 50 || buf.length > MAX_CAPTCHA_BYTES) {
             throw new Error("SLP server returned an invalid CAPTCHA image");
         }
 

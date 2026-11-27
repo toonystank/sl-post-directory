@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireRole } from "@/lib/auth-guard";
+import { verifySameOrigin } from "@/lib/csrf";
 import { prisma } from "@/lib/prisma";
 import { invalidateOfficeIndexCache } from "@/lib/server-caches";
 import { generateSlug } from "@/lib/utils";
+import { moderateRequestSchema } from "@/lib/validations";
 import { sendEditRequestApprovedEmail, sendEditRequestRejectedEmail, sendEditRequestMoreInfoEmail } from "@/lib/email";
 
 interface EditChangeField {
@@ -20,19 +21,27 @@ interface ParsedEditChanges {
 
 export async function POST(req: Request) {
     try {
-        const session = await getServerSession(authOptions);
-        const user = session?.user as { id?: string; role?: string } | undefined;
-
-        if (!session || !user?.id || (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN" && user?.role !== "MODERATOR")) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const csrf = verifySameOrigin(req);
+        if (!csrf.ok) {
+            return NextResponse.json({ error: csrf.error }, { status: 403 });
         }
 
-        const body = (await req.json()) as { requestId?: string; action?: string };
-        const { requestId, action } = body;
-
-        if (!requestId || !action || !["APPROVE", "REJECT", "MORE_INFO"].includes(action)) {
-            return NextResponse.json({ error: "Invalid request parameters" }, { status: 400 });
+        const auth = await requireRole(["ADMIN", "SUPER_ADMIN", "MODERATOR"]);
+        if (!auth.ok) {
+            return auth.response;
         }
+        const user = auth.user;
+
+        const body = await req.json();
+        const parsedBody = moderateRequestSchema.safeParse(body);
+        if (!parsedBody.success) {
+            return NextResponse.json(
+                { error: parsedBody.error.issues[0]?.message || "Invalid request parameters" },
+                { status: 400 }
+            );
+        }
+
+        const { requestId, action } = parsedBody.data;
 
         const editRequest = await prisma.editRequest.findUnique({
             where: { id: requestId },
@@ -47,6 +56,19 @@ export async function POST(req: Request) {
         }
 
         const parsedChanges = JSON.parse(editRequest.changes || "{}") as ParsedEditChanges;
+        const boundedFields = Array.isArray(parsedChanges.fields)
+            ? parsedChanges.fields
+                  .filter(
+                      (f): f is { name: string; value: string } =>
+                          Boolean(f?.name && typeof f.name === "string" && typeof f.value === "string")
+                  )
+                  .slice(0, 50)
+                  .map((f) => ({
+                      name: f.name.trim().slice(0, 60),
+                      value: f.value.trim().slice(0, 300),
+                  }))
+                  .filter((f) => f.name.length > 0 && f.value.length > 0)
+            : [];
         const officeName = editRequest.postOffice?.name || parsedChanges.name || "New Post Office";
 
         if (editRequest.status !== "PENDING" && editRequest.status !== "MORE_INFO") {
@@ -54,18 +76,26 @@ export async function POST(req: Request) {
         }
 
         if (action === "REJECT") {
-            await prisma.editRequest.update({
-                where: { id: requestId },
-                data: { status: "REJECTED" },
+            const transition = await prisma.$transaction(async (tx) => {
+                const updated = await tx.editRequest.updateMany({
+                    where: { id: requestId, status: { in: ["PENDING", "MORE_INFO"] } },
+                    data: { status: "REJECTED" },
+                });
+                if (updated.count !== 1) return false;
+
+                await tx.actionLog.create({
+                    data: {
+                        userId: user.id,
+                        action: "REJECTED_EDIT",
+                        details: JSON.stringify({ requestId, type: editRequest.type, postOfficeName: officeName }),
+                    },
+                });
+                return true;
             });
 
-            await prisma.actionLog.create({
-                data: {
-                    userId: user.id,
-                    action: "REJECTED_EDIT",
-                    details: JSON.stringify({ requestId, type: editRequest.type, postOfficeName: officeName }),
-                },
-            });
+            if (!transition) {
+                return NextResponse.json({ error: "Request is already processed" }, { status: 409 });
+            }
 
             await sendEditRequestRejectedEmail(
                 editRequest.requestedBy.email,
@@ -77,18 +107,26 @@ export async function POST(req: Request) {
         }
 
         if (action === "MORE_INFO") {
-            await prisma.editRequest.update({
-                where: { id: requestId },
-                data: { status: "MORE_INFO" },
+            const transition = await prisma.$transaction(async (tx) => {
+                const updated = await tx.editRequest.updateMany({
+                    where: { id: requestId, status: { in: ["PENDING", "MORE_INFO"] } },
+                    data: { status: "MORE_INFO" },
+                });
+                if (updated.count !== 1) return false;
+
+                await tx.actionLog.create({
+                    data: {
+                        userId: user.id,
+                        action: "REQUESTED_MORE_INFO",
+                        details: JSON.stringify({ requestId, type: editRequest.type, postOfficeName: officeName }),
+                    },
+                });
+                return true;
             });
 
-            await prisma.actionLog.create({
-                data: {
-                    userId: user.id,
-                    action: "REQUESTED_MORE_INFO",
-                    details: JSON.stringify({ requestId, type: editRequest.type, postOfficeName: officeName }),
-                },
-            });
+            if (!transition) {
+                return NextResponse.json({ error: "Request is already processed" }, { status: 409 });
+            }
 
             await sendEditRequestMoreInfoEmail(
                 editRequest.requestedBy.email,
@@ -102,7 +140,13 @@ export async function POST(req: Request) {
         if (action === "APPROVE") {
             let affectedSlug = editRequest.postOffice?.slug;
 
-            await prisma.$transaction(async (tx) => {
+            const approved = await prisma.$transaction(async (tx) => {
+                const claimed = await tx.editRequest.updateMany({
+                    where: { id: requestId, status: { in: ["PENDING", "MORE_INFO"] } },
+                    data: { status: "APPROVED" },
+                });
+                if (claimed.count !== 1) return false;
+
                 if (editRequest.type === "REMOVAL") {
                     if (editRequest.postOfficeId) {
                         const targetOfficeId = editRequest.postOfficeId;
@@ -123,8 +167,8 @@ export async function POST(req: Request) {
                         });
                     }
                 } else if (editRequest.type === "ADD") {
-                    const addName = parsedChanges.name || "Post Office";
-                    const addPostalCode = parsedChanges.postalCode || "";
+                    const addName = (parsedChanges.name || "Post Office").trim().slice(0, 100);
+                    const addPostalCode = (parsedChanges.postalCode || "").trim().slice(0, 20);
                     const baseSlug = generateSlug(addName);
                     const existingSlug = await tx.postOffice.findUnique({
                         where: { slug: baseSlug },
@@ -140,14 +184,11 @@ export async function POST(req: Request) {
                             slug: finalSlug,
                             postalCode: addPostalCode,
                             fields: {
-                                create:
-                                    parsedChanges.fields
-                                        ?.filter((f): f is { name: string; value: string } => Boolean(f?.name && typeof f.value === "string"))
-                                        .map((field) => ({
-                                            name: field.name,
-                                            value: field.value,
-                                            type: "TEXT",
-                                        })) || [],
+                                create: boundedFields.map((field) => ({
+                                    name: field.name,
+                                    value: field.value,
+                                    type: "TEXT",
+                                })),
                             },
                         },
                     });
@@ -163,12 +204,12 @@ export async function POST(req: Request) {
                     await tx.postOffice.update({
                         where: { id: editRequest.postOfficeId },
                         data: {
-                            name: parsedChanges.name || editRequest.postOffice?.name,
-                            postalCode: parsedChanges.postalCode || editRequest.postOffice?.postalCode,
+                            name: (parsedChanges.name || editRequest.postOffice?.name || "").slice(0, 100),
+                            postalCode: (parsedChanges.postalCode || editRequest.postOffice?.postalCode || "").slice(0, 20),
                         },
                     });
 
-                    if (parsedChanges.fields && Array.isArray(parsedChanges.fields) && parsedChanges.fields.length > 0) {
+                    if (boundedFields.length > 0) {
                         const existingFields = await tx.postOfficeField.findMany({
                             where: { postOfficeId: editRequest.postOfficeId },
                             select: { id: true, name: true },
@@ -178,8 +219,7 @@ export async function POST(req: Request) {
                         const updates: Promise<unknown>[] = [];
                         const toCreate: { name: string; value: string; type: string; postOfficeId: string }[] = [];
 
-                        for (const field of parsedChanges.fields) {
-                            if (!field?.name || typeof field.value !== "string") continue;
+                        for (const field of boundedFields) {
                             const existingId = existingByName.get(field.name);
                             if (existingId) {
                                 updates.push(
@@ -190,7 +230,7 @@ export async function POST(req: Request) {
                                 );
                             } else {
                                 toCreate.push({
-                                    name: String(field.name),
+                                    name: field.name,
                                     value: field.value,
                                     type: "TEXT",
                                     postOfficeId: editRequest.postOfficeId,
@@ -207,19 +247,19 @@ export async function POST(req: Request) {
                     }
                 }
 
-                await tx.editRequest.update({
-                    where: { id: requestId },
-                    data: { status: "APPROVED" },
-                });
-
                 await tx.actionLog.create({
                     data: {
-                        userId: user.id!,
+                        userId: user.id,
                         action: "APPROVED_EDIT",
                         details: JSON.stringify({ requestId, type: editRequest.type, postOfficeName: officeName }),
                     },
                 });
+                return true;
             });
+
+            if (!approved) {
+                return NextResponse.json({ error: "Request is already processed" }, { status: 409 });
+            }
 
             invalidateOfficeIndexCache();
             revalidatePath("/");

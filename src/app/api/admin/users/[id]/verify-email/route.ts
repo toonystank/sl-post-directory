@@ -1,17 +1,19 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireRole } from "@/lib/auth-guard";
+import { verifySameOrigin } from "@/lib/csrf";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const { id } = await params;
-        const session = await getServerSession(authOptions);
-        const user = session?.user as { role?: string, email?: string } | undefined;
+        const csrf = verifySameOrigin(req);
+        if (!csrf.ok) {
+            return NextResponse.json({ error: csrf.error }, { status: 403 });
+        }
 
-        // Ensure only SUPER_ADMIN or ADMIN can access
-        if (!session || (user?.role !== "SUPER_ADMIN" && user?.role !== "ADMIN")) {
-            return NextResponse.json({ error: "Unauthorized. Admin access required." }, { status: 401 });
+        const { id } = await params;
+        const auth = await requireRole(["SUPER_ADMIN"]);
+        if (!auth.ok) {
+            return auth.response;
         }
 
         const targetUser = await prisma.user.findUnique({ where: { id } });
@@ -26,11 +28,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
         const updatedUser = await prisma.user.update({
             where: { id },
-            data: { emailVerified: new Date() },
+            data: { emailVerified: new Date(), verificationToken: null },
             select: { id: true, name: true, email: true, emailVerified: true }
         });
 
-        return NextResponse.json({ success: true, user: updatedUser });
+        await prisma.actionLog.create({
+            data: {
+                userId: auth.user.id,
+                action: "ADMIN_VERIFY_EMAIL",
+                details: JSON.stringify({ targetUserId: id }),
+            },
+        });
+
+        return NextResponse.json({ success: true, user: updatedUser }, { headers: { "Cache-Control": "no-store" } });
 
     } catch (error: unknown) {
         console.error("Force Verify Email Error:", error);

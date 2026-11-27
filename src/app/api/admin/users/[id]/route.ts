@@ -1,30 +1,39 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireRole } from "@/lib/auth-guard";
+import { verifySameOrigin } from "@/lib/csrf";
 import { prisma } from "@/lib/prisma";
-
-const VALID_ROLES = ["CONTRIBUTOR", "MODERATOR", "ADMIN", "SUPER_ADMIN"] as const;
+import { adminUpdateRoleSchema } from "@/lib/validations";
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const { id } = await params;
-        const session = await getServerSession(authOptions);
-        const user = session?.user as { role?: string, email?: string } | undefined;
+        const csrf = verifySameOrigin(req);
+        if (!csrf.ok) {
+            return NextResponse.json({ error: csrf.error }, { status: 403 });
+        }
 
-        if (!session || user?.role !== "SUPER_ADMIN") {
-            return NextResponse.json({ error: "Unauthorized. Super Admin access required." }, { status: 401 });
+        const { id } = await params;
+        const auth = await requireRole(["SUPER_ADMIN"]);
+        if (!auth.ok) {
+            return auth.response;
         }
 
         const body = await req.json();
-        const { role } = body;
+        const parsed = adminUpdateRoleSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: parsed.error.issues[0]?.message || "Invalid role" },
+                { status: 400 }
+            );
+        }
+        const { role } = parsed.data;
 
-        if (!role || !VALID_ROLES.includes(role)) {
-            return NextResponse.json({ error: `Invalid role. Must be one of: ${VALID_ROLES.join(", ")}` }, { status: 400 });
+        const targetUser = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true } });
+        if (!targetUser) {
+            return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
         // Prevent modifying the user's own role to avoid accidental lockouts
-        const targetUser = await prisma.user.findUnique({ where: { id } });
-        if (targetUser?.email === user.email) {
+        if (targetUser.id === auth.user.id) {
             return NextResponse.json({ error: "Cannot modify your own active role." }, { status: 400 });
         }
 
@@ -34,7 +43,15 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
             select: { id: true, name: true, email: true, role: true }
         });
 
-        return NextResponse.json({ success: true, user: updatedUser });
+        await prisma.actionLog.create({
+            data: {
+                userId: auth.user.id,
+                action: "UPDATED_USER_ROLE",
+                details: JSON.stringify({ targetUserId: id, previousRole: targetUser.role, newRole: role }),
+            },
+        });
+
+        return NextResponse.json({ success: true, user: updatedUser }, { headers: { "Cache-Control": "no-store" } });
 
     } catch (error: unknown) {
         console.error("Super Admin Edit User Role Error:", error);
@@ -44,16 +61,22 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const { id } = await params;
-        const session = await getServerSession(authOptions);
-        const user = session?.user as { role?: string, email?: string } | undefined;
-
-        if (!session || user?.role !== "SUPER_ADMIN") {
-            return NextResponse.json({ error: "Unauthorized. Super Admin access required." }, { status: 401 });
+        const csrf = verifySameOrigin(req);
+        if (!csrf.ok) {
+            return NextResponse.json({ error: csrf.error }, { status: 403 });
         }
 
-        const targetUser = await prisma.user.findUnique({ where: { id } });
-        if (targetUser?.email === user.email) {
+        const { id } = await params;
+        const auth = await requireRole(["SUPER_ADMIN"]);
+        if (!auth.ok) {
+            return auth.response;
+        }
+
+        const targetUser = await prisma.user.findUnique({ where: { id }, select: { id: true } });
+        if (!targetUser) {
+            return NextResponse.json({ error: "User not found" }, { status: 404 });
+        }
+        if (targetUser.id === auth.user.id) {
             return NextResponse.json({ error: "Cannot delete your own account." }, { status: 400 });
         }
 
@@ -62,9 +85,16 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
             await tx.actionLog.deleteMany({ where: { userId: id } });
             await tx.editRequest.deleteMany({ where: { requestedById: id } });
             await tx.user.delete({ where: { id } });
+            await tx.actionLog.create({
+                data: {
+                    userId: auth.user.id,
+                    action: "DELETED_USER",
+                    details: JSON.stringify({ targetUserId: id }),
+                },
+            });
         });
 
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ success: true }, { headers: { "Cache-Control": "no-store" } });
 
     } catch (error: unknown) {
         console.error("Super Admin Delete User Error:", error);

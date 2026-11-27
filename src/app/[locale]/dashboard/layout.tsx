@@ -19,11 +19,11 @@ export default async function DashboardLayout({
     const session = await getServerSession(authOptions);
     const user = session?.user as SessionUser | undefined;
 
-    if (!session || !user?.email) {
+    if (!session || !user?.id || !user?.email || !user?.role) {
         redirect("/login");
     }
 
-    const role = user.role || "CONTRIBUTOR";
+    const role = user.role;
     let queueBadge = 0;
 
     if (hasDatabaseUrl && ["SUPER_ADMIN", "ADMIN", "MODERATOR"].includes(role)) {

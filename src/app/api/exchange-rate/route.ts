@@ -33,6 +33,7 @@ export async function GET() {
         const timer = setTimeout(() => controller.abort(), 3000);
         const res = await fetch("https://open.er-api.com/v6/latest/USD", {
             signal: controller.signal,
+            redirect: "error",
             next: { revalidate: 3600 },
         });
         clearTimeout(timer);

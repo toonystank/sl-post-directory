@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import nodemailer, { type SendMailOptions } from "nodemailer";
 import { escapeHtml } from "@/lib/security";
 import { getSiteUrl } from "@/lib/site";
 
@@ -27,7 +27,7 @@ const getTransporter = () => {
 
 // Send via Resend HTTP API when configured with a verified sender domain,
 // fall back to Nodemailer SMTP when SMTP credentials exist, or log locally.
-const sendOrLog = async (options: nodemailer.SendMailOptions) => {
+const sendOrLog = async (options: SendMailOptions) => {
     const resendApiKey = process.env.RESEND_API_KEY?.trim();
     const resendFrom =
         process.env.EMAIL_FROM?.trim() || process.env.RESEND_FROM_EMAIL?.trim();
@@ -86,6 +86,13 @@ const sendOrLog = async (options: nodemailer.SendMailOptions) => {
         console.warn(
             "Email delivery skipped: RESEND_API_KEY is set, but EMAIL_FROM (verified custom domain sender) is missing."
         );
+    }
+
+    if (process.env.NODE_ENV === "production") {
+        const recipient = Array.isArray(options.to) ? options.to.join(", ") : String(options.to ?? "");
+        const domain = recipient.includes("@") ? recipient.split("@")[1] : "unknown";
+        console.warn(`[EMAIL NOT SENT - NO PROVIDER CONFIGURED] to domain: ${domain}, subject: ${options.subject}`);
+        return;
     }
 
     console.log("=====================================");

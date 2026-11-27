@@ -10,6 +10,7 @@ import {
     resolveCountryFromSlug,
 } from "@/lib/rates-seo";
 import { buildLocalizedAlternates, buildLocalizedUrl } from "@/lib/site";
+import { safeJsonLd } from "@/lib/security";
 import CountryFlag from "@/components/brand/CountryFlag";
 import PostageCalculator from "@/components/PostageCalculator";
 
@@ -80,30 +81,15 @@ export default async function CountryRatesPage({
         <article className="container mx-auto max-w-5xl px-4 py-5 md:py-10 space-y-8">
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{
-                    __html: JSON.stringify(breadcrumbJsonLd)
-                        .replace(/</g, "\\u003c")
-                        .replace(/>/g, "\\u003e")
-                        .replace(/&/g, "\\u0026"),
-                }}
+                dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbJsonLd) }}
             />
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{
-                    __html: JSON.stringify(seo1kg.faqJsonLd)
-                        .replace(/</g, "\\u003c")
-                        .replace(/>/g, "\\u003e")
-                        .replace(/&/g, "\\u0026"),
-                }}
+                dangerouslySetInnerHTML={{ __html: safeJsonLd(seo1kg.faqJsonLd) }}
             />
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{
-                    __html: JSON.stringify(seo1kg.serviceJsonLd)
-                        .replace(/</g, "\\u003c")
-                        .replace(/>/g, "\\u003e")
-                        .replace(/&/g, "\\u0026"),
-                }}
+                dangerouslySetInnerHTML={{ __html: safeJsonLd(seo1kg.serviceJsonLd) }}
             />
 
             {/* Breadcrumbs */}

@@ -178,9 +178,11 @@ export default function UserManagementTable({ initialUsers }: { initialUsers: Us
 
     const generateTempPassword = () => {
         const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#";
+        const randomBytes = new Uint32Array(12);
+        crypto.getRandomValues(randomBytes);
         let out = "";
         for (let i = 0; i < 12; i++) {
-            out += chars.charAt(Math.floor(Math.random() * chars.length));
+            out += chars.charAt(randomBytes[i] % chars.length);
         }
         setTempPassword(out);
     };

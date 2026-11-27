@@ -5,10 +5,15 @@ import { LOCALE_COOKIE_NAME, resolveMiddlewareLocaleRedirect } from "./lib/local
 
 const intlMiddleware = createMiddleware(routing);
 
-function applySecurityHeaders(response: NextResponse): NextResponse {
+const SENSITIVE_ROUTE_RE = /^\/(?:(?:en|si|ta)\/)?dashboard(?:\/|$)/i;
+
+function applySecurityHeaders(response: NextResponse, pathname?: string): NextResponse {
     response.headers.set("X-Content-Type-Options", "nosniff");
     response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
     response.headers.set("Permissions-Policy", "camera=(self), microphone=(), geolocation=(self), interest-cohort=()");
+    if (pathname && SENSITIVE_ROUTE_RE.test(pathname)) {
+        response.headers.set("Cache-Control", "private, no-store");
+    }
     return response;
 }
 
@@ -41,7 +46,7 @@ export default function proxy(request: NextRequest) {
     if (isSwPrecache) {
         response.headers.delete("set-cookie");
     }
-    return applySecurityHeaders(response);
+    return applySecurityHeaders(response, request.nextUrl.pathname);
 }
 
 export const config = {

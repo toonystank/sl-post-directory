@@ -1,6 +1,6 @@
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 import { queryLocalOffices } from "@/lib/local-sqlite";
-import { clampPagination } from "@/lib/security";
+import { clampPagination, escapeSqlLike } from "@/lib/security";
 import { formatSriLankaPhone, normalizePostalCode } from "@/lib/site";
 import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
@@ -211,103 +211,76 @@ export async function GET(request: NextRequest) {
                 ? primaryTerm.replace(/^0+/, "") || primaryTerm
                 : primaryTerm;
 
-            const whereClauses: string[] = [
-                `(similarity(p.name, $1) > 0.15 OR p.name ILIKE $1 || '%' OR p.name ILIKE '%' || $1 || '%' OR p."postalCode" ILIKE '%' || $1 || '%' OR (p."postalCode" ~ '^[0-9]+$' AND LPAD(p."postalCode", 5, '0') ILIKE '%' || $1 || '%') OR p."postalCode" = $4 OR EXISTS (SELECT 1 FROM "PostOfficeField" sc WHERE sc."postOfficeId" = p.id AND sc.name = 'Short Code' AND sc.value ILIKE $1 || '%'))`,
+            const escapedTerm = escapeSqlLike(primaryTerm);
+            const whereClauses: Prisma.Sql[] = [
+                Prisma.sql`(similarity(p.name, ${primaryTerm}) > 0.15 OR p.name ILIKE ${escapedTerm + "%"} ESCAPE '\\' OR p.name ILIKE ${"%" + escapedTerm + "%"} ESCAPE '\\' OR p."postalCode" ILIKE ${"%" + escapedTerm + "%"} ESCAPE '\\' OR (p."postalCode" ~ '^[0-9]+$' AND LPAD(p."postalCode", 5, '0') ILIKE ${"%" + escapedTerm + "%"} ESCAPE '\\') OR p."postalCode" = ${strippedDigits} OR EXISTS (SELECT 1 FROM "PostOfficeField" sc WHERE sc."postOfficeId" = p.id AND sc.name = 'Short Code' AND sc.value ILIKE ${escapedTerm + "%"} ESCAPE '\\'))`,
             ];
-            let paramIndex = 5;
-            const extraParams: string[] = [strippedDigits];
 
             if (letter) {
-                whereClauses.push(`p.name ILIKE $${paramIndex} || '%'`);
-                extraParams.push(letter);
-                paramIndex++;
+                const escapedLetter = escapeSqlLike(letter);
+                whereClauses.push(Prisma.sql`p.name ILIKE ${escapedLetter + "%"} ESCAPE '\\'`);
             }
 
             if (service) {
-                whereClauses.push(`$${paramIndex} = ANY(p.services)`);
-                extraParams.push(service);
-                paramIndex++;
+                whereClauses.push(Prisma.sql`${service} = ANY(p.services)`);
             }
 
             if (division) {
                 whereClauses.push(
-                    `EXISTS (SELECT 1 FROM "PostOfficeField" f WHERE f."postOfficeId" = p.id AND f.name = 'Division' AND LOWER(f.value) = LOWER($${paramIndex}))`
+                    Prisma.sql`EXISTS (SELECT 1 FROM "PostOfficeField" f WHERE f."postOfficeId" = p.id AND f.name = 'Division' AND LOWER(f.value) = LOWER(${division}))`
                 );
-                extraParams.push(division);
-                paramIndex++;
             }
 
             if (officeType) {
                 if (officeType.toLowerCase() === "supra post office") {
                     whereClauses.push(
-                        `EXISTS (SELECT 1 FROM "PostOfficeField" f WHERE f."postOfficeId" = p.id AND f.name = 'Grade' AND LOWER(f.value) LIKE '%supra%')`
+                        Prisma.sql`EXISTS (SELECT 1 FROM "PostOfficeField" f WHERE f."postOfficeId" = p.id AND f.name = 'Grade' AND LOWER(f.value) LIKE '%supra%')`
                     );
                 } else {
                     whereClauses.push(
-                        `EXISTS (SELECT 1 FROM "PostOfficeField" f WHERE f."postOfficeId" = p.id AND f.name = 'Type' AND LOWER(f.value) = LOWER($${paramIndex}))`
+                        Prisma.sql`EXISTS (SELECT 1 FROM "PostOfficeField" f WHERE f."postOfficeId" = p.id AND f.name = 'Type' AND LOWER(f.value) = LOWER(${officeType}))`
                     );
-                    extraParams.push(officeType);
-                    paramIndex++;
                 }
             }
 
             if (is24Hour) {
                 whereClauses.push(
-                    `EXISTS (SELECT 1 FROM "PostOfficeField" f WHERE f."postOfficeId" = p.id AND f.name = 'Is24Hour' AND f.value = 'true')`
+                    Prisma.sql`EXISTS (SELECT 1 FROM "PostOfficeField" f WHERE f."postOfficeId" = p.id AND f.name = 'Is24Hour' AND f.value = 'true')`
                 );
             }
 
             if (delivery) {
+                const deliveryVal = delivery === "yes" ? "yes" : "no";
                 whereClauses.push(
-                    `EXISTS (SELECT 1 FROM "PostOfficeField" f WHERE f."postOfficeId" = p.id AND f.name = 'Delivery' AND LOWER(f.value) = $${paramIndex})`
+                    Prisma.sql`EXISTS (SELECT 1 FROM "PostOfficeField" f WHERE f."postOfficeId" = p.id AND f.name = 'Delivery' AND LOWER(f.value) = ${deliveryVal})`
                 );
-                extraParams.push(delivery === "yes" ? "yes" : "no");
-                paramIndex++;
             }
 
             if (rmsc) {
-                whereClauses.push(`p.rmsc ILIKE '%' || $${paramIndex} || '%'`);
-                extraParams.push(rmsc);
-                paramIndex++;
+                const escapedRmsc = escapeSqlLike(rmsc);
+                whereClauses.push(Prisma.sql`p.rmsc ILIKE ${"%" + escapedRmsc + "%"} ESCAPE '\\'`);
             }
 
-            const whereSQL = whereClauses.join(" AND ");
-
-            const rankedQuery = `
-                SELECT p.id, similarity(p.name, $1) as sim,
-                    CASE
-                        WHEN LOWER(p.name) = LOWER($1) OR (p."postalCode" ~ '^[0-9]+$' AND LPAD(p."postalCode", 5, '0') = LPAD($1, 5, '0')) OR p."postalCode" = $4 OR EXISTS (SELECT 1 FROM "PostOfficeField" sc WHERE sc."postOfficeId" = p.id AND sc.name = 'Short Code' AND LOWER(sc.value) = LOWER($1)) THEN 0
-                        WHEN LOWER(p.name) LIKE LOWER($1) || '%' OR (p."postalCode" ~ '^[0-9]+$' AND LPAD(p."postalCode", 5, '0') LIKE $1 || '%') OR EXISTS (SELECT 1 FROM "PostOfficeField" sc WHERE sc."postOfficeId" = p.id AND sc.name = 'Short Code' AND sc.value ILIKE $1 || '%') THEN 1
-                        WHEN LOWER(p.name) LIKE '%' || LOWER($1) || '%' THEN 2
-                        ELSE 3
-                    END as rank
-                FROM "PostOffice" p
-                WHERE ${whereSQL}
-                ORDER BY rank ASC, sim DESC, p.name ASC
-                LIMIT $2 OFFSET $3
-            `;
+            const whereSql = Prisma.join(whereClauses, " AND ");
 
             try {
-                // For countQuery, re-index $4+ parameters cleanly by passing dummy values at $2/$3 or rewriting
-                const countWhereSQL = whereSQL.replace(/\$(\d+)/g, (_, numStr) => {
-                    const n = parseInt(numStr, 10);
-                    return n >= 4 ? `$${n - 2}` : `$${n}`;
-                });
-                const finalCountQuery = `SELECT COUNT(*)::int as total FROM "PostOffice" p WHERE ${countWhereSQL}`;
-
                 const [rankedResults, countResult] = await Promise.all([
-                    prisma.$queryRawUnsafe<{ id: string; sim: number; rank: number }[]>(
-                        rankedQuery,
-                        primaryTerm,
-                        limit,
-                        cursor,
-                        ...extraParams
-                    ),
-                    prisma.$queryRawUnsafe<{ total: number }[]>(
-                        finalCountQuery,
-                        primaryTerm,
-                        ...extraParams
-                    ),
+                    prisma.$queryRaw<{ id: string; sim: number; rank: number }[]>`
+                        SELECT p.id, similarity(p.name, ${primaryTerm}) as sim,
+                            CASE
+                                WHEN LOWER(p.name) = LOWER(${primaryTerm}) OR (p."postalCode" ~ '^[0-9]+$' AND LPAD(p."postalCode", 5, '0') = LPAD(${primaryTerm}, 5, '0')) OR p."postalCode" = ${strippedDigits} OR EXISTS (SELECT 1 FROM "PostOfficeField" sc WHERE sc."postOfficeId" = p.id AND sc.name = 'Short Code' AND LOWER(sc.value) = LOWER(${primaryTerm})) THEN 0
+                                WHEN LOWER(p.name) LIKE LOWER(${escapedTerm}) || '%' ESCAPE '\' OR (p."postalCode" ~ '^[0-9]+$' AND LPAD(p."postalCode", 5, '0') LIKE ${escapedTerm} || '%' ESCAPE '\') OR EXISTS (SELECT 1 FROM "PostOfficeField" sc WHERE sc."postOfficeId" = p.id AND sc.name = 'Short Code' AND sc.value ILIKE ${escapedTerm} || '%' ESCAPE '\') THEN 1
+                                WHEN LOWER(p.name) LIKE '%' || LOWER(${escapedTerm}) || '%' ESCAPE '\' THEN 2
+                                ELSE 3
+                            END as rank
+                        FROM "PostOffice" p
+                        WHERE ${whereSql}
+                        ORDER BY rank ASC, sim DESC, p.name ASC
+                        LIMIT ${limit} OFFSET ${cursor}
+                    `,
+                    prisma.$queryRaw<{ total: number }[]>`
+                        SELECT COUNT(*)::int as total FROM "PostOffice" p WHERE ${whereSql}
+                    `,
                 ]);
 
                 total = countResult[0]?.total || 0;

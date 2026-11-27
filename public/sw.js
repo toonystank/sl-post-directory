@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v11";
+const CACHE_VERSION = "v12";
 const STATIC_CACHE = `sl-post-static-${CACHE_VERSION}`;
 const PAGES_CACHE = `sl-post-pages-${CACHE_VERSION}`;
 const RSC_CACHE = `sl-post-rsc-${CACHE_VERSION}`;
@@ -21,6 +21,15 @@ const INSTALL_STATIC_URLS = [
 ];
 
 const APP_SHELL_PATH_RE = /^\/(?:(?:si|ta)\/)?(?:|calculator|browse|track|blog|about|privacy|terms|offline|rates(?:\/.*)?|district(?:\/.*)?)$/;
+const SENSITIVE_PATH_RE = /^\/(?:(?:en|si|ta)\/)?(?:dashboard|login|register|suggest)(?:\/|$)/i;
+const SENSITIVE_API_PREFIXES = [
+  "/api/auth",
+  "/api/admin",
+  "/api/user",
+  "/api/track",
+  "/api/ocr",
+  "/api/uploadcare",
+];
 
 const STATIC_EXT_RE = /\.(?:png|jpg|jpeg|webp|avif|svg|ico|woff2?|css|js|webmanifest)$/i;
 // Next.js / Turbopack development chunks have mutable paths and `no-store` headers;
@@ -35,8 +44,9 @@ const CACHEABLE_API_PREFIXES = [
 
 function isCacheableResponse(res) {
   if (!res || !res.ok || res.redirected) return false;
+  if (res.headers.has("set-cookie")) return false;
   const cc = (res.headers.get("cache-control") || "").toLowerCase();
-  if (cc.includes("no-store")) return false;
+  if (cc.includes("no-store") || cc.includes("private")) return false;
   return true;
 }
 
@@ -213,13 +223,15 @@ self.addEventListener("message", (event) => {
       ]).then(async ([pagesCache, staticCache, apiCache]) => {
         // Warm sequentially in small steps so background warming stays low-priority
         for (const url of urls) {
-          if (typeof url !== "string") continue;
+          if (typeof url !== "string" || !url.startsWith("/") || url.startsWith("//")) continue;
+          if (SENSITIVE_PATH_RE.test(url)) continue;
           if (url.startsWith("/api/")) {
+            if (!CACHEABLE_API_PREFIXES.some((prefix) => url.startsWith(prefix))) continue;
             try {
               const existing = await apiCache.match(url);
               if (!existing) {
                 const res = await fetch(url, { credentials: "omit" });
-                if (res.ok && !res.redirected) await apiCache.put(url, res);
+                if (isCacheableResponse(res)) await apiCache.put(url, res);
               }
             } catch {
               // Ignore
@@ -231,7 +243,7 @@ self.addEventListener("message", (event) => {
               const existing = await staticCache.match(url);
               if (!existing) {
                 const res = await fetch(url, { credentials: "omit" });
-                if (res.ok && !res.redirected) await staticCache.put(url, res);
+                if (isCacheableResponse(res)) await staticCache.put(url, res);
               }
             } catch {
               // Ignore
@@ -265,13 +277,14 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Never intercept Next.js HMR, Turbopack dev chunks, auth sessions, admin endpoints, or Digital Asset Links
+  // Never intercept Next.js HMR, Turbopack dev chunks, auth/admin/user/tracking/OCR/upload endpoints,
+  // authenticated/sensitive routes (dashboard, login, register, suggest), or Digital Asset Links
   if (
     url.pathname.startsWith("/_next/webpack-hmr") ||
     url.pathname.includes("hot-update") ||
     DEV_CHUNK_RE.test(url.pathname) ||
-    url.pathname.startsWith("/api/auth") ||
-    url.pathname.startsWith("/api/admin") ||
+    SENSITIVE_API_PREFIXES.some((prefix) => url.pathname.startsWith(prefix)) ||
+    SENSITIVE_PATH_RE.test(url.pathname) ||
     url.pathname.startsWith("/.well-known/")
   ) {
     return;

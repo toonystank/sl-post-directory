@@ -1,44 +1,52 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireRole } from "@/lib/auth-guard";
+import { verifySameOrigin } from "@/lib/csrf";
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 import { invalidatePublicConfigCache } from "@/lib/server-caches";
 
-const SETTINGS_CACHE_CONTROL = "public, max-age=60, s-maxage=1800, stale-while-revalidate=86400";
-
-// GET: Public — anyone needs to know if ads are enabled
+// GET: Super admin only — public pages use `/api/public/config`
 export async function GET() {
+    const auth = await requireRole(["SUPER_ADMIN"]);
+    if (!auth.ok) {
+        return auth.response;
+    }
+
     if (!hasDatabaseUrl) {
-        return NextResponse.json({ adsEnabled: true }, { headers: { "Cache-Control": SETTINGS_CACHE_CONTROL } });
+        return NextResponse.json({ adsEnabled: true }, { headers: { "Cache-Control": "no-store" } });
     }
 
     try {
-        const settings = await prisma.siteSettings.upsert({
+        const settings = await prisma.siteSettings.findUnique({
             where: { id: "default" },
-            update: {},
-            create: { id: "default", adsEnabled: true },
+            select: { adsEnabled: true },
         });
-        return NextResponse.json({ adsEnabled: settings.adsEnabled }, { headers: { "Cache-Control": SETTINGS_CACHE_CONTROL } });
+        return NextResponse.json(
+            { adsEnabled: settings?.adsEnabled ?? true },
+            { headers: { "Cache-Control": "no-store" } }
+        );
     } catch {
-        return NextResponse.json({ adsEnabled: true }, { headers: { "Cache-Control": "public, max-age=30, s-maxage=60" } });
+        return NextResponse.json({ error: "Failed to load settings" }, { status: 500, headers: { "Cache-Control": "no-store" } });
     }
 }
 
 // PUT: Super admin only — toggle ads
 export async function PUT(req: Request) {
-    const session = await getServerSession(authOptions);
-    const user = session?.user as { id?: string; role?: string } | undefined;
+    const csrf = verifySameOrigin(req);
+    if (!csrf.ok) {
+        return NextResponse.json({ error: csrf.error }, { status: 403, headers: { "Cache-Control": "no-store" } });
+    }
 
-    if (!session || user?.role !== "SUPER_ADMIN") {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    const auth = await requireRole(["SUPER_ADMIN"]);
+    if (!auth.ok) {
+        return auth.response;
     }
 
     try {
         const { adsEnabled } = (await req.json()) as { adsEnabled?: unknown };
 
         if (typeof adsEnabled !== "boolean") {
-            return NextResponse.json({ error: "adsEnabled must be a boolean" }, { status: 400 });
+            return NextResponse.json({ error: "adsEnabled must be a boolean" }, { status: 400, headers: { "Cache-Control": "no-store" } });
         }
 
         const settings = await prisma.siteSettings.upsert({
@@ -49,7 +57,7 @@ export async function PUT(req: Request) {
 
         await prisma.actionLog.create({
             data: {
-                userId: user.id!,
+                userId: auth.user.id,
                 action: adsEnabled ? "ADS_ENABLED" : "ADS_DISABLED",
                 details: JSON.stringify({ adsEnabled }),
             },
@@ -58,8 +66,8 @@ export async function PUT(req: Request) {
         invalidatePublicConfigCache();
         revalidatePath("/", "layout");
 
-        return NextResponse.json({ adsEnabled: settings.adsEnabled });
+        return NextResponse.json({ adsEnabled: settings.adsEnabled }, { headers: { "Cache-Control": "no-store" } });
     } catch {
-        return NextResponse.json({ error: "Failed to update settings" }, { status: 500 });
+        return NextResponse.json({ error: "Failed to update settings" }, { status: 500, headers: { "Cache-Control": "no-store" } });
     }
 }

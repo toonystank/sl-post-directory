@@ -1,19 +1,22 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireRole } from "@/lib/auth-guard";
+import { verifySameOrigin } from "@/lib/csrf";
 import { prisma } from "@/lib/prisma";
 import { invalidateOfficeIndexCache } from "@/lib/server-caches";
-import { createOfficeSchema } from "@/lib/validations";
+import { createOfficeSchema, extractValidatedDynamicFields } from "@/lib/validations";
 import { generateSlug } from "@/lib/utils";
 
 export async function POST(req: Request) {
     try {
-        const session = await getServerSession(authOptions);
-        const user = session?.user as { role?: string } | undefined;
+        const csrf = verifySameOrigin(req);
+        if (!csrf.ok) {
+            return NextResponse.json({ error: csrf.error }, { status: 403 });
+        }
 
-        if (!session || (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN")) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const auth = await requireRole(["ADMIN", "SUPER_ADMIN"]);
+        if (!auth.ok) {
+            return auth.response;
         }
 
         const body = await req.json();
@@ -46,11 +49,15 @@ export async function POST(req: Request) {
                 }
             }
         } else {
-            for (const [key, value] of Object.entries(fields)) {
-                if (key.startsWith("field_") && typeof value === "string" && value.trim() !== "") {
-                    const fieldName = key.replace("field_", "");
-                    dynamicFields.push({ name: fieldName, value: value.trim(), type: "TEXT" });
+            try {
+                for (const item of extractValidatedDynamicFields(fields, 50)) {
+                    dynamicFields.push({ name: item.name, value: item.value, type: "TEXT" });
                 }
+            } catch (fieldErr) {
+                return NextResponse.json(
+                    { error: fieldErr instanceof Error ? fieldErr.message : "Invalid custom fields" },
+                    { status: 400 }
+                );
             }
         }
 

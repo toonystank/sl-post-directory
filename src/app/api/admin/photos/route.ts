@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireRole } from "@/lib/auth-guard";
+import { verifySameOrigin } from "@/lib/csrf";
 import { prisma } from "@/lib/prisma";
+import { extractUploadcareUuid } from "@/lib/security";
+import { getUploadcarePublicKey } from "@/lib/uploadcare";
+import { photoApprovalSchema } from "@/lib/validations";
 
 function revalidateOfficePages(slug: string) {
     revalidatePath(`/office/${slug}`);
@@ -12,18 +15,23 @@ function revalidateOfficePages(slug: string) {
 
 export async function PATCH(req: Request) {
     try {
-        const session = await getServerSession(authOptions);
-        const user = session?.user as { id?: string; role?: string } | undefined;
-
-        if (!session || !user?.id || !["ADMIN", "SUPER_ADMIN", "MODERATOR"].includes(user.role || "")) {
-            return NextResponse.json({ error: "Unauthorized. Admin privileges required." }, { status: 401 });
+        const csrf = verifySameOrigin(req);
+        if (!csrf.ok) {
+            return NextResponse.json({ error: csrf.error }, { status: 403 });
         }
 
-        const body = (await req.json()) as { id?: string; status?: string };
-        const photoId = body?.id?.trim();
-        if (!photoId) {
-            return NextResponse.json({ error: "Photo ID is required" }, { status: 400 });
+        const auth = await requireRole(["ADMIN", "SUPER_ADMIN", "MODERATOR"]);
+        if (!auth.ok) {
+            return auth.response;
         }
+        const user = auth.user;
+
+        const body = await req.json();
+        const parsed = photoApprovalSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json({ error: parsed.error.issues[0]?.message || "Photo ID is required" }, { status: 400 });
+        }
+        const photoId = parsed.data.id;
 
         const photo = await prisma.communityPhoto.update({
             where: { id: photoId },
@@ -55,16 +63,19 @@ export async function PATCH(req: Request) {
 
 export async function DELETE(req: Request) {
     try {
-        const session = await getServerSession(authOptions);
-        const user = session?.user as { id?: string; role?: string } | undefined;
-
-        // Ensure user is an admin or moderator
-        if (!session || !user?.id || !["ADMIN", "SUPER_ADMIN", "MODERATOR"].includes(user?.role || "")) {
-            return NextResponse.json({ error: "Unauthorized. Admin privileges required." }, { status: 401 });
+        const csrf = verifySameOrigin(req);
+        if (!csrf.ok) {
+            return NextResponse.json({ error: csrf.error }, { status: 403 });
         }
 
+        const auth = await requireRole(["ADMIN", "SUPER_ADMIN", "MODERATOR"]);
+        if (!auth.ok) {
+            return auth.response;
+        }
+        const user = auth.user;
+
         const url = new URL(req.url);
-        const photoId = url.searchParams.get("id");
+        const photoId = url.searchParams.get("id")?.trim();
 
         if (!photoId) {
             return NextResponse.json({ error: "Photo ID is required" }, { status: 400 });
@@ -85,27 +96,24 @@ export async function DELETE(req: Request) {
             where: { id: photoId },
         });
 
-        // Delete file from Uploadcare storage
-        const uploadcareSecretKey = process.env.UPLOADCARE_SECRET_KEY;
-        const uploadcarePubKey = process.env.NEXT_PUBLIC_UPLOADCARE_PUB_KEY || "16423b7c9e1a87e5884e";
-        if (uploadcareSecretKey) {
+        // Delete file from Uploadcare storage only when URL matches strict Uploadcare UUID format
+        const uploadcareSecretKey = process.env.UPLOADCARE_SECRET_KEY?.trim();
+        const uploadcarePubKey = getUploadcarePublicKey();
+        const fileUuid = extractUploadcareUuid(photo.url);
+        if (uploadcareSecretKey && fileUuid) {
             try {
-                // Extract UUID from CDN URL (e.g. https://3q5fhu0dw8.ucarecd.net/UUID/ or https://ucarecdn.com/UUID/)
-                const urlParts = photo.url.replace(/\/$/, "").split("/");
-                const fileUuid = urlParts[urlParts.length - 1];
+                const ucRes = await fetch(`https://api.uploadcare.com/files/${fileUuid}/storage/`, {
+                    method: "DELETE",
+                    headers: {
+                        Authorization: `Uploadcare.Simple ${uploadcarePubKey}:${uploadcareSecretKey}`,
+                        Accept: "application/vnd.uploadcare-v0.7+json",
+                    },
+                    redirect: "error",
+                    signal: AbortSignal.timeout(10_000),
+                });
 
-                if (fileUuid) {
-                    const ucRes = await fetch(`https://api.uploadcare.com/files/${fileUuid}/storage/`, {
-                        method: "DELETE",
-                        headers: {
-                            Authorization: `Uploadcare.Simple ${uploadcarePubKey}:${uploadcareSecretKey}`,
-                            Accept: "application/vnd.uploadcare-v0.7+json",
-                        },
-                    });
-
-                    if (!ucRes.ok) {
-                        console.warn(`Uploadcare deletion failed for ${fileUuid}: ${ucRes.status} ${ucRes.statusText}`);
-                    }
+                if (!ucRes.ok) {
+                    console.warn(`Uploadcare deletion failed for ${fileUuid}: ${ucRes.status} ${ucRes.statusText}`);
                 }
             } catch (ucError) {
                 // Log but don't fail — DB record is already deleted
