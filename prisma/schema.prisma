@@ -80,10 +80,11 @@ model User {
   role              String        @default("CONTRIBUTOR")
   emailVerified     DateTime?
   verificationToken String?       @unique
-  twoFactorSecret   String?
-  twoFactorEnabled  Boolean       @default(false)
-  backupCodes       String[]      @default([])
-  postOfficeId      String?
+  twoFactorSecret        String?
+  twoFactorEnabled       Boolean       @default(false)
+  backupCodes            String[]      @default([])
+  mailRoutingBetaEnabled Boolean       @default(false)
+  postOfficeId           String?
   postOffice        PostOffice?   @relation(fields: [postOfficeId], references: [id], onDelete: SetNull)
   edits             EditRequest[]
   actionLogs        ActionLog[]
@@ -115,9 +116,11 @@ model EditRequest {
 }
 
 model SiteSettings {
-  id         String   @id @default("default")
-  adsEnabled Boolean  @default(true)
-  updatedAt  DateTime @updatedAt
+  id                       String   @id @default("default")
+  adsEnabled               Boolean  @default(true)
+  mailRoutingBetaAvailable Boolean  @default(true)
+  mailRoutingSelfOptIn     Boolean  @default(true)
+  updatedAt                DateTime @updatedAt
 }
 
 model BlogPost {

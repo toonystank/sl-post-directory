@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireRole } from "@/lib/auth-guard";
+import { verifySameOrigin } from "@/lib/csrf";
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 import { invalidatePublicConfigCache } from "@/lib/server-caches";
+import { siteVariableSchema } from "@/lib/validations";
 
 export async function GET() {
-    const session = await getServerSession(authOptions);
-    const userRole = (session?.user as { role?: string } | undefined)?.role;
-
-    if (!session || !userRole || !["SUPER_ADMIN", "ADMIN", "MODERATOR"].includes(userRole)) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN", "MODERATOR"]);
+    if (!auth.ok) {
+        return auth.response;
     }
 
     if (!hasDatabaseUrl) {
@@ -28,27 +27,32 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-    const session = await getServerSession(authOptions);
-    const userRole = (session?.user as { role?: string } | undefined)?.role;
+    const csrf = verifySameOrigin(req);
+    if (!csrf.ok) {
+        return NextResponse.json({ error: csrf.error }, { status: 403 });
+    }
 
-    if (!session || !userRole || !["SUPER_ADMIN", "ADMIN"].includes(userRole)) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN"]);
+    if (!auth.ok) {
+        return auth.response;
     }
 
     try {
-        const body = (await req.json()) as { key?: string; value?: string; description?: string };
-        const key = body.key?.trim();
-        const value = body.value;
-        const description = body.description?.trim();
-
-        if (!key || value === undefined || value === null || String(value).trim() === "") {
-            return NextResponse.json({ error: "Key and Value are required" }, { status: 400 });
+        const body = await req.json();
+        const parsed = siteVariableSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: parsed.error.issues[0]?.message || "Key and Value are required" },
+                { status: 400 }
+            );
         }
+
+        const { key, value, description } = parsed.data;
 
         const variable = await prisma.siteVariable.upsert({
             where: { key },
-            update: { value: String(value), description },
-            create: { key, value: String(value), description },
+            update: { value, description: description || null },
+            create: { key, value, description: description || null },
         });
 
         invalidatePublicConfigCache();
@@ -56,7 +60,7 @@ export async function POST(req: NextRequest) {
         revalidatePath("/calculator");
         revalidatePath("/rates", "layout");
 
-        return NextResponse.json(variable);
+        return NextResponse.json(variable, { headers: { "Cache-Control": "no-store" } });
     } catch (error) {
         console.error("Error saving variable:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -64,11 +68,14 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-    const session = await getServerSession(authOptions);
-    const userRole = (session?.user as { role?: string } | undefined)?.role;
+    const csrf = verifySameOrigin(req);
+    if (!csrf.ok) {
+        return NextResponse.json({ error: csrf.error }, { status: 403 });
+    }
 
-    if (!session || !userRole || !["SUPER_ADMIN", "ADMIN"].includes(userRole)) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN"]);
+    if (!auth.ok) {
+        return auth.response;
     }
 
     try {
@@ -86,8 +93,11 @@ export async function DELETE(req: NextRequest) {
         revalidatePath("/calculator");
         revalidatePath("/rates", "layout");
 
-        return NextResponse.json({ success: true });
-    } catch (error) {
+        return NextResponse.json({ success: true }, { headers: { "Cache-Control": "no-store" } });
+    } catch (error: unknown) {
+        if (typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "P2025") {
+            return NextResponse.json({ error: "Variable not found" }, { status: 404 });
+        }
         console.error("Error deleting variable:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }

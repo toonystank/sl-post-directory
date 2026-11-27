@@ -10,6 +10,7 @@ import PillarBox from "@/components/brand/PillarBox";
 import Postmark from "@/components/brand/Postmark";
 import SearchBar from "./SearchBar";
 import { triggerHaptic } from "@/lib/haptics";
+import { useStaffStation } from "@/context/StaffStationContext";
 import { SearchMode } from "./types";
 
 interface HomeHeroProps {
@@ -58,11 +59,24 @@ export function ModeToggle({ searchMode, onModeChange, className }: { searchMode
     );
 }
 
-export default function HomeHero({ search, searchMode: controlledMode, total = 4024, activeQuery, searchRef }: HomeHeroProps) {
+export default function HomeHero({ search, searchMode: controlledMode, total = 4036, activeQuery, searchRef }: HomeHeroProps) {
     const t = useTranslations("Home");
     const locale = useLocale();
     const isIndic = locale === "si" || locale === "ta";
     const router = useRouter();
+    const { station, hydrated: stationHydrated } = useStaffStation();
+    const activeStation = stationHydrated ? station : null;
+    const formattedCount = total.toLocaleString("en-US");
+    const stationDisplay = activeStation
+        ? `${activeStation.name}${activeStation.shortCode ? ` [${activeStation.shortCode}]` : ""}`
+        : "";
+    const stationKickerLabel = activeStation
+        ? `${activeStation.name}${activeStation.postalCode ? ` (${activeStation.postalCode})` : ""}`
+        : "";
+    const secondStampCode = activeStation?.postalCode || "20000";
+    const secondStampLabel = activeStation
+        ? activeStation.name.toUpperCase().slice(0, 14)
+        : "KANDY";
     const [localQuery, setLocalQuery] = React.useState("");
     const [localMode] = React.useState<SearchMode>("name");
     const localSearchContainerRef = React.useRef<HTMLDivElement>(null);
@@ -94,7 +108,12 @@ export default function HomeHero({ search, searchMode: controlledMode, total = 4
                                         isIndic ? "text-[9.5px] md:text-xs" : "text-[10px] md:text-xs"
                                     )}
                                 >
-                                    {t("kicker")}
+                                    {activeStation
+                                        ? t("staffKicker", {
+                                              station: stationKickerLabel,
+                                              count: formattedCount,
+                                          })
+                                        : t("kicker", { count: formattedCount })}
                                 </p>
                                 <h1
                                     className={cn(
@@ -104,8 +123,16 @@ export default function HomeHero({ search, searchMode: controlledMode, total = 4
                                             : "display text-[1.28rem] sm:text-[1.5rem] leading-[1.08] md:text-4xl lg:text-5xl"
                                     )}
                                 >
-                                    <span className="md:hidden">{t("headlineMobile")}</span>
-                                    <span className="hidden md:inline">{t("headlineDesktop")}</span>
+                                    <span className="md:hidden">
+                                        {activeStation
+                                            ? t("staffHeadlineMobile", { station: stationDisplay })
+                                            : t("headlineMobile")}
+                                    </span>
+                                    <span className="hidden md:inline">
+                                        {activeStation
+                                            ? t("staffHeadlineDesktop", { station: stationDisplay })
+                                            : t("headlineDesktop")}
+                                    </span>
                                 </h1>
                                 <p
                                     className={cn(
@@ -115,7 +142,9 @@ export default function HomeHero({ search, searchMode: controlledMode, total = 4
                                             : "mt-1.5 md:mt-3 text-[11.5px] sm:text-xs md:text-base leading-snug md:leading-relaxed"
                                     )}
                                 >
-                                    {t("lede")}
+                                    {activeStation
+                                        ? t("staffLede", { count: formattedCount })
+                                        : t("lede", { count: formattedCount })}
                                 </p>
                             </div>
 
@@ -138,12 +167,12 @@ export default function HomeHero({ search, searchMode: controlledMode, total = 4
                                     className="absolute right-0 top-0 z-0 rounded-full bg-background"
                                 />
                                 <Postmark
-                                    code="20000"
+                                    code={secondStampCode}
                                     size="md"
                                     boxSize={58}
                                     tone="ink"
                                     rotate={-16}
-                                    label="KANDY"
+                                    label={secondStampLabel}
                                     bottomLabel="ශ්‍රී ලංකා · SRI LANKA"
                                     date="17 NOV 26"
                                     time="PM 14.00"
@@ -177,10 +206,10 @@ export default function HomeHero({ search, searchMode: controlledMode, total = 4
                         <p className="hidden md:block mt-3 font-mono text-xs text-muted-foreground">
                             {total > 0 && !effectiveQuery
                                 ? locale === "si"
-                                    ? `තැපැල් කාර්යාල ${total.toLocaleString()} · පළාත් 9 · EN / සිං / த`
+                                    ? `තැපැල් කාර්යාල ${formattedCount} · පළාත් 9 · EN / සිං / த`
                                     : locale === "ta"
-                                        ? `${total.toLocaleString()} அஞ்சல் நிலையங்கள் · 9 மாகாணங்கள் · EN / සිං / த`
-                                        : `${total.toLocaleString()} offices · 9 provinces · EN / සිං / த`
+                                        ? `${formattedCount} அஞ்சல் நிலையங்கள் · 9 மாகாணங்கள் · EN / සිං / த`
+                                        : `${formattedCount} offices · 9 provinces · EN / සිං / த`
                                 : "EN / සිං / த"}
                         </p>
                     </div>
@@ -203,11 +232,11 @@ export default function HomeHero({ search, searchMode: controlledMode, total = 4
                             className="absolute right-0 top-1 z-0 rounded-full bg-background"
                         />
                         <Postmark
-                            code="20000"
+                            code={secondStampCode}
                             size="lg"
                             tone="ink"
                             rotate={-18}
-                            label="KANDY"
+                            label={secondStampLabel}
                             bottomLabel="ශ්‍රී ලංකා · SRI LANKA"
                             date="17 NOV 26"
                             time="PM 14.00"

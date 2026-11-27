@@ -14,9 +14,8 @@ interface AdminImageUploadProps {
     metadataTag?: string;
 }
 
-const UPLOADCARE_PUBLIC_KEY = process.env.NEXT_PUBLIC_UPLOADCARE_PUB_KEY || "16423b7c9e1a87e5884e";
-const UPLOADCARE_CDN_BASE = (process.env.NEXT_PUBLIC_UPLOADCARE_CDN || "https://3q5fhu0dw8.ucarecd.net").replace(/\/$/, "");
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ALLOWED_UPLOAD_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export default function AdminImageUpload({
     value,
@@ -37,8 +36,8 @@ export default function AdminImageUpload({
                 setError("File is too large. Maximum size is 5MB.");
                 return;
             }
-            if (!file.type.startsWith("image/")) {
-                setError("Only image files are allowed.");
+            if (!ALLOWED_UPLOAD_MIME_TYPES.has(file.type)) {
+                setError("Only JPEG, PNG, and WebP images are allowed.");
                 return;
             }
 
@@ -46,9 +45,32 @@ export default function AdminImageUpload({
             setError(null);
 
             try {
+                const signRes = await fetch("/api/uploadcare/sign", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ scope: "admin" }),
+                });
+
+                if (!signRes.ok) {
+                    const signErr = (await signRes.json().catch(() => ({}))) as { error?: string };
+                    throw new Error(signErr.error || "Unable to authorize upload");
+                }
+
+                const signData = (await signRes.json()) as {
+                    publicKey: string;
+                    cdnBase: string;
+                    store?: string;
+                    signature?: string;
+                    expire?: number;
+                };
+
                 const formData = new FormData();
-                formData.append("UPLOADCARE_PUB_KEY", UPLOADCARE_PUBLIC_KEY);
-                formData.append("UPLOADCARE_STORE", "1");
+                formData.append("UPLOADCARE_PUB_KEY", signData.publicKey);
+                formData.append("UPLOADCARE_STORE", signData.store || "1");
+                if (signData.signature && signData.expire) {
+                    formData.append("signature", signData.signature);
+                    formData.append("expire", String(signData.expire));
+                }
                 formData.append("file", file);
                 formData.append("metadata[source]", metadataTag);
 
@@ -61,10 +83,11 @@ export default function AdminImageUpload({
 
                 const data = (await response.json()) as { file?: string };
                 if (!data.file) throw new Error("Missing file ID");
-                const cdnUrl = normalizeUploadcareImageUrl(`${UPLOADCARE_CDN_BASE}/${data.file}/`);
+                const cdnBase = signData.cdnBase.replace(/\/+$/, "");
+                const cdnUrl = normalizeUploadcareImageUrl(`${cdnBase}/${data.file}/`);
                 onChange(cdnUrl);
-            } catch {
-                setError("Upload failed. Please try again.");
+            } catch (err) {
+                setError(err instanceof Error && err.message ? err.message : "Upload failed. Please try again.");
             } finally {
                 setIsUploading(false);
             }
@@ -101,7 +124,7 @@ export default function AdminImageUpload({
             <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
                 className="hidden"
                 onChange={(e) => {
                     const file = e.target.files?.[0];

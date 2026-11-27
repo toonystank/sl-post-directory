@@ -210,7 +210,17 @@ export default function SuggestForm({ office }: { office: Office }) {
 
                             {(() => {
                                 const fieldMap = new Map((office.fields || []).map(f => [f.name, f.value]));
-                                const standardFields = ["Division", "Delivery", "Type", "Location", "Short Code"];
+                                const standardFields = [
+                                    "Division",
+                                    "Delivery",
+                                    "Type",
+                                    "Grade",
+                                    "Phone",
+                                    "Telephone",
+                                    "Working Hours",
+                                    "Location",
+                                    "Short Code",
+                                ];
                                 const extraFields = (office.fields || []).filter(f => !standardFields.includes(f.name));
 
                                 return (
@@ -232,16 +242,15 @@ export default function SuggestForm({ office }: { office: Office }) {
 
                                             <div>
                                                 <label className="block text-sm font-medium text-muted-foreground mb-1.5">{t("type")}</label>
-                                                <Select name="field_Type" defaultValue={fieldMap.get("Type") || "Post office"}>
+                                                <Select name="field_Type" defaultValue={fieldMap.get("Type") || "Post Office"}>
                                                     <SelectTrigger className="w-full h-10 bg-card text-sm">
                                                         <SelectValue placeholder={t("selectType")} />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        <SelectItem value="Post office">Post office</SelectItem>
-                                                        <SelectItem value="Sub Post office">Sub Post office</SelectItem>
-                                                        <SelectItem value="Agency Post office">Agency Post office</SelectItem>
-                                                        <SelectItem value="Branch Post office">Branch Post office</SelectItem>
-                                                        <SelectItem value="Camp Post office">Camp Post office</SelectItem>
+                                                        <SelectItem value="Post Office">Post Office</SelectItem>
+                                                        <SelectItem value="Sub Post Office">Sub Post Office</SelectItem>
+                                                        <SelectItem value="Agency Post Office">Agency Post Office</SelectItem>
+                                                        <SelectItem value="RMSC / Sorting Hub">RMSC / Sorting Hub</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>
@@ -261,7 +270,33 @@ export default function SuggestForm({ office }: { office: Office }) {
 
                                             <div>
                                                 <label className="block text-sm font-medium text-muted-foreground mb-1.5">{t("shortCode")}</label>
-                                                <Input type="text" name="field_Short Code" defaultValue={fieldMap.get("Short Code") || ""} placeholder="e.g. WP/CO" />
+                                                <Input type="text" name="field_Short Code" defaultValue={fieldMap.get("Short Code") || ""} placeholder="e.g. AW / ATG" />
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-muted-foreground mb-1.5">Phone Number</label>
+                                                <Input type="text" name="field_Phone" defaultValue={fieldMap.get("Phone") || fieldMap.get("Telephone") || ""} placeholder="e.g. 011 232-8301" />
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-muted-foreground mb-1.5">Grade</label>
+                                                <Select name="field_Grade" defaultValue={fieldMap.get("Grade") || ""}>
+                                                    <SelectTrigger className="w-full h-10 bg-card text-sm">
+                                                        <SelectValue placeholder="Select Grade (optional)" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="Supra">Supra</SelectItem>
+                                                        <SelectItem value="Special">Special</SelectItem>
+                                                        <SelectItem value="Class I">Class I</SelectItem>
+                                                        <SelectItem value="Class II">Class II</SelectItem>
+                                                        <SelectItem value="Class III">Class III</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+
+                                            <div className="md:col-span-2">
+                                                <label className="block text-sm font-medium text-muted-foreground mb-1.5">Working Hours</label>
+                                                <Input type="text" name="field_Working Hours" defaultValue={fieldMap.get("Working Hours") || ""} placeholder="e.g. Mon–Fri 8:30 AM – 4:30 PM · Sat 8:30 AM – 1:00 PM" />
                                             </div>
 
                                             <div className="md:col-span-2">

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { verifySameOrigin } from "@/lib/csrf";
 import { checkRateLimit, rateLimitHeaders, rateLimiters } from "@/lib/rate-limiter";
 import {
     MAX_BATCH_BARCODES,
@@ -23,8 +24,31 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const BEPOST_MULTI_URL = "https://bepost.lk/p/Search/New_serch_barcode.php";
+const MAX_UPSTREAM_HTML_BYTES = 512_000;
+const COD_CACHE_TTL_MS = 60_000;
+const COD_CACHE_MAX_ENTRIES = 500;
 const BROWSER_UA =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+
+const codDetailCache = new Map<string, { result: CodTrackingResult | null; expiresAt: number }>();
+
+function getCachedCodResult(barcode: string): CodTrackingResult | null | undefined {
+    const entry = codDetailCache.get(barcode);
+    if (!entry) return undefined;
+    if (Date.now() > entry.expiresAt) {
+        codDetailCache.delete(barcode);
+        return undefined;
+    }
+    return entry.result;
+}
+
+function setCachedCodResult(barcode: string, result: CodTrackingResult | null): void {
+    codDetailCache.set(barcode, { result, expiresAt: Date.now() + COD_CACHE_TTL_MS });
+    if (codDetailCache.size > COD_CACHE_MAX_ENTRIES) {
+        const oldest = codDetailCache.keys().next().value;
+        if (oldest !== undefined) codDetailCache.delete(oldest);
+    }
+}
 
 const codRequestSchema = z.object({
     barcodes: z
@@ -71,6 +95,11 @@ function extractCookieHeader(headers: Headers): string {
  * (avoids bepost.lk's same-session cooldown between consecutive POSTs).
  */
 async function fetchSingleCodDetails(barcode: string): Promise<CodTrackingResult | null> {
+    const cached = getCachedCodResult(barcode);
+    if (cached !== undefined) {
+        return cached;
+    }
+
     const initRes = await fetch(BEPOST_MULTI_URL, {
         method: "GET",
         headers: {
@@ -79,6 +108,7 @@ async function fetchSingleCodDetails(barcode: string): Promise<CodTrackingResult
             "Accept-Language": "en-US,en;q=0.9",
         },
         cache: "no-store",
+        redirect: "error",
         signal: AbortSignal.timeout(12000),
     });
 
@@ -87,7 +117,7 @@ async function fetchSingleCodDetails(barcode: string): Promise<CodTrackingResult
     }
 
     const cookieHeader = extractCookieHeader(initRes.headers);
-    const initHtml = await initRes.text();
+    const initHtml = (await initRes.text()).slice(0, MAX_UPSTREAM_HTML_BYTES);
     const csrfToken = extractBepostCsrfToken(initHtml);
 
     if (!csrfToken) {
@@ -112,6 +142,7 @@ async function fetchSingleCodDetails(barcode: string): Promise<CodTrackingResult
         },
         body: detailParams.toString(),
         cache: "no-store",
+        redirect: "error",
         signal: AbortSignal.timeout(12000),
     });
 
@@ -119,13 +150,23 @@ async function fetchSingleCodDetails(barcode: string): Promise<CodTrackingResult
         throw new Error(`bepost.lk details query returned HTTP ${detailRes.status}`);
     }
 
-    const detailHtml = await detailRes.text();
-    return parseCodDetailsHtml(detailHtml, barcode);
+    const detailHtml = (await detailRes.text()).slice(0, MAX_UPSTREAM_HTML_BYTES);
+    const parsed = parseCodDetailsHtml(detailHtml, barcode);
+    setCachedCodResult(barcode, parsed);
+    return parsed;
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse<CodBatchApiResponse>> {
+    const csrf = verifySameOrigin(req);
+    if (!csrf.ok) {
+        return NextResponse.json(
+            { success: false, items: [], error: csrf.error },
+            { status: 403, headers: { "Cache-Control": "no-store" } }
+        );
+    }
+
     const rl = await checkRateLimit(req, rateLimiters.tracking);
-    const headers = rateLimitHeaders(rl);
+    const headers = { ...rateLimitHeaders(rl), "Cache-Control": "no-store" };
     if (rl.isRateLimited) {
         return NextResponse.json(
             { success: false, items: [], error: "Too many tracking requests. Please wait a moment." },
@@ -156,6 +197,16 @@ export async function POST(req: NextRequest): Promise<NextResponse<CodBatchApiRe
     }
 
     const barcodes = Array.from(new Set(parsed.data.barcodes));
+
+    if (barcodes.length > 1) {
+        const batchRl = await checkRateLimit(req, rateLimiters.trackingBatch);
+        if (batchRl.isRateLimited) {
+            return NextResponse.json(
+                { success: false, items: [], error: "Too many batch tracking requests. Please wait a moment." },
+                { status: 429, headers: { ...rateLimitHeaders(batchRl), "Cache-Control": "no-store" } }
+            );
+        }
+    }
 
     try {
         // Fast path for single barcode: 1 GET + 1 direct details_barcode POST (0ms delay, full details)
@@ -191,6 +242,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<CodBatchApiRe
                 "Accept-Language": "en-US,en;q=0.9",
             },
             cache: "no-store",
+            redirect: "error",
             signal: AbortSignal.timeout(12000),
         });
 
@@ -199,7 +251,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<CodBatchApiRe
         }
 
         const cookieHeader = extractCookieHeader(initRes.headers);
-        const initHtml = await initRes.text();
+        const initHtml = (await initRes.text()).slice(0, MAX_UPSTREAM_HTML_BYTES);
         const csrfToken = extractBepostCsrfToken(initHtml);
 
         if (!csrfToken) {
@@ -224,6 +276,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<CodBatchApiRe
             },
             body: searchParams.toString(),
             cache: "no-store",
+            redirect: "error",
             signal: AbortSignal.timeout(15000),
         });
 
@@ -231,7 +284,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<CodBatchApiRe
             throw new Error(`bepost.lk batch query returned HTTP ${batchRes.status}`);
         }
 
-        const batchHtml = await batchRes.text();
+        const batchHtml = (await batchRes.text()).slice(0, MAX_UPSTREAM_HTML_BYTES);
         const summary = parseCodSummaryHtml(batchHtml);
 
         if (summary.rateLimited) {
@@ -247,10 +300,10 @@ export async function POST(req: NextRequest): Promise<NextResponse<CodBatchApiRe
 
         const summaryByBarcode = new Map(summary.rows.map((r) => [r.barcode, r]));
 
-        // Fetch full details for found items with max concurrency of 4 using fresh sessions
+        // Fetch full details for found items with max concurrency of 3 using fresh sessions
         const items: CodLookupItemResponse[] = await mapWithConcurrency(
             barcodes,
-            4,
+            3,
             async (barcode): Promise<CodLookupItemResponse> => {
                 const classification = classifyBarcode(barcode);
                 const eligibleForSlp = classification !== "cod_only" && classification !== "international";

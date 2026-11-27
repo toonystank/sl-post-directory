@@ -23,10 +23,25 @@ async function buildCompactIndex(): Promise<CompactOfficeIndex> {
                 slug: true,
                 name: true,
                 postalCode: true,
+                operatingHours: true,
+                rmsc: true,
+                controllingOfficeId: true,
                 services: true,
                 fields: {
                     where: {
-                        name: { in: ["Type", "Division", "Phone", "Telephone", "Is24Hour"] },
+                        name: {
+                            in: [
+                                "Type",
+                                "Division",
+                                "Phone",
+                                "Telephone",
+                                "Is24Hour",
+                                "Short Code",
+                                "Delivery",
+                                "Grade",
+                                "Working Hours",
+                            ],
+                        },
                     },
                     select: {
                         name: true,

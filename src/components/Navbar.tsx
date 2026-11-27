@@ -5,7 +5,7 @@ import { Link, usePathname, useRouter } from "@/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { ThemeToggle } from "./theme-toggle";
-import { ArrowLeft, Download, LogOut, SlidersHorizontal, User } from "lucide-react";
+import { ArrowLeft, Download, LogOut, MapPin, SlidersHorizontal, User } from "lucide-react";
 import { m } from "motion/react";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
@@ -14,6 +14,8 @@ import CurrencySwitcher from "./CurrencySwitcher";
 import StampLogo from "./brand/StampLogo";
 import { useInstantLocale, type AppLocale } from "@/context/InstantLocaleContext";
 import { usePWA } from "@/context/PWAContext";
+import { useStaffStation } from "@/context/StaffStationContext";
+import StaffStationSheet from "@/components/staff/StaffStationSheet";
 import { triggerHaptic } from "@/lib/haptics";
 import { stripLocalePrefix } from "@/lib/locale";
 
@@ -32,10 +34,21 @@ export default function Navbar() {
     const t = useTranslations("Nav");
     const tApp = useTranslations("App");
     const tInstall = useTranslations("Install");
+    const tStaff = useTranslations("Staff");
     const { locale, setLocale, prefetchLocale } = useInstantLocale();
     const { isInstalled, canNativePrompt, isIOS, triggerInstall, isOfflineFallbackPage } = usePWA();
+    const { station, hydrated: stationHydrated, mailRoutingEnabled } = useStaffStation();
     const [scrolled, setScrolled] = React.useState(false);
     const [hasMounted, setHasMounted] = React.useState(false);
+    const [stationSheetOpen, setStationSheetOpen] = React.useState(false);
+
+    const activeStation = stationHydrated ? station : null;
+    const mobileStationLabel = activeStation
+        ? activeStation.shortCode ||
+          (activeStation.name.length > 7
+              ? `${activeStation.name.slice(0, 6)}…`
+              : activeStation.name)
+        : "";
 
     const localeShort = locale === "si" ? "සිං" : locale === "ta" ? "த" : "EN";
     const nextLocale = LOCALE_CYCLE[(LOCALE_CYCLE.indexOf(locale) + 1) % LOCALE_CYCLE.length];
@@ -45,7 +58,12 @@ export default function Navbar() {
         const onScroll = () => setScrolled(window.scrollY > 4);
         onScroll();
         window.addEventListener("scroll", onScroll, { passive: true });
-        return () => window.removeEventListener("scroll", onScroll);
+        const onOpenStationSheet = () => setStationSheetOpen(true);
+        window.addEventListener("lpd:open-station-sheet", onOpenStationSheet);
+        return () => {
+            window.removeEventListener("scroll", onScroll);
+            window.removeEventListener("lpd:open-station-sheet", onOpenStationSheet);
+        };
     }, []);
 
     const isOfflineFallback =
@@ -73,6 +91,7 @@ export default function Navbar() {
         : pathname === "/blog" ? tApp("titleGuides")
         : pathname.startsWith("/blog/") ? tApp("titleGuide")
         : pathname.startsWith("/office/") ? tApp("titleOffice")
+        : pathname.startsWith("/routing") ? t("routing")
         : pathname.startsWith("/suggest") ? tApp("titleSuggest")
         : pathname.startsWith("/login") ? t("login")
         : pathname.startsWith("/register") ? tApp("titleRegister")
@@ -81,12 +100,15 @@ export default function Navbar() {
         : "";
 
     const navItems = [
-        { href: "/", label: t("home"), active: isHome, soon: false },
-        { href: "/calculator", label: t("calculator"), active: !isOfflineFallback && (pathname.startsWith("/calculator") || pathname.startsWith("/rates")), soon: false },
-        { href: "/browse", label: t("browse"), active: !isOfflineFallback && (pathname.startsWith("/browse") || pathname.startsWith("/office") || pathname.startsWith("/district")), soon: false },
-        { href: "/track", label: t("track"), active: !isOfflineFallback && pathname.startsWith("/track"), soon: false },
-        { href: "/blog", label: t("blog"), active: !isOfflineFallback && pathname.startsWith("/blog"), soon: false },
-        ...(isAdmin ? [{ href: "/dashboard", label: t("dashboard"), active: !isOfflineFallback && pathname.startsWith("/dashboard"), soon: false }] : []),
+        { href: "/", label: t("home"), active: isHome, soon: false, beta: false },
+        { href: "/calculator", label: t("calculator"), active: !isOfflineFallback && (pathname.startsWith("/calculator") || pathname.startsWith("/rates")), soon: false, beta: false },
+        { href: "/browse", label: t("browse"), active: !isOfflineFallback && (pathname.startsWith("/browse") || pathname.startsWith("/office") || pathname.startsWith("/district")), soon: false, beta: false },
+        ...(mailRoutingEnabled
+            ? [{ href: "/routing", label: t("routing"), active: !isOfflineFallback && pathname.startsWith("/routing"), soon: false, beta: true }]
+            : []),
+        { href: "/track", label: t("track"), active: !isOfflineFallback && pathname.startsWith("/track"), soon: false, beta: false },
+        { href: "/blog", label: t("blog"), active: !isOfflineFallback && pathname.startsWith("/blog"), soon: false, beta: false },
+        ...(isAdmin ? [{ href: "/dashboard", label: t("dashboard"), active: !isOfflineFallback && pathname.startsWith("/dashboard"), soon: false, beta: false }] : []),
     ];
 
     const goBack = () => {
@@ -131,12 +153,28 @@ export default function Navbar() {
                                     <ArrowLeft className="h-[18px] w-[18px]" strokeWidth={2.2} />
                                 </button>
                             )}
-                            <span className={cn("font-heading text-[17px] font-extrabold [font-stretch:84%] truncate", isTabRoot && "pl-0.5")}>
+                            <span className={cn("font-heading text-[17px] font-extrabold [font-stretch:84%] min-w-0 truncate", isTabRoot && "pl-0.5")}>
                                 {mobileTitle}
                             </span>
                         </>
                     )}
                     <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                        {activeStation && (
+                            <button
+                                type="button"
+                                data-testid="navbar-origin-btn-mobile"
+                                aria-label={tStaff("originButtonAria", { station: activeStation.name })}
+                                title={`${activeStation.name}${activeStation.postalCode ? ` (${activeStation.postalCode})` : ""}`}
+                                onClick={() => {
+                                    triggerHaptic("light");
+                                    setStationSheetOpen(true);
+                                }}
+                                className="tap inline-flex h-8 max-w-[82px] items-center gap-1 rounded-full border border-emerald-700/45 bg-emerald-500/12 px-2 text-[11px] font-extrabold leading-none text-emerald-900 dark:text-emerald-200 shadow-[var(--shadow-elev-1)] hover:bg-emerald-500/20"
+                            >
+                                <MapPin className="h-3.5 w-3.5 shrink-0 text-emerald-700 dark:text-emerald-300" aria-hidden="true" />
+                                <span className="truncate font-mono">{mobileStationLabel}</span>
+                            </button>
+                        )}
                         {isRatesPage && <CurrencySwitcher compact />}
                         <button
                             type="button"
@@ -198,6 +236,11 @@ export default function Navbar() {
                                 )}
                             >
                                 <span>{item.label}</span>
+                                {item.beta && (
+                                    <span className="hidden lg:inline-flex rounded bg-amber-500/20 px-1 py-px font-mono text-[9px] font-extrabold uppercase tracking-tight text-amber-900 dark:text-amber-300">
+                                        Beta
+                                    </span>
+                                )}
                                 {item.soon && (
                                     <span className="hidden xl:inline-flex rounded bg-secondary/70 px-1 py-px font-mono text-[9px] font-bold uppercase tracking-tight text-secondary-foreground">
                                         Soon
@@ -228,6 +271,22 @@ export default function Navbar() {
                                 <span>{tInstall("install")}</span>
                             </Button>
                         )}
+                        {activeStation && (
+                            <button
+                                type="button"
+                                data-testid="navbar-origin-btn-desktop"
+                                aria-label={tStaff("originButtonAria", { station: activeStation.name })}
+                                title={`${activeStation.name}${activeStation.postalCode ? ` (${activeStation.postalCode})` : ""}`}
+                                onClick={() => {
+                                    triggerHaptic("light");
+                                    setStationSheetOpen(true);
+                                }}
+                                className="tap inline-flex h-8 items-center gap-1.5 rounded-full border border-emerald-700/45 bg-emerald-500/12 px-2.5 text-xs font-bold text-emerald-900 dark:text-emerald-200 hover:bg-emerald-500/20"
+                            >
+                                <MapPin className="h-3.5 w-3.5 shrink-0 text-emerald-700 dark:text-emerald-300" aria-hidden="true" />
+                                <span className="max-w-[110px] truncate">{activeStation.name}</span>
+                            </button>
+                        )}
                         {isRatesPage && <CurrencySwitcher />}
                         <LanguageSwitcher />
                         <ThemeToggle />
@@ -257,6 +316,7 @@ export default function Navbar() {
                     </div>
                 </div>
             </header>
+            <StaffStationSheet open={stationSheetOpen} onOpenChange={setStationSheetOpen} />
         </>
     );
 }

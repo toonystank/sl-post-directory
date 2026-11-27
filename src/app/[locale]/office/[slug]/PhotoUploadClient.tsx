@@ -11,11 +11,11 @@ export function PhotoUploadClient({ officeId }: { officeId: string }) {
 
     const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
-    const handleUploadComplete = async (url: string) => {
+    const handleUploadComplete = async (url: string, uploadTicket?: string) => {
         setStatusMessage(null);
         setStatusError(false);
 
-        if (turnstileSiteKey && !turnstileToken) {
+        if (turnstileSiteKey && !turnstileToken && !uploadTicket) {
             setStatusError(true);
             setStatusMessage("Please complete the Captcha before uploading a photo.");
             return;
@@ -25,7 +25,12 @@ export function PhotoUploadClient({ officeId }: { officeId: string }) {
             const res = await fetch(`/api/offices/${officeId}/photos`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ url, caption: "", turnstileToken }),
+                body: JSON.stringify({
+                    url,
+                    caption: "",
+                    turnstileToken,
+                    ...(uploadTicket ? { uploadTicket } : {}),
+                }),
             });
 
             if (res.ok) {
@@ -58,7 +63,12 @@ export function PhotoUploadClient({ officeId }: { officeId: string }) {
                     />
                 </div>
             )}
-            <PhotoUpload officeId={officeId} onUploadComplete={handleUploadComplete} />
+            <PhotoUpload
+                officeId={officeId}
+                turnstileToken={turnstileToken}
+                disabled={Boolean(turnstileSiteKey && !turnstileToken)}
+                onUploadComplete={handleUploadComplete}
+            />
             {statusMessage && (
                 <p
                     className={`text-xs font-medium ${

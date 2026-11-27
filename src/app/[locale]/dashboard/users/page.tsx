@@ -22,6 +22,7 @@ export default async function UserManagementPage() {
                   role: true,
                   twoFactorEnabled: true,
                   emailVerified: true,
+                  mailRoutingBetaEnabled: true,
               },
           })
         : [];

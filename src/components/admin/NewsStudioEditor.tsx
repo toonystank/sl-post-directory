@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent } from "@/components/shell/Sheet";
 import { showNativeToast } from "@/components/shell/NativeToast";
 import { sanitizeRichHtml } from "@/lib/sanitize-html";
+import { isSafeExternalHttpUrl } from "@/lib/security";
 import { replacePlaceholders } from "@/lib/variables";
 import { cn } from "@/lib/utils";
 import AdminImageUpload from "./AdminImageUpload";
@@ -630,7 +631,7 @@ export default function NewsStudioEditor({
                         }}
                     />
 
-                    {sourceUrl.trim() && (
+                    {sourceUrl.trim() && isSafeExternalHttpUrl(sourceUrl) && (
                         <div className="rounded-md border border-foreground bg-muted/40 p-4 flex items-center justify-between gap-3">
                             <div>
                                 <p className="label-mono">Official Source / Circular</p>

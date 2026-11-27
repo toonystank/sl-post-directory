@@ -7,14 +7,20 @@ import { Camera, X, CheckCircle, Loader2 } from "lucide-react";
 
 interface PhotoUploadProps {
     officeId: string;
-    onUploadComplete?: (url: string) => void;
+    turnstileToken?: string | null;
+    disabled?: boolean;
+    onUploadComplete?: (url: string, uploadTicket?: string) => void;
 }
 
-const UPLOADCARE_PUBLIC_KEY = process.env.NEXT_PUBLIC_UPLOADCARE_PUB_KEY || "16423b7c9e1a87e5884e";
-const UPLOADCARE_CDN_BASE = process.env.NEXT_PUBLIC_UPLOADCARE_CDN || "https://3q5fhu0dw8.ucarecd.net";
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ALLOWED_UPLOAD_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
-export default function PhotoUpload({ officeId, onUploadComplete }: PhotoUploadProps) {
+export default function PhotoUpload({
+    officeId,
+    turnstileToken,
+    disabled = false,
+    onUploadComplete,
+}: PhotoUploadProps) {
     const t = useTranslations("Photos");
     const [isUploading, setIsUploading] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
@@ -23,13 +29,17 @@ export default function PhotoUpload({ officeId, onUploadComplete }: PhotoUploadP
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const uploadFile = useCallback(async (file: File) => {
+        if (disabled) {
+            setError("Please complete the Captcha before uploading a photo.");
+            return;
+        }
         if (file.size > MAX_FILE_SIZE) {
             setError("File is too large. Maximum size is 5MB.");
             return;
         }
 
-        if (!file.type.startsWith("image/")) {
-            setError("Only image files are allowed.");
+        if (!ALLOWED_UPLOAD_MIME_TYPES.has(file.type)) {
+            setError("Only JPEG, PNG, and WebP images are allowed.");
             return;
         }
 
@@ -37,9 +47,37 @@ export default function PhotoUpload({ officeId, onUploadComplete }: PhotoUploadP
         setError(null);
 
         try {
+            const signRes = await fetch("/api/uploadcare/sign", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    scope: "community",
+                    officeId,
+                    turnstileToken: turnstileToken ?? null,
+                }),
+            });
+
+            if (!signRes.ok) {
+                const signErr = (await signRes.json().catch(() => ({}))) as { error?: string };
+                throw new Error(signErr.error || "Unable to authorize upload");
+            }
+
+            const signData = (await signRes.json()) as {
+                publicKey: string;
+                cdnBase: string;
+                store?: string;
+                signature?: string;
+                expire?: number;
+                uploadTicket?: string;
+            };
+
             const formData = new FormData();
-            formData.append("UPLOADCARE_PUB_KEY", UPLOADCARE_PUBLIC_KEY);
-            formData.append("UPLOADCARE_STORE", "1");
+            formData.append("UPLOADCARE_PUB_KEY", signData.publicKey);
+            formData.append("UPLOADCARE_STORE", signData.store || "1");
+            if (signData.signature && signData.expire) {
+                formData.append("signature", signData.signature);
+                formData.append("expire", String(signData.expire));
+            }
             formData.append("file", file);
             formData.append("metadata[officeId]", officeId);
 
@@ -50,16 +88,18 @@ export default function PhotoUpload({ officeId, onUploadComplete }: PhotoUploadP
 
             if (!response.ok) throw new Error("Upload failed");
 
-            const data = await response.json();
-            const cdnUrl = `${UPLOADCARE_CDN_BASE}/${data.file}/`;
+            const data = (await response.json()) as { file?: string };
+            if (!data.file) throw new Error("Upload failed");
+            const cdnBase = signData.cdnBase.replace(/\/+$/, "");
+            const cdnUrl = `${cdnBase}/${data.file}/`;
             setUploadedUrl(cdnUrl);
-            onUploadComplete?.(cdnUrl);
-        } catch {
-            setError("Upload failed. Please try again.");
+            onUploadComplete?.(cdnUrl, signData.uploadTicket);
+        } catch (err) {
+            setError(err instanceof Error && err.message ? err.message : "Upload failed. Please try again.");
         } finally {
             setIsUploading(false);
         }
-    }, [officeId, onUploadComplete]);
+    }, [disabled, officeId, onUploadComplete, turnstileToken]);
 
     const handleDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
@@ -101,20 +141,23 @@ export default function PhotoUpload({ officeId, onUploadComplete }: PhotoUploadP
     return (
         <div>
             <div
-                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragOver={(e) => { if (!disabled) { e.preventDefault(); setIsDragging(true); } }}
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className={`relative rounded-md border-2 border-dashed p-8 text-center cursor-pointer transition-colors ${
-                    isDragging
-                        ? "border-foreground bg-secondary/20"
-                        : "border-border bg-card hover:border-foreground/50"
+                onClick={() => !disabled && fileInputRef.current?.click()}
+                className={`relative rounded-md border-2 border-dashed p-8 text-center transition-colors ${
+                    disabled
+                        ? "border-border bg-muted/40 opacity-60 cursor-not-allowed"
+                        : isDragging
+                          ? "border-foreground bg-secondary/20 cursor-pointer"
+                          : "border-border bg-card hover:border-foreground/50 cursor-pointer"
                 }`}
             >
                 <input
                     ref={fileInputRef}
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp"
+                    disabled={disabled}
                     className="hidden"
                     onChange={handleFileChange}
                 />

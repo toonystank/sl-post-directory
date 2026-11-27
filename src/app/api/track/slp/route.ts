@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { verifySameOrigin } from "@/lib/csrf";
 import { checkRateLimit, rateLimitHeaders, rateLimiters } from "@/lib/rate-limiter";
 import { VALID_BARCODE_REGEX } from "@/lib/tracking/classifier";
 import { parseSlpHtml } from "@/lib/tracking/parsers";
-import { verifyUpstreamSessionCookie } from "@/lib/tracking/session-token";
+import { consumeUpstreamSessionCookie } from "@/lib/tracking/session-token";
 import type { SlpTrackApiResponse } from "@/lib/tracking/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const SLP_TRACK_URL = "https://slpmail.slpost.gov.lk/track/index.php";
+const MAX_UPSTREAM_HTML_BYTES = 512_000;
 const BROWSER_UA =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
@@ -20,6 +22,14 @@ const slpTrackSchema = z.object({
 });
 
 export async function POST(req: NextRequest): Promise<NextResponse<SlpTrackApiResponse>> {
+    const csrf = verifySameOrigin(req);
+    if (!csrf.ok) {
+        return NextResponse.json(
+            { success: false, status: "error", error: csrf.error },
+            { status: 403, headers: { "Cache-Control": "no-store" } }
+        );
+    }
+
     const rl = await checkRateLimit(req, rateLimiters.tracking);
     const headers = {
         ...rateLimitHeaders(rl),
@@ -60,7 +70,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<SlpTrackApiRe
     }
 
     const { barcode, captcha, token } = parsed.data;
-    const cookiePair = verifyUpstreamSessionCookie(token);
+    const cookiePair = await consumeUpstreamSessionCookie(token);
     if (!cookiePair) {
         return NextResponse.json(
             {
@@ -90,6 +100,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<SlpTrackApiRe
             },
             body: params.toString(),
             cache: "no-store",
+            redirect: "error",
             signal: AbortSignal.timeout(15000),
         });
 
@@ -97,7 +108,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<SlpTrackApiRe
             throw new Error(`SLP track endpoint returned HTTP ${res.status}`);
         }
 
-        const html = await res.text();
+        const html = (await res.text()).slice(0, MAX_UPSTREAM_HTML_BYTES);
         const result = parseSlpHtml(html, barcode);
 
         if (result.status === "invalid_captcha") {

@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import {
     clampPagination,
     escapeHtml,
+    escapeSqlLike,
+    extractUploadcareUuid,
+    isSafeExternalHttpUrl,
     isSafePublicImageUrl,
     isUploadcareImageUrl,
     normalizeUploadcareImageUrl,
@@ -26,8 +29,23 @@ test("isSafePublicImageUrl accepts public HTTPS asset URLs and rejects XSS/SSRF 
     assert.equal(isSafePublicImageUrl("https://10.0.0.5/internal.png"), false);
     assert.equal(isSafePublicImageUrl("https://172.16.0.1/vpc.png"), false);
     assert.equal(isSafePublicImageUrl("https://service.internal/img.png"), false);
+    assert.equal(isSafePublicImageUrl("https://[::1]/secret.png"), false);
+    assert.equal(isSafePublicImageUrl("https://[::ffff:127.0.0.1]/secret.png"), false);
+    assert.equal(isSafePublicImageUrl("https://[::ffff:169.254.169.254]/latest/meta-data/"), false);
+    assert.equal(isSafePublicImageUrl("https://[fe80::1]/link-local.png"), false);
+    assert.equal(isSafePublicImageUrl("https://[fc00::1]/ula.png"), false);
+    assert.equal(isSafePublicImageUrl("https://100.64.0.1/cgnat.png"), false);
+    assert.equal(isSafePublicImageUrl("https://user:pass@ucarecdn.com/img.png"), false);
+    assert.equal(isSafePublicImageUrl("https://sub.localhost/img.png"), false);
     assert.equal(isSafePublicImageUrl("not-a-url"), false);
     assert.equal(isSafePublicImageUrl(""), false);
+
+    assert.equal(isSafeExternalHttpUrl("https://slpost.gov.lk/circular"), true);
+    assert.equal(isSafeExternalHttpUrl("https://[::1]/admin"), false);
+    assert.equal(isSafeExternalHttpUrl("javascript:alert(1)"), false);
+    assert.equal(extractUploadcareUuid("https://3q5fhu0dw8.ucarecd.net/8f4c1a2e-9b2d-4c4b-9e6d-1234567890ab/"), "8f4c1a2e-9b2d-4c4b-9e6d-1234567890ab");
+    assert.equal(extractUploadcareUuid("https://ucarecdn.com/8f4c1a2e-9b2d-4c4b-9e6d-1234567890ab/../../etc"), null);
+    assert.equal(escapeSqlLike("100%_\\admin"), "100\\%\\_\\\\admin");
 });
 
 test("isUploadcareImageUrl strictly validates Uploadcare UUID URLs and normalizes trailing slashes", () => {

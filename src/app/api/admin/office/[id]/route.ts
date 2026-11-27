@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireRole } from "@/lib/auth-guard";
+import { verifySameOrigin } from "@/lib/csrf";
 import { prisma } from "@/lib/prisma";
 import { invalidateOfficeIndexCache } from "@/lib/server-caches";
-import { updateOfficeSchema } from "@/lib/validations";
+import { extractValidatedDynamicFields, updateOfficeSchema } from "@/lib/validations";
 
 function revalidateOfficeDirectory(slug?: string) {
     invalidateOfficeIndexCache();
@@ -24,11 +24,9 @@ function revalidateOfficeDirectory(slug?: string) {
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
-        const session = await getServerSession(authOptions);
-        const user = session?.user as { role?: string } | undefined;
-
-        if (!session || (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN" && user?.role !== "MODERATOR")) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const auth = await requireRole(["ADMIN", "SUPER_ADMIN", "MODERATOR"]);
+        if (!auth.ok) {
+            return auth.response;
         }
 
         const office = await prisma.postOffice.findUnique({
@@ -53,12 +51,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const { id } = await params;
-        const session = await getServerSession(authOptions);
-        const user = session?.user as { role?: string } | undefined;
+        const csrf = verifySameOrigin(req);
+        if (!csrf.ok) {
+            return NextResponse.json({ error: csrf.error }, { status: 403 });
+        }
 
-        if (!session || (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN")) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const { id } = await params;
+        const auth = await requireRole(["ADMIN", "SUPER_ADMIN"]);
+        if (!auth.ok) {
+            return auth.response;
         }
 
         const body = await req.json();
@@ -86,8 +87,44 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
             ...fields
         } = parsed.data;
 
+        if (controllingOfficeId && controllingOfficeId === id) {
+            return NextResponse.json({ error: "An office cannot be its own controlling office" }, { status: 400 });
+        }
+
+        const sanitizedChildIds = controlledOfficesIds?.filter((cid) => cid !== id);
+
+        const newFields: { name: string; value: string; type: string; postOfficeId: string }[] = [];
+        if (Array.isArray(customFields)) {
+            for (const item of customFields) {
+                if (item.name.trim() && item.value.trim()) {
+                    newFields.push({
+                        name: item.name.trim(),
+                        value: item.value.trim(),
+                        type: "TEXT",
+                        postOfficeId: id,
+                    });
+                }
+            }
+        } else {
+            try {
+                for (const item of extractValidatedDynamicFields(fields, 50)) {
+                    newFields.push({
+                        name: item.name,
+                        value: item.value,
+                        type: "TEXT",
+                        postOfficeId: id,
+                    });
+                }
+            } catch (fieldErr) {
+                return NextResponse.json(
+                    { error: fieldErr instanceof Error ? fieldErr.message : "Invalid custom fields" },
+                    { status: 400 }
+                );
+            }
+        }
+
         const result = await prisma.$transaction(async (tx) => {
-            if (controlledOfficesIds !== undefined) {
+            if (sanitizedChildIds !== undefined) {
                 await tx.postOffice.updateMany({
                     where: { controllingOfficeId: id },
                     data: { controllingOfficeId: null },
@@ -105,9 +142,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
                     ...(latitude !== undefined && { latitude }),
                     ...(longitude !== undefined && { longitude }),
                     ...(controllingOfficeId !== undefined && { controllingOfficeId: controllingOfficeId || null }),
-                    ...(controlledOfficesIds !== undefined && {
+                    ...(sanitizedChildIds !== undefined && {
                         controlledOffices: {
-                            connect: controlledOfficesIds.map((childId) => ({ id: childId })),
+                            connect: sanitizedChildIds.map((childId) => ({ id: childId })),
                         },
                     }),
                 },
@@ -116,33 +153,6 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
             await tx.postOfficeField.deleteMany({
                 where: { postOfficeId: id },
             });
-
-            const newFields: { name: string; value: string; type: string; postOfficeId: string }[] = [];
-
-            if (Array.isArray(customFields)) {
-                for (const item of customFields) {
-                    if (item.name.trim() && item.value.trim()) {
-                        newFields.push({
-                            name: item.name.trim(),
-                            value: item.value.trim(),
-                            type: "TEXT",
-                            postOfficeId: id,
-                        });
-                    }
-                }
-            } else {
-                for (const [key, value] of Object.entries(fields)) {
-                    if (key.startsWith("field_") && typeof value === "string" && value.trim() !== "") {
-                        const fieldName = key.replace("field_", "");
-                        newFields.push({
-                            name: fieldName,
-                            value: value.trim(),
-                            type: "TEXT",
-                            postOfficeId: id,
-                        });
-                    }
-                }
-            }
 
             if (newFields.length > 0) {
                 await tx.postOfficeField.createMany({ data: newFields });
@@ -180,12 +190,15 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const { id } = await params;
-        const session = await getServerSession(authOptions);
-        const user = session?.user as { role?: string } | undefined;
+        const csrf = verifySameOrigin(req);
+        if (!csrf.ok) {
+            return NextResponse.json({ error: csrf.error }, { status: 403 });
+        }
 
-        if (!session || (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN")) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const { id } = await params;
+        const auth = await requireRole(["ADMIN", "SUPER_ADMIN"]);
+        if (!auth.ok) {
+            return auth.response;
         }
 
         const deletedSlug = await prisma.$transaction(async (tx) => {

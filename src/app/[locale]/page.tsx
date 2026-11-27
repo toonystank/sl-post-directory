@@ -57,7 +57,7 @@ async function getHomeDirectoryStats(): Promise<{
             .map((o) => o.fields.find((f) => f.name === "Division")?.value || "")
             .filter(Boolean);
         return {
-            totalOffices: local.length || 4024,
+            totalOffices: local.length || 4036,
             divisions: dedupeDivisionLinks(divNames),
         };
     };

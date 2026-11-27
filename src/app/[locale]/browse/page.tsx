@@ -59,8 +59,27 @@ async function getInitialBrowseData(): Promise<InitialDirectoryData> {
                 slug: o.slug,
                 name: o.name,
                 postalCode: normalizePostalCode(o.postalCode),
+                operatingHours: o.operatingHours,
+                rmsc: o.rmsc,
                 services: o.services,
                 fields: o.fields.map((f) => ({ name: f.name, value: f.value })),
+                controllingOffice: o.controllingOffice
+                    ? {
+                          id: o.controllingOffice.id,
+                          slug: o.controllingOffice.slug,
+                          name: o.controllingOffice.name,
+                          postalCode: normalizePostalCode(o.controllingOffice.postalCode),
+                          shortCode: o.controllingOffice.shortCode,
+                      }
+                    : null,
+                controlledOffices: o.controlledOffices?.map((c) => ({
+                    id: c.id,
+                    slug: c.slug,
+                    name: c.name,
+                    postalCode: normalizePostalCode(c.postalCode),
+                    shortCode: c.shortCode,
+                    delivery: c.delivery,
+                })),
             })),
             total: sorted.length,
             nextCursor: sorted.length > INITIAL_SSR_LIMIT ? INITIAL_SSR_LIMIT : null,
@@ -77,7 +96,22 @@ async function getInitialBrowseData(): Promise<InitialDirectoryData> {
             prisma.postOffice.findMany({
                 take: INITIAL_SSR_LIMIT,
                 orderBy: { name: "asc" },
-                include: { fields: { select: { name: true, value: true } } },
+                include: {
+                    fields: { select: { name: true, value: true } },
+                    controllingOffice: {
+                        select: {
+                            id: true,
+                            slug: true,
+                            name: true,
+                            postalCode: true,
+                            fields: { where: { name: "Short Code" }, select: { value: true } },
+                        },
+                    },
+                    controlledOffices: {
+                        orderBy: { name: "asc" },
+                        select: { id: true, slug: true, name: true, postalCode: true },
+                    },
+                },
             }),
             prisma.postOffice.count(),
             prisma.postOfficeField.findMany({
@@ -99,8 +133,25 @@ async function getInitialBrowseData(): Promise<InitialDirectoryData> {
                 slug: o.slug,
                 name: o.name,
                 postalCode: normalizePostalCode(o.postalCode),
+                operatingHours: o.operatingHours,
+                rmsc: o.rmsc,
                 services: o.services,
                 fields: o.fields,
+                controllingOffice: o.controllingOffice
+                    ? {
+                          id: o.controllingOffice.id,
+                          slug: o.controllingOffice.slug,
+                          name: o.controllingOffice.name,
+                          postalCode: normalizePostalCode(o.controllingOffice.postalCode),
+                          shortCode: o.controllingOffice.fields[0]?.value,
+                      }
+                    : null,
+                controlledOffices: o.controlledOffices.map((c) => ({
+                    id: c.id,
+                    slug: c.slug,
+                    name: c.name,
+                    postalCode: normalizePostalCode(c.postalCode),
+                })),
             })),
             total,
             nextCursor: total > INITIAL_SSR_LIMIT ? INITIAL_SSR_LIMIT : null,

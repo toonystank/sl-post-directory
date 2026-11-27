@@ -1,17 +1,14 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireRole } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
     try {
-        const session = await getServerSession(authOptions);
-        const user = session?.user as { role?: string } | undefined;
-
-        if (!session || (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN" && user?.role !== "MODERATOR")) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const auth = await requireRole(["SUPER_ADMIN"]);
+        if (!auth.ok) {
+            return auth.response;
         }
 
         const offices = await prisma.postOffice.findMany({
@@ -35,6 +32,7 @@ export async function GET() {
             headers: {
                 "Content-Type": "application/json",
                 "Content-Disposition": `attachment; filename="${fileName}"`,
+                "Cache-Control": "no-store",
             },
         });
 

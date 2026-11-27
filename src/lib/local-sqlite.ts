@@ -29,6 +29,11 @@ export interface LocalOfficeLink {
     slug: string;
     name: string;
     postalCode: string;
+    shortCode?: string;
+    delivery?: string;
+    type?: string;
+    phone?: string;
+    rmsc?: string | null;
 }
 
 export interface LocalOfficeRecord {
@@ -36,12 +41,14 @@ export interface LocalOfficeRecord {
     name: string;
     slug: string;
     postalCode: string;
+    operatingHours: string | null;
     services: string[];
     rmsc: string | null;
     latitude: number | null;
     longitude: number | null;
     createdAt: Date;
     updatedAt: Date;
+    controllingOfficeId: string | null;
     fields: LocalOfficeField[];
     photos: LocalOfficePhoto[];
     reviews: LocalOfficeReview[];
@@ -49,13 +56,32 @@ export interface LocalOfficeRecord {
     controlledOffices: LocalOfficeLink[];
 }
 
+interface EnrichedCompactRecord {
+    id: string;
+    slug: string;
+    name: string;
+    postalCode: string;
+    operatingHours?: string | null;
+    services?: string[];
+    rmsc?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    controllingOfficeId?: string | null;
+    fields: { name: string; value: string; type?: string }[];
+}
+
 interface IndexedLocalOffice {
     record: LocalOfficeRecord;
     nameLower: string;
     baseSlug: string;
     codeLower: string;
+    shortCodeLower: string;
     firstChar: string;
     divisionLower: string;
+    typeLower: string;
+    deliveryLower: string;
+    gradeLower: string;
+    rmscLower: string;
     fieldsLower: string[];
     servicesLower: Set<string>;
 }
@@ -100,9 +126,7 @@ function getSqliteModule(): SqliteModule | null {
     const proc = process as unknown as {
         getBuiltinModule?: (id: string) => unknown;
     };
-    const builtin = proc.getBuiltinModule?.("node:sqlite") as
-        | SqliteModule
-        | undefined;
+    const builtin = proc.getBuiltinModule?.("node:sqlite") as SqliteModule | undefined;
     if (builtin?.DatabaseSync) {
         return builtin;
     }
@@ -133,14 +157,21 @@ function buildSearchIndex(offices: LocalOfficeRecord[]): void {
             slugs.set(base, record);
         }
 
-        const divisionField = record.fields.find((f) => f.name === "Division");
+        const getField = (name: string) =>
+            record.fields.find((f) => f.name === name)?.value?.trim() || "";
+
         return {
             record,
             nameLower: record.name.toLowerCase(),
             baseSlug: base,
             codeLower: record.postalCode.toLowerCase(),
+            shortCodeLower: getField("Short Code").toLowerCase(),
             firstChar: record.name.charAt(0).toUpperCase(),
-            divisionLower: divisionField ? divisionField.value.toLowerCase() : "",
+            divisionLower: getField("Division").toLowerCase(),
+            typeLower: getField("Type").toLowerCase(),
+            deliveryLower: getField("Delivery").toLowerCase(),
+            gradeLower: getField("Grade").toLowerCase(),
+            rmscLower: (record.rmsc || "").toLowerCase(),
             fieldsLower: record.fields.map((f) => f.value.toLowerCase()),
             servicesLower: new Set(record.services.map((s) => s.toLowerCase())),
         };
@@ -170,11 +201,89 @@ function toDisplayCase(raw: string): string {
         .replace(/\bSpo\b/g, "SPO");
 }
 
+function loadOfficesFromEnrichedJson(enrichedPath: string): LocalOfficeRecord[] {
+    const raw = JSON.parse(fs.readFileSync(enrichedPath, "utf8")) as EnrichedCompactRecord[];
+    const now = new Date();
+    const records: LocalOfficeRecord[] = raw.map((item) => ({
+        id: item.id,
+        name: item.name,
+        slug: item.slug,
+        postalCode: normalizePostalCode(item.postalCode),
+        operatingHours: item.operatingHours ?? null,
+        services: Array.isArray(item.services) ? item.services : [],
+        rmsc: item.rmsc ?? null,
+        latitude: typeof item.latitude === "number" ? item.latitude : null,
+        longitude: typeof item.longitude === "number" ? item.longitude : null,
+        createdAt: now,
+        updatedAt: now,
+        controllingOfficeId: item.controllingOfficeId ?? null,
+        fields: (item.fields || []).map((f, idx) => ({
+            id: `${item.id}-f${idx}`,
+            officeId: item.id,
+            name: f.name,
+            value: f.value,
+        })),
+        photos: [],
+        reviews: [],
+        controllingOffice: null,
+        controlledOffices: [],
+    }));
+
+    const byId = new Map(records.map((r) => [r.id, r]));
+    const getFieldVal = (rec: LocalOfficeRecord, name: string) =>
+        rec.fields.find((f) => f.name === name)?.value?.trim();
+
+    for (const rec of records) {
+        if (rec.controllingOfficeId && byId.has(rec.controllingOfficeId)) {
+            const parent = byId.get(rec.controllingOfficeId)!;
+            rec.controllingOffice = {
+                id: parent.id,
+                slug: parent.slug,
+                name: parent.name,
+                postalCode: parent.postalCode,
+                shortCode: getFieldVal(parent, "Short Code"),
+                delivery: getFieldVal(parent, "Delivery"),
+                type: getFieldVal(parent, "Type"),
+                phone: getFieldVal(parent, "Phone") || getFieldVal(parent, "Telephone"),
+                rmsc: parent.rmsc,
+            };
+            parent.controlledOffices.push({
+                id: rec.id,
+                slug: rec.slug,
+                name: rec.name,
+                postalCode: rec.postalCode,
+                shortCode: getFieldVal(rec, "Short Code"),
+                delivery: getFieldVal(rec, "Delivery"),
+                type: getFieldVal(rec, "Type"),
+            });
+        }
+    }
+
+    for (const rec of records) {
+        if (rec.controlledOffices.length > 1) {
+            rec.controlledOffices.sort((a, b) => a.name.localeCompare(b.name));
+        }
+    }
+
+    records.sort((a, b) => a.name.localeCompare(b.name));
+    return records;
+}
+
 /**
- * Fallback loader from bundled `src/data/offices-fallback.json` + `src/data/postal-codes-fallback.json` when neither
- * Postgres (`DATABASE_URL`) nor `prisma/dev.db` is available in local development.
+ * Fallback loader preferring `src/data/offices-enriched.json` when available,
+ * otherwise `src/data/offices-fallback.json` + `src/data/postal-codes-fallback.json`.
  */
 function loadOfficesFromBundledJson(): LocalOfficeRecord[] {
+    const enrichedPath = path.join(process.cwd(), "src", "data", "offices-enriched.json");
+    if (fs.existsSync(enrichedPath)) {
+        try {
+            const loaded = loadOfficesFromEnrichedJson(enrichedPath);
+            if (loaded.length > 0) return loaded;
+        } catch {
+            // Fall through to legacy fallback
+        }
+    }
+
     const data10Path = path.join(process.cwd(), "src", "data", "offices-fallback.json");
     const scrapedPath = path.join(process.cwd(), "src", "data", "postal-codes-fallback.json");
 
@@ -231,10 +340,8 @@ function loadOfficesFromBundledJson(): LocalOfficeRecord[] {
                 const postalCode =
                     fromName || fromScraped || normalizePostalCode(rawPoCode) || "";
 
-                const key = `${cleanName.toUpperCase()}|${postalCode}`;
                 if (seenUpperNames.has(cleanName.toUpperCase()) && !postalCode) continue;
                 seenUpperNames.add(cleanName.toUpperCase());
-                void key;
 
                 const ds = typeof item["DS"] === "string" ? item["DS"].trim() : "";
                 const phone = typeof item["Te. No"] === "string" ? item["Te. No"].trim() : "";
@@ -283,7 +390,7 @@ function loadOfficesFromBundledJson(): LocalOfficeRecord[] {
                 id: `${rowId}-hours`,
                 officeId: rowId,
                 name: "Working Hours",
-                value: "8:00 AM - 4:00 PM (Weekdays)",
+                value: "Mon–Fri 8:30 AM – 4:30 PM · Sat 8:30 AM – 1:00 PM",
             },
         ];
         if (entry.division) {
@@ -316,12 +423,14 @@ function loadOfficesFromBundledJson(): LocalOfficeRecord[] {
             name: entry.name,
             slug,
             postalCode: entry.postalCode,
+            operatingHours: "Mon–Fri 8:30 AM – 4:30 PM · Sat 8:30 AM – 1:00 PM",
             services: [],
             rmsc: null,
             latitude: null,
             longitude: null,
             createdAt: now,
             updatedAt: now,
+            controllingOfficeId: null,
             fields,
             photos: [],
             reviews: [],
@@ -331,11 +440,6 @@ function loadOfficesFromBundledJson(): LocalOfficeRecord[] {
     });
 }
 
-/**
- * Loads and caches all Sri Lankan post offices from `prisma/dev.db`
- * (or falls back to bundled `src/data/offices-fallback.json` + `src/data/postal-codes-fallback.json`),
- * with precomputed lowercase indices for O(1) id/slug lookup and sub-ms filtering.
- */
 export function loadLocalOffices(): LocalOfficeRecord[] {
     if (cachedOffices !== null) {
         return cachedOffices;
@@ -347,6 +451,12 @@ export function loadLocalOffices(): LocalOfficeRecord[] {
         buildSearchIndex(offices);
         return cachedOffices;
     };
+
+    // Always prefer enriched JSON when it exists over legacy dev.db
+    const enrichedPath = path.join(process.cwd(), "src", "data", "offices-enriched.json");
+    if (fs.existsSync(enrichedPath)) {
+        return loadBundled();
+    }
 
     const dbPath = path.join(process.cwd(), "prisma", "dev.db");
     if (!fs.existsSync(dbPath)) {
@@ -362,9 +472,7 @@ export function loadLocalOffices(): LocalOfficeRecord[] {
     try {
         db = new sqliteMod.DatabaseSync(dbPath, { open: true, readOnly: true });
         const rows = db
-            .prepare(
-                "SELECT id, name, postalCode, createdAt, updatedAt FROM PostOffice ORDER BY name ASC"
-            )
+            .prepare("SELECT id, name, postalCode, createdAt, updatedAt FROM PostOffice ORDER BY name ASC")
             .all();
 
         if (rows.length === 0) {
@@ -384,12 +492,14 @@ export function loadLocalOffices(): LocalOfficeRecord[] {
                 name: row.name,
                 slug,
                 postalCode: normalizePostalCode(row.postalCode),
+                operatingHours: null,
                 services: [],
                 rmsc: null,
                 latitude: null,
                 longitude: null,
                 createdAt: Number.isFinite(createdMs) && createdMs > 0 ? new Date(createdMs) : new Date(),
                 updatedAt: Number.isFinite(updatedMs) && updatedMs > 0 ? new Date(updatedMs) : new Date(),
+                controllingOfficeId: null,
                 fields: [
                     {
                         id: `${rowId}-type`,
@@ -401,7 +511,7 @@ export function loadLocalOffices(): LocalOfficeRecord[] {
                         id: `${rowId}-hours`,
                         officeId: rowId,
                         name: "Working Hours",
-                        value: "8:00 AM - 4:00 PM (Weekdays)",
+                        value: "Mon–Fri 8:30 AM – 4:30 PM · Sat 8:30 AM – 1:00 PM",
                     },
                 ],
                 photos: [],
@@ -420,7 +530,7 @@ export function loadLocalOffices(): LocalOfficeRecord[] {
         try {
             db?.close();
         } catch {
-            // Ignore close errors on read-only fallback DB
+            // Ignore close errors
         }
     }
 }
@@ -433,6 +543,8 @@ export function queryLocalOffices(params: {
     division?: string;
     officeType?: string;
     is24Hour?: boolean;
+    delivery?: "yes" | "no" | null;
+    rmsc?: string | null;
     cursor?: number;
     limit?: number;
 }): {
@@ -466,17 +578,30 @@ export function queryLocalOffices(params: {
 
     const officeType = params.officeType?.trim().toLowerCase() || "";
     if (officeType) {
-        filtered = filtered.filter((item) =>
-            item.record.fields.some(
-                (f) => f.name === "Type" && f.value.toLowerCase() === officeType
-            )
-        );
+        if (officeType === "supra post office") {
+            filtered = filtered.filter(
+                (item) => item.gradeLower.includes("supra") || item.typeLower === "supra post office"
+            );
+        } else {
+            filtered = filtered.filter((item) => item.typeLower === officeType);
+        }
     }
 
     if (params.is24Hour) {
         filtered = filtered.filter((item) =>
             item.record.fields.some((f) => f.name === "Is24Hour" && f.value === "true")
         );
+    }
+
+    if (params.delivery === "yes") {
+        filtered = filtered.filter((item) => item.deliveryLower === "yes");
+    } else if (params.delivery === "no") {
+        filtered = filtered.filter((item) => item.deliveryLower === "no");
+    }
+
+    const rmsc = params.rmsc?.trim().toLowerCase() || "";
+    if (rmsc) {
+        filtered = filtered.filter((item) => item.rmscLower.includes(rmsc));
     }
 
     const q = params.q?.trim() || "";
@@ -496,18 +621,21 @@ export function queryLocalOffices(params: {
                 const isCodeExact =
                     item.codeLower === qLower ||
                     (codeVariants.length > 0 && codeVariants.includes(item.codeLower));
+                const isShortExact = item.shortCodeLower !== "" && item.shortCodeLower === qLower;
                 const isCodePrefix =
                     item.codeLower.startsWith(qLower) ||
                     (codeVariants.length > 0 &&
                         codeVariants.some((v) => item.codeLower.startsWith(v)));
+                const isShortPrefix =
+                    item.shortCodeLower !== "" && item.shortCodeLower.startsWith(qLower);
                 const isCodeContains =
                     item.codeLower.includes(qLower) ||
                     (codeVariants.length > 0 &&
                         codeVariants.some((v) => item.codeLower.includes(v)));
 
-                if (item.nameLower === qLower || isCodeExact) {
+                if (item.nameLower === qLower || isCodeExact || isShortExact) {
                     exact.push(item);
-                } else if (item.nameLower.startsWith(qLower) || isCodePrefix) {
+                } else if (item.nameLower.startsWith(qLower) || isCodePrefix || isShortPrefix) {
                     prefix.push(item);
                 } else if (
                     item.nameLower.includes(qLower) ||
@@ -518,7 +646,6 @@ export function queryLocalOffices(params: {
                 }
             }
 
-            // Inputs are already sorted by name ASC, so bucket concatenation preserves O(N) ranked order!
             filtered = [...exact, ...prefix, ...contains];
         }
     }
@@ -564,18 +691,20 @@ export function autocompleteLocalOffices(q: string, mode = "name"): string[] {
         const codeExact =
             item.record.postalCode === trimmed ||
             (codeVariants.length > 0 && codeVariants.includes(item.record.postalCode));
+        const shortExact = item.shortCodeLower !== "" && item.shortCodeLower === qLower;
         const codePrefix =
             item.record.postalCode.startsWith(trimmed) ||
             (codeVariants.length > 0 &&
                 codeVariants.some((v) => item.record.postalCode.startsWith(v)));
+        const shortPrefix = item.shortCodeLower !== "" && item.shortCodeLower.startsWith(qLower);
         const codeContains =
             item.record.postalCode.includes(trimmed) ||
             (codeVariants.length > 0 &&
                 codeVariants.some((v) => item.record.postalCode.includes(v)));
 
-        if (item.nameLower === qLower || codeExact) {
+        if (item.nameLower === qLower || codeExact || shortExact) {
             exact.push(item.record);
-        } else if (item.nameLower.startsWith(qLower) || codePrefix) {
+        } else if (item.nameLower.startsWith(qLower) || codePrefix || shortPrefix) {
             prefix.push(item.record);
         } else if (
             item.nameLower.includes(qLower) ||

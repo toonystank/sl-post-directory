@@ -57,6 +57,30 @@ async function main() {
         }
 
         console.log(`[schema] Verified BlogPost news columns: ${found.join(", ")}`);
+
+        // Ensure Mail Routing Beta feature flag columns exist on User & SiteSettings
+        const userTableCheck = await prisma.$queryRawUnsafe(
+            'SELECT to_regclass(\'"User"\')::text AS tbl'
+        );
+        if (Array.isArray(userTableCheck) && userTableCheck[0] && userTableCheck[0].tbl) {
+            await prisma.$executeRawUnsafe(`
+                ALTER TABLE "User"
+                  ADD COLUMN IF NOT EXISTS "mailRoutingBetaEnabled" BOOLEAN NOT NULL DEFAULT false
+            `);
+            console.log('[schema] Verified User.mailRoutingBetaEnabled column.');
+        }
+
+        const settingsTableCheck = await prisma.$queryRawUnsafe(
+            'SELECT to_regclass(\'"SiteSettings"\')::text AS tbl'
+        );
+        if (Array.isArray(settingsTableCheck) && settingsTableCheck[0] && settingsTableCheck[0].tbl) {
+            await prisma.$executeRawUnsafe(`
+                ALTER TABLE "SiteSettings"
+                  ADD COLUMN IF NOT EXISTS "mailRoutingBetaAvailable" BOOLEAN NOT NULL DEFAULT true,
+                  ADD COLUMN IF NOT EXISTS "mailRoutingSelfOptIn" BOOLEAN NOT NULL DEFAULT true
+            `);
+            console.log('[schema] Verified SiteSettings mail routing beta columns.');
+        }
     } finally {
         await prisma.$disconnect();
     }

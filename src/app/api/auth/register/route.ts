@@ -4,15 +4,27 @@ import bcrypt from "bcrypt";
 import crypto from "node:crypto";
 import { sendVerificationEmail } from "@/lib/email";
 import { registerSchema } from "@/lib/validations";
-import { checkRateLimit, rateLimiters } from "@/lib/rate-limiter";
+import { checkRateLimit, rateLimiters, rateLimitHeaders } from "@/lib/rate-limiter";
+import { verifyTurnstile } from "@/lib/turnstile";
+import { verifySameOrigin } from "@/lib/csrf";
+
+const NEUTRAL_REGISTER_MESSAGE = "If this email is available, a verification email has been sent.";
 
 export async function POST(req: Request) {
     try {
+        const csrf = verifySameOrigin(req);
+        if (!csrf.ok) {
+            return NextResponse.json({ error: csrf.error }, { status: 403 });
+        }
+
         // Enforce Rate Limit: Max 5 accounts per hour per IP
         const rateLimit = await checkRateLimit(req, rateLimiters.register);
 
         if (rateLimit.isRateLimited) {
-            return NextResponse.json({ error: "Too many registration attempts. Please try again later." }, { status: 429 });
+            return NextResponse.json(
+                { error: "Too many registration attempts. Please try again later." },
+                { status: 429, headers: rateLimitHeaders(rateLimit) }
+            );
         }
 
         const body = await req.json();
@@ -26,46 +38,29 @@ export async function POST(req: Request) {
             );
         }
 
-        const { name, email, password, turnstileToken } = validation.data;
+        const { name, email: rawEmail, password, turnstileToken } = validation.data;
+        const email = rawEmail.trim().toLowerCase();
 
-        // Verify Turnstile Captcha — fail-closed in production
-        const turnstileSecret = process.env.TURNSTILE_SECRET_KEY;
-        if (turnstileSecret && turnstileToken) {
-            const formData = new FormData();
-            formData.append("secret", turnstileSecret);
-            formData.append("response", turnstileToken);
-
-            const result = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-                body: formData,
-                method: "POST",
-            });
-
-            const outcome = await result.json();
-            if (!outcome.success) {
-                return NextResponse.json({ error: "Captcha verification failed" }, { status: 400 });
-            }
-        } else if (turnstileSecret && !turnstileToken) {
-            return NextResponse.json({ error: "Please complete the Captcha" }, { status: 400 });
-        } else if (!turnstileSecret && process.env.NODE_ENV === "production") {
-            console.error("CRITICAL: TURNSTILE_SECRET_KEY is not configured in production!");
-            return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
+        const captcha = await verifyTurnstile(turnstileToken);
+        if (!captcha.ok) {
+            return NextResponse.json({ error: captcha.error }, { status: captcha.status });
         }
 
-        // Check if user already exists
-        const existingUser = await prisma.user.findUnique({
-            where: { email },
+        // Check if user already exists (case-insensitive)
+        const existingUser = await prisma.user.findFirst({
+            where: { email: { equals: email, mode: "insensitive" } },
+            select: { id: true },
         });
 
+        // Always perform bcrypt work to eliminate timing side-channel for email enumeration
+        const passwordHash = await bcrypt.hash(password, 10);
+
         if (existingUser) {
-            // Generic response to prevent user enumeration
             return NextResponse.json({
                 success: true,
-                message: "If this email is available, a verification email has been sent.",
+                message: NEUTRAL_REGISTER_MESSAGE,
             });
         }
-
-        // Hash password
-        const passwordHash = await bcrypt.hash(password, 10);
 
         // Generate verification token
         const verificationToken = crypto.randomBytes(32).toString("hex");
@@ -86,7 +81,7 @@ export async function POST(req: Request) {
 
         return NextResponse.json({
             success: true,
-            message: "Account created successfully. Please check your email to verify your account.",
+            message: NEUTRAL_REGISTER_MESSAGE,
         });
     } catch (error: unknown) {
         console.error("Registration Error:", error);

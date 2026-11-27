@@ -51,6 +51,11 @@ update_admin.js
 check_users.js
 security_audit_report.md
 test_out.txt
+post-office-backup-*.json
+post-office-enriched-*.json
 
 # Database files
 *.db
+
+# Harvest cache
+scripts/cache/

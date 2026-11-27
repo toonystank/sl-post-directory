@@ -159,6 +159,28 @@ export default function OfficeEditModal({ officeId, onClose, onSaved }: OfficeEd
         setNewServiceInput("");
     };
 
+    const getCustomFieldValue = (fieldName: string) =>
+        customFields.find((f) => f.name.toLowerCase() === fieldName.toLowerCase())?.value || "";
+
+    const setCustomFieldValue = (fieldName: string, value: string) => {
+        setCustomFields((prev) => {
+            const idx = prev.findIndex((f) => f.name.toLowerCase() === fieldName.toLowerCase());
+            if (idx >= 0) {
+                const next = [...prev];
+                next[idx] = { ...next[idx], name: fieldName, value };
+                return next;
+            }
+            return [
+                ...prev,
+                {
+                    id: `quick-${fieldName}-${Date.now()}`,
+                    name: fieldName,
+                    value,
+                },
+            ];
+        });
+    };
+
     const addCustomFieldRow = () => {
         setCustomFields((prev) => [
             ...prev,
@@ -370,10 +392,87 @@ export default function OfficeEditModal({ officeId, onClose, onSaved }: OfficeEd
                                             id="edit-office-rmsc"
                                             value={rmsc}
                                             onChange={(e) => setRmsc(e.target.value)}
-                                            placeholder="e.g. Colombo RMSC"
+                                            placeholder="e.g. Kandy RMSC"
                                             className="h-12 text-base bg-background"
                                         />
                                     </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="label-mono block mb-1.5" htmlFor="edit-office-short-code">
+                                            Short Code
+                                        </label>
+                                        <Input
+                                            id="edit-office-short-code"
+                                            value={getCustomFieldValue("Short Code")}
+                                            onChange={(e) => setCustomFieldValue("Short Code", e.target.value.toUpperCase())}
+                                            placeholder="e.g. AW / ATG"
+                                            className="h-12 text-base font-mono bg-background"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="label-mono block mb-1.5" htmlFor="edit-office-delivery">
+                                            Delivery Office
+                                        </label>
+                                        <select
+                                            id="edit-office-delivery"
+                                            value={getCustomFieldValue("Delivery")}
+                                            onChange={(e) => setCustomFieldValue("Delivery", e.target.value)}
+                                            className="h-12 w-full rounded-md border border-input bg-background px-3 text-base"
+                                        >
+                                            <option value="">Unspecified</option>
+                                            <option value="Yes">Yes — Delivery Office</option>
+                                            <option value="No">No — Non-Delivery</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="label-mono block mb-1.5" htmlFor="edit-office-type">
+                                            Office Type
+                                        </label>
+                                        <select
+                                            id="edit-office-type"
+                                            value={getCustomFieldValue("Type")}
+                                            onChange={(e) => setCustomFieldValue("Type", e.target.value)}
+                                            className="h-12 w-full rounded-md border border-input bg-background px-3 text-base"
+                                        >
+                                            <option value="Post Office">Post Office</option>
+                                            <option value="Sub Post Office">Sub Post Office</option>
+                                            <option value="Agency Post Office">Agency Post Office</option>
+                                            <option value="RMSC / Sorting Hub">RMSC / Sorting Hub</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="label-mono block mb-1.5" htmlFor="edit-office-grade">
+                                            Grade
+                                        </label>
+                                        <select
+                                            id="edit-office-grade"
+                                            value={getCustomFieldValue("Grade")}
+                                            onChange={(e) => setCustomFieldValue("Grade", e.target.value)}
+                                            className="h-12 w-full rounded-md border border-input bg-background px-3 text-base"
+                                        >
+                                            <option value="">Unspecified</option>
+                                            <option value="Supra">Supra</option>
+                                            <option value="Special">Special</option>
+                                            <option value="Class I">Class I</option>
+                                            <option value="Class II">Class II</option>
+                                            <option value="Class III">Class III</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="label-mono block mb-1.5" htmlFor="edit-office-phone">
+                                        Phone Number(s)
+                                    </label>
+                                    <Input
+                                        id="edit-office-phone"
+                                        value={getCustomFieldValue("Phone") || getCustomFieldValue("Telephone")}
+                                        onChange={(e) => setCustomFieldValue("Phone", e.target.value)}
+                                        placeholder="e.g. 011 232-8301 / 011 232-8302"
+                                        className="h-12 text-base font-mono bg-background"
+                                    />
                                 </div>
                             </div>
                         )}

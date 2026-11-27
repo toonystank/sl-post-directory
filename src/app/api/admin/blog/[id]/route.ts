@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireRole } from "@/lib/auth-guard";
+import { verifySameOrigin } from "@/lib/csrf";
 import { prisma } from "@/lib/prisma";
 import { sanitizeRichHtml } from "@/lib/sanitize-html";
 import { blogPostInputSchema } from "@/lib/validations";
@@ -21,11 +21,9 @@ function revalidateBlogRoutes(slug?: string) {
 }
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-    const session = await getServerSession(authOptions);
-    const userRole = (session?.user as { role?: string } | undefined)?.role;
-
-    if (!session || !userRole || !["SUPER_ADMIN", "ADMIN", "MODERATOR"].includes(userRole)) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN", "MODERATOR"]);
+    if (!auth.ok) {
+        return auth.response;
     }
 
     try {
@@ -42,11 +40,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-    const session = await getServerSession(authOptions);
-    const userRole = (session?.user as { role?: string } | undefined)?.role;
+    const csrf = verifySameOrigin(req);
+    if (!csrf.ok) {
+        return NextResponse.json({ error: csrf.error }, { status: 403 });
+    }
 
-    if (!session || !userRole || !["SUPER_ADMIN", "ADMIN", "MODERATOR"].includes(userRole)) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN", "MODERATOR"]);
+    if (!auth.ok) {
+        return auth.response;
     }
 
     try {
@@ -138,12 +139,15 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-    const session = await getServerSession(authOptions);
-    const userRole = (session?.user as { role?: string } | undefined)?.role;
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const csrf = verifySameOrigin(req);
+    if (!csrf.ok) {
+        return NextResponse.json({ error: csrf.error }, { status: 403 });
+    }
 
-    if (!session || !userRole || !["SUPER_ADMIN", "ADMIN"].includes(userRole)) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireRole(["SUPER_ADMIN", "ADMIN"]);
+    if (!auth.ok) {
+        return auth.response;
     }
 
     try {

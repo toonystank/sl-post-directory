@@ -2,9 +2,10 @@ import type { PostOffice, SearchMode, SearchResponse } from "@/components/direct
 import { formatSriLankaPhone, normalizePostalCode, postalCodeSearchVariants } from "./site";
 import { HAS_INDIC_SCRIPT_REGEX, resolveAlias } from "./place-aliases";
 import { normalizePlaceName, type PlaceDictionary, type PlaceRecord } from "./address-extract";
+import type { RoutingOfficeNode } from "./mail-routing";
 
 /**
- * Compact tuple row for a single post office:
+ * Compact tuple row for a single post office (v3):
  * [0] id
  * [1] slug
  * [2] name
@@ -12,8 +13,12 @@ import { normalizePlaceName, type PlaceDictionary, type PlaceRecord } from "./ad
  * [4] divisionIdx (-1 if none)
  * [5] typeIdx (-1 if default "Post Office")
  * [6] phone ("" if none)
- * [7] flagsBitmask (bit 0 = is24Hour)
+ * [7] flagsBitmask (bit 0 = is24Hour, bit 1 = deliveryYes, bit 2 = deliveryNo, bit 3 = isSupra, bit 4 = isControlling)
  * [8] serviceIndices (indices into `s[]` lookup table)
+ * [9] shortCode ("" if none)
+ * [10] rmscIdx (-1 if none, index into `m[]`)
+ * [11] controllingIdx (-1 if none, index into `r[]`)
+ * [12] hoursIdx (-1 if none, index into `h[]`)
  */
 export type CompactOfficeRow = [
     string,
@@ -24,7 +29,11 @@ export type CompactOfficeRow = [
     number,
     string,
     number,
-    number[]
+    number[],
+    string?,
+    number?,
+    number?,
+    number?
 ];
 
 export interface CompactOfficeIndex {
@@ -33,6 +42,8 @@ export interface CompactOfficeIndex {
     d: string[];
     t: string[];
     s: string[];
+    m?: string[]; // RMSC / TPO lookup table
+    h?: string[]; // Working hours lookup table
     r: CompactOfficeRow[];
 }
 
@@ -41,11 +52,18 @@ export interface OfficeIndexSourceRecord {
     slug: string;
     name: string;
     postalCode: string;
+    operatingHours?: string | null;
+    rmsc?: string | null;
+    controllingOfficeId?: string | null;
     services?: string[];
     fields?: { name: string; value: string }[];
 }
 
-const FLAG_IS_24_HOUR = 1;
+const FLAG_IS_24_HOUR = 1 << 0;
+const FLAG_DELIVERY_YES = 1 << 1;
+const FLAG_DELIVERY_NO = 1 << 2;
+const FLAG_IS_SUPRA = 1 << 3;
+const FLAG_IS_CONTROLLING = 1 << 4;
 
 function fnv1aHash(input: string): string {
     let hash = 0x811c9dc5;
@@ -58,19 +76,21 @@ function fnv1aHash(input: string): string {
 
 /**
  * Encodes all Sri Lanka post offices into a dictionary-compressed tuple index.
- * For 4,158 offices, the resulting JSON gzips to ~90–130 KB while retaining every
- * field needed for instant client-side search, A–Z browse, postcode & service filtering.
  */
 export function encodeOfficeIndex(records: OfficeIndexSourceRecord[]): CompactOfficeIndex {
     const divisionMap = new Map<string, number>();
     const typeMap = new Map<string, number>();
     const serviceMap = new Map<string, number>();
+    const rmscMap = new Map<string, number>();
+    const hoursMap = new Map<string, number>();
 
     const divisions: string[] = [];
     const types: string[] = [];
     const services: string[] = [];
+    const rmscs: string[] = [];
+    const hoursList: string[] = [];
 
-    const intern = (map: Map<string, number>, arr: string[], raw?: string): number => {
+    const intern = (map: Map<string, number>, arr: string[], raw?: string | null): number => {
         const val = (raw || "").trim();
         if (!val) return -1;
         const existing = map.get(val);
@@ -81,7 +101,7 @@ export function encodeOfficeIndex(records: OfficeIndexSourceRecord[]): CompactOf
         return idx;
     };
 
-    // Deduplicate obvious lowercase/empty-postcode duplicates (e.g. "kabagamuwa" without postcode vs "Kabagamuwa" with 71202)
+    // Deduplicate obvious lowercase/empty-postcode duplicates
     const namesWithPostalCode = new Set<string>();
     for (const rec of records) {
         if (normalizePostalCode(rec.postalCode)) {
@@ -95,6 +115,15 @@ export function encodeOfficeIndex(records: OfficeIndexSourceRecord[]): CompactOf
     });
 
     const sorted = [...cleanedRecords].sort((a, b) => a.name.localeCompare(b.name));
+    const idToSortedIdx = new Map<string, number>();
+    const controllingIds = new Set<string>();
+    for (let i = 0; i < sorted.length; i++) {
+        idToSortedIdx.set(sorted[i].id, i);
+        if (sorted[i].controllingOfficeId) {
+            controllingIds.add(sorted[i].controllingOfficeId!);
+        }
+    }
+
     const rows: CompactOfficeRow[] = new Array(sorted.length);
     const hashChunks: string[] = [String(sorted.length)];
 
@@ -103,12 +132,20 @@ export function encodeOfficeIndex(records: OfficeIndexSourceRecord[]): CompactOf
         let division = "";
         let type = "";
         let phone = "";
+        let shortCode = "";
+        let delivery = "";
+        let grade = "";
+        let workingHours = rec.operatingHours?.trim() || "";
         let is24Hour = false;
 
         if (rec.fields) {
             for (const f of rec.fields) {
                 if (f.name === "Division") division = f.value;
                 else if (f.name === "Type") type = f.value;
+                else if (f.name === "Short Code") shortCode = f.value.trim().toUpperCase();
+                else if (f.name === "Delivery") delivery = f.value.trim();
+                else if (f.name === "Grade") grade = f.value.trim();
+                else if (f.name === "Working Hours" && !workingHours) workingHours = f.value.trim();
                 else if (f.name === "Phone" || f.name === "Telephone") {
                     if (!phone && f.value) phone = formatSriLankaPhone(f.value);
                 } else if (f.name === "Is24Hour" && f.value === "true") {
@@ -118,7 +155,11 @@ export function encodeOfficeIndex(records: OfficeIndexSourceRecord[]): CompactOf
         }
 
         const divIdx = intern(divisionMap, divisions, division);
-        const typeIdx = intern(typeMap, types, type === "Post Office" ? "" : type);
+        const normalizedType = type === "Post office" ? "Post Office" : type;
+        const typeIdx = intern(typeMap, types, normalizedType === "Post Office" ? "" : normalizedType);
+        const rmscIdx = intern(rmscMap, rmscs, rec.rmsc);
+        const hoursIdx = intern(hoursMap, hoursList, workingHours);
+
         const svcIndices: number[] = [];
         if (rec.services && rec.services.length > 0) {
             for (const svc of rec.services) {
@@ -127,8 +168,18 @@ export function encodeOfficeIndex(records: OfficeIndexSourceRecord[]): CompactOf
             }
         }
 
-        const flags = is24Hour ? FLAG_IS_24_HOUR : 0;
+        let flags = 0;
+        if (is24Hour) flags |= FLAG_IS_24_HOUR;
+        if (/^yes|delivery$/i.test(delivery)) flags |= FLAG_DELIVERY_YES;
+        else if (/^no|non[\s-]*delivery$/i.test(delivery)) flags |= FLAG_DELIVERY_NO;
+        if (/supra/i.test(grade) || /supra/i.test(normalizedType)) flags |= FLAG_IS_SUPRA;
+        if (controllingIds.has(rec.id)) flags |= FLAG_IS_CONTROLLING;
+
         const postalCode = normalizePostalCode(rec.postalCode);
+        const controllingIdx =
+            rec.controllingOfficeId && idToSortedIdx.has(rec.controllingOfficeId)
+                ? idToSortedIdx.get(rec.controllingOfficeId)!
+                : -1;
 
         rows[i] = [
             rec.id,
@@ -140,21 +191,26 @@ export function encodeOfficeIndex(records: OfficeIndexSourceRecord[]): CompactOf
             phone,
             flags,
             svcIndices,
+            shortCode,
+            rmscIdx,
+            controllingIdx,
+            hoursIdx,
         ];
 
-        // Sample rows into deterministic content version hash
         if (i < 16 || i % 37 === 0 || i === sorted.length - 1) {
-            hashChunks.push(`${rec.slug}:${postalCode}:${divIdx}:${flags}`);
+            hashChunks.push(`${rec.slug}:${postalCode}:${divIdx}:${flags}:${shortCode}:${rmscIdx}:${hoursIdx}`);
         }
     }
 
-    const version = `v2-${sorted.length}-${fnv1aHash(hashChunks.join("|"))}`;
+    const version = `v4-${sorted.length}-${fnv1aHash(hashChunks.join("|"))}`;
     return {
         v: version,
         count: sorted.length,
         d: divisions,
         t: types,
         s: services,
+        m: rmscs,
+        h: hoursList,
         r: rows,
     };
 }
@@ -176,9 +232,25 @@ export function isValidCompactOfficeIndex(value: unknown): value is CompactOffic
  */
 export function decodeOfficeRowToPostOffice(
     index: CompactOfficeIndex,
-    row: CompactOfficeRow
+    row: CompactOfficeRow,
+    children?: CompactOfficeRow[]
 ): PostOffice {
-    const [id, slug, name, postalCode, divIdx, typeIdx, phone, flags, svcIndices] = row;
+    const [
+        id,
+        slug,
+        name,
+        postalCode,
+        divIdx,
+        typeIdx,
+        phone,
+        flags,
+        svcIndices,
+        shortCode = "",
+        rmscIdx = -1,
+        controllingIdx = -1,
+        hoursIdx = -1,
+    ] = row;
+
     const fields: { name: string; value: string }[] = [
         { name: "Type", value: typeIdx >= 0 ? (index.t[typeIdx] || "Post Office") : "Post Office" },
     ];
@@ -188,21 +260,62 @@ export function decodeOfficeRowToPostOffice(
     if (phone) {
         fields.push({ name: "Phone", value: phone });
     }
+    if (shortCode) {
+        fields.push({ name: "Short Code", value: shortCode });
+    }
+    if ((flags & FLAG_DELIVERY_YES) !== 0) {
+        fields.push({ name: "Delivery", value: "Yes" });
+    } else if ((flags & FLAG_DELIVERY_NO) !== 0) {
+        fields.push({ name: "Delivery", value: "No" });
+    }
+    if ((flags & FLAG_IS_SUPRA) !== 0) {
+        fields.push({ name: "Grade", value: "Supra" });
+    }
     if ((flags & FLAG_IS_24_HOUR) !== 0) {
         fields.push({ name: "Is24Hour", value: "true" });
+    }
+
+    const operatingHours = hoursIdx >= 0 && index.h?.[hoursIdx] ? index.h[hoursIdx] : null;
+    if (operatingHours) {
+        fields.push({ name: "Working Hours", value: operatingHours });
     }
 
     const services = svcIndices
         .map((idx) => index.s[idx])
         .filter((s): s is string => Boolean(s));
 
+    const rmsc = rmscIdx >= 0 && index.m?.[rmscIdx] ? index.m[rmscIdx] : null;
+    const ctrlRow = controllingIdx >= 0 ? index.r[controllingIdx] : undefined;
+    const controllingOffice = ctrlRow
+        ? {
+              id: ctrlRow[0],
+              slug: ctrlRow[1],
+              name: ctrlRow[2],
+              postalCode: ctrlRow[3],
+              shortCode: ctrlRow[9] || "",
+          }
+        : null;
+
+    const controlledOffices = children?.map((c) => ({
+        id: c[0],
+        slug: c[1],
+        name: c[2],
+        postalCode: c[3],
+        shortCode: c[9] || "",
+        delivery: (c[7] & FLAG_DELIVERY_YES) !== 0 ? "Yes" : (c[7] & FLAG_DELIVERY_NO) !== 0 ? "No" : "",
+    }));
+
     return {
         id,
         slug,
         name,
         postalCode,
+        operatingHours,
         services,
         fields,
+        rmsc,
+        controllingOffice,
+        ...(controlledOffices && controlledOffices.length > 0 ? { controlledOffices } : {}),
     };
 }
 
@@ -212,10 +325,15 @@ interface PreparedRow {
     nameCompact: string;
     codeLower: string;
     codeStripped: string;
+    shortCodeLower: string;
     firstChar: string;
     divisionLower: string;
     typeLower: string;
     is24Hour: boolean;
+    deliveryYes: boolean;
+    deliveryNo: boolean;
+    isSupra: boolean;
+    rmscLower: string;
     servicesLower: string[];
 }
 
@@ -227,10 +345,6 @@ function cleanOfficeSearchTerm(raw: string): string {
     return stripped || raw.trim();
 }
 
-/**
- * Lightweight bounded Levenshtein distance (early-exits if > maxDist).
- * Keeps fuzzy matching across 4,158 names well under 5ms on mobile CPUs.
- */
 function boundedEditDistance(a: string, b: string, maxDist: number): number {
     const lenA = a.length;
     const lenB = b.length;
@@ -249,11 +363,7 @@ function boundedEditDistance(a: string, b: string, maxDist: number): number {
 
         for (let j = 1; j <= lenB; j++) {
             const cost = chA === b.charCodeAt(j - 1) ? 0 : 1;
-            const val = Math.min(
-                prev[j] + 1,
-                curr[j - 1] + 1,
-                prev[j - 1] + cost
-            );
+            const val = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
             curr[j] = val;
             if (val < rowMin) rowMin = val;
         }
@@ -272,7 +382,6 @@ function fuzzyMatchesName(item: PreparedRow, qLower: string, qCompact: string): 
     if (item.nameCompact.includes(qCompact)) return true;
 
     const maxDist = qLower.length >= 7 ? 2 : 1;
-    // Compare against the first token or full name prefix for fast typo tolerance
     const candidateLen = Math.min(item.nameLower.length, qLower.length + maxDist);
     const candidatePrefix = item.nameLower.slice(0, candidateLen);
     if (boundedEditDistance(qLower, candidatePrefix, maxDist) <= maxDist) {
@@ -293,6 +402,8 @@ export interface LocalQueryParams {
     division?: string | null;
     officeType?: string | null;
     is24Hour?: boolean;
+    delivery?: "yes" | "no" | null;
+    rmsc?: string | null;
     cursor?: number;
     limit?: number;
 }
@@ -306,31 +417,49 @@ export interface RichAutocompleteSuggestion {
     kind: "office" | "division";
 }
 
-/**
- * In-memory search engine hydrated from the compact office index.
- * Executes autocomplete, A–Z browse, postcode, division, type, 24h, and service filters in < 10ms.
- */
 export class LocalOfficeSearchEngine {
     readonly index: CompactOfficeIndex;
     private readonly prepared: PreparedRow[];
     private readonly slugMap: Map<string, CompactOfficeRow>;
+    private readonly childrenByParentId: Map<string, CompactOfficeRow[]>;
     private cachedPlaceDict: PlaceDictionary | null = null;
+    private cachedRoutingNodes: RoutingOfficeNode[] | null = null;
     readonly divisions: string[];
     readonly types: string[];
+    readonly rmscs: string[];
 
     constructor(index: CompactOfficeIndex) {
         this.index = index;
         this.slugMap = new Map();
+        this.childrenByParentId = new Map();
         this.divisions = [...index.d].filter(Boolean).sort((a, b) => a.localeCompare(b));
         const typeSet = new Set<string>(["Post Office", ...index.t.filter(Boolean)]);
+        if (index.r.some((row) => (row[7] & FLAG_IS_SUPRA) !== 0)) {
+            typeSet.add("Supra Post Office");
+        }
         this.types = Array.from(typeSet).sort((a, b) => a.localeCompare(b));
+        this.rmscs = [...(index.m || [])].filter(Boolean).sort((a, b) => a.localeCompare(b));
+
+        for (const row of index.r) {
+            const ctrlIdx = row[11] ?? -1;
+            if (ctrlIdx >= 0 && index.r[ctrlIdx]) {
+                const parentId = index.r[ctrlIdx][0];
+                let bucket = this.childrenByParentId.get(parentId);
+                if (!bucket) {
+                    bucket = [];
+                    this.childrenByParentId.set(parentId, bucket);
+                }
+                bucket.push(row);
+            }
+        }
 
         const divisionsLower = index.d.map((d) => d.toLowerCase());
         const typesLower = index.t.map((t) => t.toLowerCase());
         const servicesLower = index.s.map((s) => s.toLowerCase());
+        const rmscsLower = (index.m || []).map((m) => m.toLowerCase());
 
         this.prepared = index.r.map((row) => {
-            const [, slug, name, rawPostalCode, divIdx, typeIdx, , flags, svcIndices] = row;
+            const [, slug, name, rawPostalCode, divIdx, typeIdx, , flags, svcIndices, shortCode = "", rmscIdx = -1] = row;
             const normalizedCode = normalizePostalCode(rawPostalCode);
             if (normalizedCode !== rawPostalCode) {
                 row[3] = normalizedCode;
@@ -344,10 +473,15 @@ export class LocalOfficeSearchEngine {
                 nameCompact: nameLower.replace(/[^a-z0-9]/g, ""),
                 codeLower,
                 codeStripped: codeLower.replace(/^0+/, ""),
+                shortCodeLower: shortCode.trim().toLowerCase(),
                 firstChar: name.charAt(0).toUpperCase(),
                 divisionLower: divIdx >= 0 ? (divisionsLower[divIdx] || "") : "",
                 typeLower: typeIdx >= 0 ? (typesLower[typeIdx] || "post office") : "post office",
                 is24Hour: (flags & FLAG_IS_24_HOUR) !== 0,
+                deliveryYes: (flags & FLAG_DELIVERY_YES) !== 0,
+                deliveryNo: (flags & FLAG_DELIVERY_NO) !== 0,
+                isSupra: (flags & FLAG_IS_SUPRA) !== 0,
+                rmscLower: rmscIdx >= 0 ? (rmscsLower[rmscIdx] || "") : "",
                 servicesLower: svcIndices.map((idx) => servicesLower[idx] || "").filter(Boolean),
             };
         });
@@ -367,9 +501,56 @@ export class LocalOfficeSearchEngine {
     }
 
     /**
-     * Builds and caches an exact, postal-code, and bucketed-fuzzy place dictionary
-     * across all offices in the local index for fast offline address matching.
+     * Reconstructs lightweight RoutingOfficeNode records for all offices in < 3ms
+     * for offline mail routing, RMSC hub browsing, and trainee quiz generation.
      */
+    getRoutingNodes(): RoutingOfficeNode[] {
+        if (this.cachedRoutingNodes) {
+            return this.cachedRoutingNodes;
+        }
+        const nodes: RoutingOfficeNode[] = this.index.r.map((row) => {
+            const [
+                id,
+                slug,
+                name,
+                postalCode,
+                divIdx,
+                typeIdx,
+                ,
+                flags,
+                ,
+                shortCode = "",
+                rmscIdx = -1,
+                controllingIdx = -1,
+            ] = row;
+            const ctrlRow = controllingIdx >= 0 ? this.index.r[controllingIdx] : undefined;
+            return {
+                id,
+                slug,
+                name,
+                postalCode,
+                shortCode: shortCode || undefined,
+                type: typeIdx >= 0 ? (this.index.t[typeIdx] || "Post Office") : "Post Office",
+                grade: (flags & FLAG_IS_SUPRA) !== 0 ? "Supra" : undefined,
+                division: divIdx >= 0 ? this.index.d[divIdx] : undefined,
+                delivery:
+                    (flags & FLAG_DELIVERY_YES) !== 0
+                        ? "Yes"
+                        : (flags & FLAG_DELIVERY_NO) !== 0
+                          ? "No"
+                          : "",
+                rmsc: rmscIdx >= 0 && this.index.m?.[rmscIdx] ? this.index.m[rmscIdx] : null,
+                controllingOfficeId: ctrlRow ? ctrlRow[0] : null,
+                controllingOfficeSlug: ctrlRow ? ctrlRow[1] : null,
+                controllingOfficeName: ctrlRow ? ctrlRow[2] : null,
+                controllingOfficePostalCode: ctrlRow ? ctrlRow[3] : null,
+                controllingOfficeShortCode: ctrlRow ? ctrlRow[9] || "" : null,
+            };
+        });
+        this.cachedRoutingNodes = nodes;
+        return nodes;
+    }
+
     getPlaceDictionary(): PlaceDictionary {
         if (this.cachedPlaceDict) {
             return this.cachedPlaceDict;
@@ -409,7 +590,6 @@ export class LocalOfficeSearchEngine {
             }
         }
 
-        // Prefer canonical / shorter office names (e.g. "Kandy" before "Kandy Branch")
         const sortByCanonical = (a: PlaceRecord, b: PlaceRecord) => {
             const aHasDigits = /\d/.test(a.name) ? 1 : 0;
             const bHasDigits = /\d/.test(b.name) ? 1 : 0;
@@ -478,6 +658,8 @@ export class LocalOfficeSearchEngine {
         const divisionFilterLower = (params.division || "").trim().toLowerCase();
         const typeFilterLower = (params.officeType || "").trim().toLowerCase();
         const only24Hour = Boolean(params.is24Hour);
+        const deliveryFilter = params.delivery || null;
+        const rmscFilterLower = (params.rmsc || "").trim().toLowerCase();
         const rawInput = (params.q || "").trim();
         const rawQ =
             rawInput && HAS_INDIC_SCRIPT_REGEX.test(rawInput)
@@ -505,11 +687,25 @@ export class LocalOfficeSearchEngine {
         }
 
         if (typeFilterLower) {
-            pool = pool.filter((item) => item.typeLower === typeFilterLower);
+            if (typeFilterLower === "supra post office") {
+                pool = pool.filter((item) => item.isSupra || item.typeLower === "supra post office");
+            } else {
+                pool = pool.filter((item) => item.typeLower === typeFilterLower);
+            }
         }
 
         if (only24Hour) {
             pool = pool.filter((item) => item.is24Hour);
+        }
+
+        if (deliveryFilter === "yes") {
+            pool = pool.filter((item) => item.deliveryYes);
+        } else if (deliveryFilter === "no") {
+            pool = pool.filter((item) => item.deliveryNo);
+        }
+
+        if (rmscFilterLower) {
+            pool = pool.filter((item) => item.rmscLower.includes(rmscFilterLower));
         }
 
         let ranked: PreparedRow[];
@@ -540,6 +736,7 @@ export class LocalOfficeSearchEngine {
                     (codeVariants.length > 0 &&
                         (codeVariants.includes(item.codeLower) ||
                             (item.codeStripped !== "" && codeVariants.includes(item.codeStripped))));
+                const isShortExact = item.shortCodeLower !== "" && item.shortCodeLower === qLower;
                 const isCodePrefix =
                     item.codeLower.startsWith(qLower) ||
                     (codeVariants.length > 0 &&
@@ -548,14 +745,16 @@ export class LocalOfficeSearchEngine {
                                 item.codeLower.startsWith(v) ||
                                 (item.codeStripped !== "" && item.codeStripped.startsWith(v))
                         ));
+                const isShortPrefix =
+                    item.shortCodeLower !== "" && item.shortCodeLower.startsWith(qLower);
                 const isCodeContains =
                     item.codeLower.includes(qLower) ||
                     (codeVariants.length > 0 &&
                         codeVariants.some((v) => item.codeLower.includes(v)));
 
-                if (item.nameLower === qLower || isCodeExact) {
+                if (item.nameLower === qLower || isCodeExact || isShortExact) {
                     exact.push(item);
-                } else if (item.nameLower.startsWith(qLower) || isCodePrefix) {
+                } else if (item.nameLower.startsWith(qLower) || isCodePrefix || isShortPrefix) {
                     prefix.push(item);
                 } else if (
                     item.nameLower.includes(qLower) ||
@@ -572,7 +771,13 @@ export class LocalOfficeSearchEngine {
 
         const total = ranked.length;
         const slice = ranked.slice(cursor, cursor + limit);
-        const offices = slice.map((item) => decodeOfficeRowToPostOffice(this.index, item.row));
+        const offices = slice.map((item) =>
+            decodeOfficeRowToPostOffice(
+                this.index,
+                item.row,
+                this.childrenByParentId.get(item.row[0])
+            )
+        );
         const nextCursor = cursor + limit < total ? cursor + limit : null;
 
         return { offices, total, nextCursor };
@@ -625,6 +830,7 @@ export class LocalOfficeSearchEngine {
                 (codeVariants.length > 0 &&
                     (codeVariants.includes(item.codeLower) ||
                         (item.codeStripped !== "" && codeVariants.includes(item.codeStripped))));
+            const isShortExact = item.shortCodeLower !== "" && item.shortCodeLower === qLower;
             const isCodePrefix =
                 item.codeLower.startsWith(qLower) ||
                 (codeVariants.length > 0 &&
@@ -633,13 +839,15 @@ export class LocalOfficeSearchEngine {
                             item.codeLower.startsWith(v) ||
                             (item.codeStripped !== "" && item.codeStripped.startsWith(v))
                     ));
+            const isShortPrefix =
+                item.shortCodeLower !== "" && item.shortCodeLower.startsWith(qLower);
             const isCodeContains =
                 item.codeLower.includes(qLower) ||
                 (codeVariants.length > 0 && codeVariants.some((v) => item.codeLower.includes(v)));
 
-            if (item.nameLower === qLower || isCodeExact) {
+            if (item.nameLower === qLower || isCodeExact || isShortExact) {
                 exact.push(item.row);
-            } else if (item.nameLower.startsWith(qLower) || isCodePrefix) {
+            } else if (item.nameLower.startsWith(qLower) || isCodePrefix || isShortPrefix) {
                 prefix.push(item.row);
             } else if (
                 item.nameLower.includes(qLower) ||
@@ -660,9 +868,14 @@ export class LocalOfficeSearchEngine {
         const seen = new Set<string>();
         for (const bucket of [exact, prefix, contains, fuzzy]) {
             for (const row of bucket) {
-                const [, slug, name, postalCode, divIdx] = row;
+                const [, slug, name, postalCode, divIdx, , , , , shortCode = ""] = row;
                 const division = divIdx >= 0 ? this.index.d[divIdx] : undefined;
-                const label = isNumeric && postalCode ? `${name} (${postalCode})` : name;
+                const label =
+                    isNumeric && postalCode
+                        ? `${name} (${postalCode})`
+                        : shortCode && shortCode.toLowerCase() === qLower
+                          ? `${name} [${shortCode}]`
+                          : name;
                 const dedupKey = `${name.toLowerCase()}|${postalCode}`;
                 if (!seen.has(dedupKey)) {
                     seen.add(dedupKey);
