@@ -43,6 +43,7 @@ export default function SiteFooter() {
                             </li>
                         )}
                         <li><Link href="/calculator" className="hover:text-primary">{tNav("calculator")}</Link></li>
+                        <li><Link href="/track" className="hover:text-primary">{tNav("track")}</Link></li>
                         <li><Link href="/rates" className="hover:text-primary">Postage Rate Tables</Link></li>
                         <li><Link href="/blog" className="hover:text-primary">{tNav("blog")}</Link></li>
                     </ul>
@@ -55,7 +56,7 @@ export default function SiteFooter() {
                                 {t("source")}
                             </a>
                         </li>
-                        <li><Link href="/login" className="hover:text-primary">{t("contribute")}</Link></li>
+                        <li><Link href="/login" rel="nofollow" className="hover:text-primary">{t("contribute")}</Link></li>
                         <li><Link href="/about" className="hover:text-primary">{t("about")}</Link></li>
                         <li><Link href="/privacy" className="hover:text-primary">{t("privacy")}</Link></li>
                         <li><Link href="/terms" className="hover:text-primary">{t("terms")}</Link></li>

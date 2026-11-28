@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { setRequestLocale } from "next-intl/server";
 import { Link } from "@/navigation";
 import { Plane, Banknote, Mail, ArrowRight, Globe } from "lucide-react";
 import { DEFAULT_RATE_CONFIG, calculateAllInternationalServices } from "@/lib/postage-rates";
@@ -9,29 +10,24 @@ import {
     formatLkrPlain,
     formatWeightSlug,
 } from "@/lib/rates-seo";
-import { buildLocalizedAlternates, buildLocalizedUrl } from "@/lib/site";
+import { buildEnglishCanonicalAlternates, buildLocalizedUrl } from "@/lib/site";
 import { safeJsonLd } from "@/lib/security";
 import CountryFlag from "@/components/brand/CountryFlag";
 
 export const revalidate = 86400;
 
-export async function generateMetadata({
-    params,
-}: {
-    params: Promise<{ locale: string }>;
-}): Promise<Metadata> {
-    const { locale } = await params;
+export async function generateMetadata(): Promise<Metadata> {
     const title = "Sri Lanka Post Postage Rates 2026 — International, EMS, COD & Local";
     const description =
         "Compare official 2026 Sri Lanka Post international air mail, EMS Express, sea parcel, domestic SLP Courier, and Cash on Delivery (COD) postage prices by country and weight.";
     return {
         title,
         description,
-        alternates: buildLocalizedAlternates("/rates", locale),
+        alternates: buildEnglishCanonicalAlternates("/rates"),
         openGraph: {
             title,
             description,
-            url: buildLocalizedUrl("/rates", locale),
+            url: buildLocalizedUrl("/rates", "en"),
         },
     };
 }
@@ -42,6 +38,7 @@ export default async function RatesHubPage({
     params: Promise<{ locale: string }>;
 }) {
     const { locale } = await params;
+    setRequestLocale(locale);
 
     const topCountries = TOP_SEO_COUNTRY_CODES.map((code) =>
         DEFAULT_RATE_CONFIG.emsCountries.find((c) => c.code === code)

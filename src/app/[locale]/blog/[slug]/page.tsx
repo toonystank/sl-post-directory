@@ -7,7 +7,7 @@ import { sanitizeRichHtml } from "@/lib/sanitize-html";
 import { isSafeExternalHttpUrl, safeJsonLd } from "@/lib/security";
 import { getVariablesMap, replacePlaceholders } from "@/lib/variables";
 import {
-    buildLocalizedAlternates,
+    buildEnglishCanonicalAlternates,
     buildLocalizedUrl,
     getDefaultOpenGraphImages,
     getOgLocale,
@@ -19,17 +19,22 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export const revalidate = 3600;
+export const dynamicParams = true;
+
+export function generateStaticParams() {
+    return [];
+}
 
 export async function generateMetadata({
     params,
 }: {
     params: Promise<{ locale: string; slug: string }>;
 }): Promise<Metadata> {
-    const { locale, slug } = await params;
+    const { slug } = await params;
     const post = await getPostBySlug(slug);
     if (!post) return { title: "Article Not Found" };
 
-    const canonicalUrl = buildLocalizedUrl(`/blog/${slug}`, locale);
+    const canonicalUrl = buildLocalizedUrl(`/blog/${slug}`, "en");
     const ogImages = post.coverImage
         ? [
               {
@@ -44,12 +49,12 @@ export async function generateMetadata({
     return {
         title: post.title,
         description: post.excerpt,
-        alternates: buildLocalizedAlternates(`/blog/${slug}`, locale),
+        alternates: buildEnglishCanonicalAlternates(`/blog/${slug}`),
         openGraph: {
             title: post.title,
             description: post.excerpt,
             url: canonicalUrl,
-            locale: getOgLocale(locale),
+            locale: getOgLocale("en"),
             type: "article",
             publishedTime: post.date.toISOString(),
             authors: [post.author],

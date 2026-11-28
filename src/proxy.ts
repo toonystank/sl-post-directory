@@ -2,6 +2,8 @@ import createMiddleware from "next-intl/middleware";
 import { NextResponse, type NextRequest } from "next/server";
 import { routing } from "./i18n/routing";
 import { LOCALE_COOKIE_NAME, resolveMiddlewareLocaleRedirect } from "./lib/locale";
+import { resolveLegacyHostRedirect } from "./lib/seo-office";
+import { getSiteUrl } from "./lib/site";
 
 const intlMiddleware = createMiddleware(routing);
 
@@ -18,6 +20,19 @@ function applySecurityHeaders(response: NextResponse, pathname?: string): NextRe
 }
 
 export default function proxy(request: NextRequest) {
+    // Automatically 301-redirect legacy lankapost.vercel.app traffic once a custom domain
+    // (e.g., https://thapal.lk) is configured via NEXT_PUBLIC_SITE_URL.
+    const legacyRedirectTarget = resolveLegacyHostRedirect({
+        host: request.headers.get("host"),
+        canonicalOrigin: getSiteUrl(),
+        pathname: request.nextUrl.pathname,
+        search: request.nextUrl.search,
+        method: request.method,
+    });
+    if (legacyRedirectTarget) {
+        return applySecurityHeaders(NextResponse.redirect(legacyRedirectTarget, 301));
+    }
+
     const isSwPrecache = request.headers.get("x-sw-precache") === "1";
     const isRscOrPrefetch =
         request.headers.get("rsc") === "1" ||

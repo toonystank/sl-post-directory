@@ -6,6 +6,7 @@ import type { InitialDirectoryData } from "@/components/directory/useDirectorySt
 import { Link } from "@/navigation";
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
 import { loadLocalOffices } from "@/lib/local-sqlite";
+import { getLocalizedPageMetadata } from "@/lib/seo-office";
 import {
     buildLocalizedAlternates,
     buildLocalizedUrl,
@@ -26,9 +27,7 @@ export async function generateMetadata({
     params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
     const { locale } = await params;
-    const title = "Browse Post Offices Directory";
-    const description =
-        "Search and browse Sri Lanka post offices alphabetically, by 5-digit postal code, division, office type, or postal service.";
+    const { title, description } = getLocalizedPageMetadata("browse", locale);
     return {
         title,
         description,

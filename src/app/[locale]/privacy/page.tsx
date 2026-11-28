@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/navigation";
+import { getLocalizedPageMetadata } from "@/lib/seo-office";
 import { buildLocalizedAlternates, getContactEmail } from "@/lib/site";
 
 export const revalidate = 86400;
@@ -11,10 +12,10 @@ export async function generateMetadata({
     params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
     const { locale } = await params;
+    const { title, description } = getLocalizedPageMetadata("privacy", locale);
     return {
-        title: "Privacy Policy",
-        description:
-            "Privacy Policy for Lanka Post Directory web and Android app, covering contributor submissions, camera/OCR scanning, offline storage, analytics, cookies, data deletion, and Google Ads.",
+        title,
+        description,
         alternates: buildLocalizedAlternates("/privacy", locale),
     };
 }

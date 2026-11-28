@@ -13,17 +13,27 @@ import {
     XCircle,
 } from "lucide-react";
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
-import { getLocalOfficeBySlug } from "@/lib/local-sqlite";
+import { getLocalOfficeBySlug, getLocalOfficesByDivision } from "@/lib/local-sqlite";
 import { getPostOfficeStatus, parseOperatingHours } from "@/lib/holidays";
 import { inferHubFromOffice } from "@/lib/mail-routing";
 import { safeJsonLd } from "@/lib/security";
 import {
+    buildOfficeMetadataCopy,
+    buildOfficeSeoContent,
+    classifyOfficeSitemapTier,
+    selectRelatedDivisionOffices,
+    type DivisionSiblingCandidate,
+    type OfficeSeoInput,
+} from "@/lib/seo-office";
+import {
+    buildEnglishCanonicalAlternates,
     buildLocalizedAlternates,
     buildLocalizedUrl,
     formatSriLankaPhone,
     getDefaultOpenGraphImages,
     getOgLocale,
     normalizePostalCode,
+    slugifyDivision,
 } from "@/lib/site";
 import { Link } from "@/navigation";
 import { CopyButton } from "@/components/CopyButton";
@@ -40,6 +50,61 @@ import { PhotoUploadClient } from "./PhotoUploadClient";
 import OfficeActions from "./OfficeActions";
 
 export const revalidate = 86400; // Cache the post office page for 24 hours
+export const dynamicParams = true;
+
+// Returning an empty array activates Next.js 16 on-demand ISR caching for all 4,000+ office pages
+// without slowing down builds or hitting PostgreSQL on every crawler request.
+export function generateStaticParams() {
+    return [];
+}
+
+const findDivisionSiblings = cache(async function findDivisionSiblings(
+    division: string
+): Promise<DivisionSiblingCandidate[]> {
+    const clean = division.trim();
+    if (!clean) return [];
+
+    const fromLocal = (): DivisionSiblingCandidate[] =>
+        getLocalOfficesByDivision(clean).map((o) => ({
+            slug: o.slug,
+            name: o.name,
+            postalCode: normalizePostalCode(o.postalCode),
+            type: o.fields.find((f) => f.name === "Type")?.value || "Post Office",
+        }));
+
+    if (!hasDatabaseUrl) return fromLocal();
+    try {
+        const rows = await prisma.postOffice.findMany({
+            where: {
+                fields: {
+                    some: {
+                        name: "Division",
+                        value: { equals: clean, mode: "insensitive" },
+                    },
+                },
+            },
+            orderBy: { name: "asc" },
+            select: {
+                slug: true,
+                name: true,
+                postalCode: true,
+                fields: {
+                    where: { name: "Type" },
+                    select: { value: true },
+                },
+            },
+        });
+        if (rows.length === 0) return fromLocal();
+        return rows.map((r) => ({
+            slug: r.slug,
+            name: r.name,
+            postalCode: normalizePostalCode(r.postalCode),
+            type: r.fields[0]?.value || "Post Office",
+        }));
+    } catch {
+        return fromLocal();
+    }
+});
 
 const findOfficeDetails = cache(async function findOfficeDetails(slug: string) {
     if (!hasDatabaseUrl) {
@@ -119,6 +184,109 @@ async function getApprovedReviewSummary(
     }
 }
 
+function splitPhoneNumbers(raw?: string | null): string[] {
+    if (!raw) return [];
+    return raw
+        .split(/\s*\/\s*/)
+        .map((part) => formatSriLankaPhone(part.trim()))
+        .filter(Boolean);
+}
+
+type OfficeRecord = NonNullable<Awaited<ReturnType<typeof findOfficeDetails>>>;
+
+function extractOfficeSeoContext(office: OfficeRecord, open24hLabel: string = "Open 24 hours") {
+    const getField = (name: string) =>
+        office.fields.find((f) => f.name === name)?.value?.trim() || "";
+
+    const normalizedCode = normalizePostalCode(office.postalCode);
+    const type = getField("Type") || "Post Office";
+    const grade = getField("Grade");
+    const shortCode = getField("Short Code");
+    const delivery = getField("Delivery");
+    const division = getField("Division");
+    const dpmg = getField("DPMG");
+    const fax = formatSriLankaPhone(getField("Fax"));
+    const is24Hour = getField("Is24Hour") === "true";
+    const rawTelephone = getField("Telephone") || getField("Phone");
+    const phoneNumbers = splitPhoneNumbers(rawTelephone);
+    const workingHoursField =
+        ("operatingHours" in office && office.operatingHours ? office.operatingHours.trim() : "") ||
+        getField("Working Hours");
+    const parsedHours = parseOperatingHours(workingHoursField, is24Hour, type);
+    const hoursSummary = is24Hour ? open24hLabel : parsedHours.summary;
+    const isDeliveryOffice = /^yes|delivery$/i.test(delivery);
+    const isNonDeliveryOffice = /^no|non/i.test(delivery);
+    const effectiveRmsc =
+        office.rmsc ||
+        inferHubFromOffice({
+            rmsc: null,
+            postalCode: normalizedCode,
+            division,
+        });
+
+    const ctrlRaw = office.controllingOffice as
+        | {
+              id: string;
+              slug: string;
+              name: string;
+              postalCode: string;
+              shortCode?: string;
+              phone?: string;
+              fields?: { name: string; value: string }[];
+          }
+        | null
+        | undefined;
+
+    const controllingOffice = ctrlRaw
+        ? {
+              id: ctrlRaw.id,
+              slug: ctrlRaw.slug,
+              name: ctrlRaw.name,
+              postalCode: normalizePostalCode(ctrlRaw.postalCode),
+              shortCode:
+                  ctrlRaw.shortCode ||
+                  ctrlRaw.fields?.find((f) => f.name === "Short Code")?.value ||
+                  "",
+              phone:
+                  formatSriLankaPhone(
+                      ctrlRaw.phone ||
+                          ctrlRaw.fields?.find((f) => f.name === "Phone" || f.name === "Telephone")
+                              ?.value
+                  ) || "",
+          }
+        : null;
+
+    const seoInput: OfficeSeoInput = {
+        name: office.name,
+        postalCode: normalizedCode,
+        type,
+        grade: grade || undefined,
+        shortCode: shortCode || undefined,
+        division: division || undefined,
+        dpmg: dpmg || undefined,
+        rmsc: effectiveRmsc || undefined,
+        phoneNumbers,
+        fax: fax || undefined,
+        hoursSummary,
+        is24Hour,
+        weekdayHours: parsedHours.weekday?.label,
+        saturdayHours: parsedHours.saturday?.label,
+        sundayHours: parsedHours.sunday?.label,
+        isDeliveryOffice,
+        isNonDeliveryOffice,
+        controllingOffice: controllingOffice
+            ? {
+                  name: controllingOffice.name,
+                  postalCode: controllingOffice.postalCode,
+                  phone: controllingOffice.phone || undefined,
+              }
+            : null,
+        controlledCount: office.controlledOffices?.length ?? 0,
+    };
+
+    return { seoInput, type, normalizedCode, division, controllingOffice };
+}
+
 export async function generateMetadata({
     params,
 }: {
@@ -134,35 +302,27 @@ export async function generateMetadata({
         };
     }
 
-    const postalCode = normalizePostalCode(office.postalCode);
-    const typeField = office.fields.find((f) => f.name === "Type")?.value || "Post Office";
-    const division = office.fields.find((f) => f.name === "Division")?.value;
-    const shortCode = office.fields.find((f) => f.name === "Short Code")?.value;
-    const codePart = postalCode ? ` - Postal Code ${postalCode}` : "";
-    const title = `${office.name}${codePart}`;
-    const description = `Find telephone numbers, working hours, short code${shortCode ? ` (${shortCode})` : ""}, delivery status, and controlling office routing for ${office.name} (${typeField}${division ? `, ${division}` : ""}).${postalCode ? ` Postal Code: ${postalCode}, Sri Lanka.` : ""}`;
-    const canonicalUrl = buildLocalizedUrl(`/office/${office.slug}`, locale);
+    const { seoInput, type, normalizedCode } = extractOfficeSeoContext(office);
+    const { tier } = classifyOfficeSitemapTier({ type, postalCode: normalizedCode });
+    const isMajorTier = tier === 1;
+    const effectiveLocale = isMajorTier ? locale : "en";
+    const { title, description } = buildOfficeMetadataCopy(seoInput, effectiveLocale);
+    const canonicalUrl = buildLocalizedUrl(`/office/${office.slug}`, effectiveLocale);
 
     return {
         title,
         description,
-        alternates: buildLocalizedAlternates(`/office/${office.slug}`, locale),
+        alternates: isMajorTier
+            ? buildLocalizedAlternates(`/office/${office.slug}`, locale)
+            : buildEnglishCanonicalAlternates(`/office/${office.slug}`),
         openGraph: {
             title: `${title} | Lanka Post Directory`,
             description,
             url: canonicalUrl,
-            locale: getOgLocale(locale),
+            locale: getOgLocale(effectiveLocale),
             images: getDefaultOpenGraphImages(`${title} | Lanka Post Directory`),
         },
     };
-}
-
-function splitPhoneNumbers(raw?: string | null): string[] {
-    if (!raw) return [];
-    return raw
-        .split(/\s*\/\s*/)
-        .map((part) => formatSriLankaPhone(part.trim()))
-        .filter(Boolean);
 }
 
 export default async function OfficeDetails({
@@ -179,10 +339,14 @@ export default async function OfficeDetails({
         notFound();
     }
 
-    const [t, tStatus, reviewSummary] = await Promise.all([
+    const divisionRaw =
+        office.fields.find((f) => f.name === "Division")?.value?.trim() || "";
+
+    const [t, tStatus, reviewSummary, divisionSiblings] = await Promise.all([
         getTranslations("Office"),
         getTranslations("Status"),
         getApprovedReviewSummary(office.id, office.reviews),
+        divisionRaw ? findDivisionSiblings(divisionRaw) : Promise.resolve([]),
     ]);
 
     const getField = (name: string) =>
@@ -193,12 +357,10 @@ export default async function OfficeDetails({
     const grade = getField("Grade");
     const shortCode = getField("Short Code");
     const delivery = getField("Delivery");
-    const division = getField("Division");
+    const division = divisionRaw;
     const dpmg = getField("DPMG");
     const fax = formatSriLankaPhone(getField("Fax"));
-    const divisionSlug = division
-        ? division.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
-        : null;
+    const divisionSlug = division ? slugifyDivision(division) : null;
     const is24Hour = getField("Is24Hour") === "true";
     const rawTelephone = getField("Telephone") || getField("Phone");
     const phoneNumbers = splitPhoneNumbers(rawTelephone);
@@ -428,6 +590,43 @@ export default async function OfficeDetails({
     ]);
     const extraFields = office.fields.filter((f) => !coreHandledFields.has(f.name));
 
+    const seoContent = buildOfficeSeoContent(
+        {
+            name: office.name,
+            postalCode: normalizedCode,
+            type,
+            grade: grade || undefined,
+            shortCode: shortCode || undefined,
+            division: division || undefined,
+            dpmg: dpmg || undefined,
+            rmsc: effectiveRmsc || undefined,
+            phoneNumbers,
+            fax: fax || undefined,
+            hoursSummary,
+            is24Hour,
+            weekdayHours: parsedHours.weekday?.label,
+            saturdayHours: parsedHours.saturday?.label,
+            sundayHours: parsedHours.sunday?.label,
+            isDeliveryOffice,
+            isNonDeliveryOffice,
+            controllingOffice: controllingOffice
+                ? {
+                      name: controllingOffice.name,
+                      postalCode: controllingOffice.postalCode,
+                      phone: controllingOffice.phone || undefined,
+                  }
+                : null,
+            controlledCount: controlledOffices.length,
+        },
+        locale
+    );
+
+    const relatedDivisionOffices = selectRelatedDivisionOffices(
+        office.slug,
+        divisionSiblings,
+        8
+    );
+
     return (
         <article className="container mx-auto max-w-3xl px-4 py-4 md:py-10">
             <script
@@ -437,6 +636,10 @@ export default async function OfficeDetails({
             <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbLd) }}
+            />
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: safeJsonLd(seoContent.faqJsonLd) }}
             />
 
             <div className="hidden md:block mb-4">
@@ -789,6 +992,34 @@ export default async function OfficeDetails({
                 )}
             </section>
 
+            {/* Contextual Overview & FAQs (adds unique informational value and structured FAQ answers) */}
+            <section className="border-b-2 border-foreground py-8 space-y-5">
+                <div className="space-y-2">
+                    <h2 className="font-heading text-xl font-extrabold [font-stretch:82%]">
+                        {seoContent.overviewHeading}
+                    </h2>
+                    <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
+                        {seoContent.overviewParagraph}
+                    </p>
+                </div>
+
+                <div className="rounded-lg border-2 border-foreground/25 bg-card p-4 sm:p-5 space-y-3">
+                    <h3 className="label-mono">{seoContent.faqHeading}</h3>
+                    <dl className="divide-y divide-border">
+                        {seoContent.faqs.map((faq) => (
+                            <div key={faq.question} className="py-3 first:pt-0 last:pb-0">
+                                <dt className="font-bold text-sm sm:text-base text-foreground mb-1">
+                                    {faq.question}
+                                </dt>
+                                <dd className="text-sm text-muted-foreground leading-relaxed">
+                                    {faq.answer}
+                                </dd>
+                            </div>
+                        ))}
+                    </dl>
+                </div>
+            </section>
+
             {/* Community Photos Section */}
             <section className="border-b-2 border-foreground py-8 space-y-6">
                 <div>
@@ -818,6 +1049,57 @@ export default async function OfficeDetails({
                 />
             </section>
 
+            {/* Internal Crawl Mesh: Nearby / Same Division Post Offices & Postal Tools */}
+            {relatedDivisionOffices.length > 0 && division && divisionSlug && (
+                <section className="border-b-2 border-foreground py-8 space-y-4">
+                    <div className="flex items-center justify-between gap-2">
+                        <h2 className="font-heading text-xl font-extrabold [font-stretch:82%]">
+                            Other Post Offices in {division}
+                        </h2>
+                        <Link
+                            href={`/district/${divisionSlug}`}
+                            className="text-xs sm:text-sm font-semibold text-primary hover:underline shrink-0"
+                        >
+                            View all &rarr;
+                        </Link>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {relatedDivisionOffices.map((sibling) => (
+                            <Link
+                                key={sibling.slug}
+                                href={`/office/${sibling.slug}`}
+                                className="tap flex items-center justify-between gap-3 rounded-md border border-foreground/30 bg-card px-3.5 py-2.5 text-sm hover:border-foreground hover:bg-secondary/20 transition-colors"
+                            >
+                                <span className="font-semibold truncate">{sibling.name}</span>
+                                <span className="font-mono text-xs font-bold text-primary shrink-0">
+                                    {sibling.postalCode || sibling.type || "PO"}
+                                </span>
+                            </Link>
+                        ))}
+                    </div>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                        <Link
+                            href="/calculator"
+                            className="tap rounded-full border border-foreground/40 bg-background px-3 py-1.5 text-xs font-semibold hover:border-foreground hover:bg-secondary/30"
+                        >
+                            2026 Postage Calculator
+                        </Link>
+                        <Link
+                            href="/track"
+                            className="tap rounded-full border border-foreground/40 bg-background px-3 py-1.5 text-xs font-semibold hover:border-foreground hover:bg-secondary/30"
+                        >
+                            Track SL Post Parcel
+                        </Link>
+                        <Link
+                            href="/rates"
+                            className="tap rounded-full border border-foreground/40 bg-background px-3 py-1.5 text-xs font-semibold hover:border-foreground hover:bg-secondary/30"
+                        >
+                            International &amp; Local Rates
+                        </Link>
+                    </div>
+                </section>
+            )}
+
             {/* Suggest an Edit */}
             <section className="pt-8 pb-4">
                 <div className="rounded-md border-2 border-foreground bg-card overflow-hidden">
@@ -831,7 +1113,7 @@ export default async function OfficeDetails({
                             <p className="text-sm text-muted-foreground mt-0.5">{t("workHereBody")}</p>
                         </div>
                         <Button asChild size="lg" className="w-full sm:w-auto shrink-0">
-                            <Link href={`/suggest/${office.id}`}>{t("suggestEdit")}</Link>
+                            <Link href={`/suggest/${office.id}`} rel="nofollow">{t("suggestEdit")}</Link>
                         </Button>
                     </div>
                 </div>

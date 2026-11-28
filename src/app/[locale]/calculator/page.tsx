@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { setRequestLocale } from "next-intl/server";
 import PostageCalculator from "@/components/PostageCalculator";
 import CalculatorHeader from "@/components/CalculatorHeader";
+import { getLocalizedPageMetadata } from "@/lib/seo-office";
 import {
     buildLocalizedAlternates,
     buildLocalizedUrl,
@@ -15,9 +16,7 @@ export async function generateMetadata({
     params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
     const { locale } = await params;
-    const title = "Postage Calculator";
-    const description =
-        "Calculate official Sri Lanka Post shipping costs for domestic letters, parcels, SLP Courier (formerly Speed Post), COD, and international EMS, Air Mail, U-Packet, TDS, and Sea Mail.";
+    const { title, description } = getLocalizedPageMetadata("calculator", locale);
     return {
         title,
         description,

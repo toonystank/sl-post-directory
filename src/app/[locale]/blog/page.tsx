@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { getAllPosts } from "@/lib/blog";
+import { getLocalizedPageMetadata } from "@/lib/seo-office";
 import {
     buildLocalizedAlternates,
     buildLocalizedUrl,
@@ -17,9 +18,7 @@ export async function generateMetadata({
     params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
     const { locale } = await params;
-    const title = "Postal News, Service Alerts & Guides";
-    const description =
-        "Latest Sri Lanka Post news updates, service alerts, postage tariff revisions, and helpful shipping guides.";
+    const { title, description } = getLocalizedPageMetadata("blog", locale);
     return {
         title,
         description,

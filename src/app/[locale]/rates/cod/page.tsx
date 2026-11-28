@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { setRequestLocale } from "next-intl/server";
 import { Link } from "@/navigation";
 import {
     DEFAULT_RATE_CONFIG,
@@ -7,7 +8,7 @@ import {
 } from "@/lib/postage-rates";
 import { formatLkrPlain } from "@/lib/rates-seo";
 import { safeJsonLd } from "@/lib/security";
-import { buildLocalizedAlternates, buildLocalizedUrl } from "@/lib/site";
+import { buildEnglishCanonicalAlternates, buildLocalizedUrl } from "@/lib/site";
 import PostageCalculator from "@/components/PostageCalculator";
 
 export const revalidate = 86400;
@@ -21,23 +22,18 @@ const SAMPLE_COD_CASES = [
     { weightGrams: 5000, codAmount: 25000 },
 ];
 
-export async function generateMetadata({
-    params,
-}: {
-    params: Promise<{ locale: string }>;
-}): Promise<Metadata> {
-    const { locale } = await params;
+export async function generateMetadata(): Promise<Metadata> {
     const title = "Sri Lanka Post COD (Cash on Delivery) Charges & Calculator 2026";
     const description =
         "Calculate Sri Lanka Post Cash on Delivery (COD) courier fee, money order commission, COD service fee, and exact net payout for online sellers.";
     return {
         title,
         description,
-        alternates: buildLocalizedAlternates("/rates/cod", locale),
+        alternates: buildEnglishCanonicalAlternates("/rates/cod"),
         openGraph: {
             title,
             description,
-            url: buildLocalizedUrl("/rates/cod", locale),
+            url: buildLocalizedUrl("/rates/cod", "en"),
         },
     };
 }
@@ -48,6 +44,7 @@ export default async function CodRatesPage({
     params: Promise<{ locale: string }>;
 }) {
     const { locale } = await params;
+    setRequestLocale(locale);
 
     const sampleRows = SAMPLE_COD_CASES.map((item) => ({
         ...item,

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
+import { setRequestLocale } from "next-intl/server";
 import { Link } from "@/navigation";
 import {
     POPULAR_WEIGHT_GRAMS,
@@ -10,19 +11,24 @@ import {
     parseWeightSlug,
     resolveCountryFromSlug,
 } from "@/lib/rates-seo";
-import { buildLocalizedAlternates, buildLocalizedUrl } from "@/lib/site";
+import { buildCanonicalToPathAlternates, buildLocalizedUrl } from "@/lib/site";
 import { safeJsonLd } from "@/lib/security";
 import CountryFlag from "@/components/brand/CountryFlag";
 import PostageCalculator from "@/components/PostageCalculator";
 
 export const revalidate = 86400;
+export const dynamicParams = true;
+
+export function generateStaticParams() {
+    return [];
+}
 
 export async function generateMetadata({
     params,
 }: {
     params: Promise<{ locale: string; country: string; weight: string }>;
 }): Promise<Metadata> {
-    const { locale, country: rawCountry, weight: rawWeight } = await params;
+    const { country: rawCountry, weight: rawWeight } = await params;
     const resolvedCountry = resolveCountryFromSlug(rawCountry);
     const parsedWeight = parseWeightSlug(rawWeight);
 
@@ -33,23 +39,25 @@ export async function generateMetadata({
     const seo = buildInternationalRateSeoData(
         resolvedCountry.country,
         parsedWeight.grams,
-        locale
+        "en"
     );
     const headlinePrice = seo.cheapest
         ? formatLkrPlain(seo.cheapest.result.totalCost)
         : "";
     const title = `Sri Lanka Post ${resolvedCountry.country.name} ${seo.weightLabel} Price${headlinePrice ? ` (${headlinePrice})` : ""} — EMS & Air Parcel 2026`;
     const description = `${seo.answerSentence} Full 2026 Sri Lanka Post international shipping calculator for ${resolvedCountry.country.name}.`;
-    const canonicalPath = `/rates/${resolvedCountry.canonicalSlug}/${parsedWeight.canonicalSlug}`;
+    const parentCountryPath = `/rates/${resolvedCountry.canonicalSlug}`;
 
     return {
         title,
         description,
-        alternates: buildLocalizedAlternates(canonicalPath, locale),
+        // Consolidate per-weight sub-variants onto the main country rate page so Google
+        // indexes one authoritative page per destination instead of flagging 5 thin duplicates.
+        alternates: buildCanonicalToPathAlternates(parentCountryPath),
         openGraph: {
             title,
             description,
-            url: buildLocalizedUrl(canonicalPath, locale),
+            url: buildLocalizedUrl(parentCountryPath, "en"),
         },
     };
 }
@@ -60,6 +68,7 @@ export default async function CountryWeightRatePage({
     params: Promise<{ locale: string; country: string; weight: string }>;
 }) {
     const { locale, country: rawCountry, weight: rawWeight } = await params;
+    setRequestLocale(locale);
     const resolvedCountry = resolveCountryFromSlug(rawCountry);
     const parsedWeight = parseWeightSlug(rawWeight);
 

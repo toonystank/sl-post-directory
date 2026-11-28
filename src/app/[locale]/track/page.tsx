@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { setRequestLocale } from "next-intl/server";
 import TrackerClient from "@/components/tracking/TrackerClient";
+import { getLocalizedPageMetadata } from "@/lib/seo-office";
 import {
     buildLocalizedAlternates,
     buildLocalizedUrl,
@@ -14,9 +15,7 @@ export async function generateMetadata({
     params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
     const { locale } = await params;
-    const title = "Track Sri Lanka Post Parcel · COD, SLP Courier & Registered Mail";
-    const description =
-        "Track Sri Lanka Post COD (BD), SLP Mail Courier (NA, BF), Registered Post (RA, BG), and international EMS articles in one place.";
+    const { title, description } = getLocalizedPageMetadata("track", locale);
     return {
         title,
         description,

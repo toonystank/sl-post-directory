@@ -1,21 +1,16 @@
 import type { Metadata } from "next";
 import { setRequestLocale } from "next-intl/server";
 import { Link } from "@/navigation";
-import { buildLocalizedAlternates, getContactEmail } from "@/lib/site";
+import { buildEnglishCanonicalAlternates, getContactEmail } from "@/lib/site";
 
 export const revalidate = 86400;
 
-export async function generateMetadata({
-    params,
-}: {
-    params: Promise<{ locale: string }>;
-}): Promise<Metadata> {
-    const { locale } = await params;
+export async function generateMetadata(): Promise<Metadata> {
     return {
         title: "About & Contact",
         description:
             "Learn about Lanka Post Directory — an independent Sri Lanka post office finder, 2026 postage calculator, and live parcel tracker, including official data sources and contact information.",
-        alternates: buildLocalizedAlternates("/about", locale),
+        alternates: buildEnglishCanonicalAlternates("/about"),
     };
 }
 

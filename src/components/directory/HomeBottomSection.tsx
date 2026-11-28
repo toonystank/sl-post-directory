@@ -11,14 +11,14 @@ import { triggerHaptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
 const POPULAR_RATE_LINKS = [
-    { href: "/rates/taiwan/1kg", label: "Taiwan 1kg", flagCode: "TW" },
-    { href: "/rates/united-kingdom/1kg", label: "UK 1kg", flagCode: "GB" },
-    { href: "/rates/united-states/1kg", label: "USA 1kg", flagCode: "US" },
-    { href: "/rates/australia/2kg", label: "Australia 2kg", flagCode: "AU" },
-    { href: "/rates/united-arab-emirates/1kg", label: "UAE / Dubai 1kg", flagCode: "AE" },
-    { href: "/rates/japan/1kg", label: "Japan 1kg", flagCode: "JP" },
-    { href: "/rates/canada/1kg", label: "Canada 1kg", flagCode: "CA" },
-    { href: "/rates/india/1kg", label: "India 1kg", flagCode: "IN" },
+    { href: "/rates/taiwan", label: "Taiwan", flagCode: "TW" },
+    { href: "/rates/united-kingdom", label: "United Kingdom", flagCode: "GB" },
+    { href: "/rates/united-states", label: "United States", flagCode: "US" },
+    { href: "/rates/australia", label: "Australia", flagCode: "AU" },
+    { href: "/rates/united-arab-emirates", label: "UAE / Dubai", flagCode: "AE" },
+    { href: "/rates/japan", label: "Japan", flagCode: "JP" },
+    { href: "/rates/canada", label: "Canada", flagCode: "CA" },
+    { href: "/rates/india", label: "India", flagCode: "IN" },
     { href: "/rates/local", label: "Local & SLP Courier", flagCode: "LK" },
     { href: "/rates/cod", label: "COD Charges", flagCode: "LK" },
 ];
@@ -192,7 +192,7 @@ export default function HomeBottomSection({
                     </div>
                 </div>
 
-                {/* Browse Post Offices by Postal Division (collapsed accordion on < md, expanded in SSR DOM on md+) */}
+                {/* Browse Post Offices by Postal Division (horizontal snap strip on mobile so all division hubs remain crawlable by Googlebot Smartphone; tap count pill to expand full grid) */}
                 {divisions.length > 0 && (
                     <div className="rounded-2xl border border-border md:border-2 md:border-foreground bg-card p-4 sm:p-5 shadow-[var(--shadow-elev-1)] md:shadow-none">
                         <div className="flex items-center justify-between gap-2">
@@ -228,15 +228,17 @@ export default function HomeBottomSection({
                         </div>
                         <div
                             className={cn(
-                                "flex-wrap gap-2 md:mt-3",
-                                divisionsOpen ? "flex mt-3" : "hidden md:flex"
+                                "gap-2 mt-3",
+                                divisionsOpen
+                                    ? "flex flex-wrap"
+                                    : "flex overflow-x-auto scrollbar-hide snap-carousel pb-1 md:flex-wrap md:overflow-visible md:pb-0"
                             )}
                         >
                             {divisions.map((div) => (
                                 <Link
                                     key={div.slug}
                                     href={`/district/${div.slug}`}
-                                    className="tap rounded-full border border-border md:border-[1.5px] md:border-foreground/50 bg-background px-3 py-1.5 text-xs font-semibold hover:border-foreground hover:bg-secondary/35 transition-colors"
+                                    className="tap shrink-0 whitespace-nowrap rounded-full border border-border md:border-[1.5px] md:border-foreground/50 bg-background px-3 py-1.5 text-xs font-semibold hover:border-foreground hover:bg-secondary/35 transition-colors"
                                 >
                                     {div.name}
                                 </Link>

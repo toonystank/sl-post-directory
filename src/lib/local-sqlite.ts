@@ -743,3 +743,28 @@ export function getLocalOfficeById(id: string): LocalOfficeRecord | null {
     loadLocalOffices();
     return idMap?.get(String(id)) ?? null;
 }
+
+export function getLocalOfficesByDivision(division: string): LocalOfficeRecord[] {
+    const target = division.trim().toLowerCase();
+    if (!target) return [];
+    loadLocalOffices();
+    const index = cachedIndex ?? [];
+    return index
+        .filter((item) => item.divisionLower === target)
+        .map((item) => item.record);
+}
+
+export function getLocalDivisionNames(): string[] {
+    loadLocalOffices();
+    const index = cachedIndex ?? [];
+    const seen = new Set<string>();
+    const names: string[] = [];
+    for (const item of index) {
+        const div = item.record.fields.find((f) => f.name === "Division")?.value?.trim();
+        if (div && !seen.has(div.toLowerCase())) {
+            seen.add(div.toLowerCase());
+            names.push(div);
+        }
+    }
+    return names.sort((a, b) => a.localeCompare(b));
+}

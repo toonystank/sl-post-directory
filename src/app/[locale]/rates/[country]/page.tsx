@@ -1,33 +1,50 @@
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
+import { setRequestLocale } from "next-intl/server";
 import { Link } from "@/navigation";
+import { DEFAULT_RATE_CONFIG } from "@/lib/postage-rates";
 import {
     POPULAR_WEIGHT_GRAMS,
     buildCountryTariffTable,
     buildInternationalRateSeoData,
+    countryToSlug,
     formatLkrPlain,
     formatWeightSlug,
     resolveCountryFromSlug,
 } from "@/lib/rates-seo";
-import { buildLocalizedAlternates, buildLocalizedUrl } from "@/lib/site";
+import { buildEnglishCanonicalAlternates, buildLocalizedUrl } from "@/lib/site";
 import { safeJsonLd } from "@/lib/security";
 import CountryFlag from "@/components/brand/CountryFlag";
 import PostageCalculator from "@/components/PostageCalculator";
 
 export const revalidate = 86400;
+export const dynamicParams = true;
+
+export function generateStaticParams({
+    params: { locale },
+}: {
+    params: { locale: string };
+}) {
+    // Pre-render all 52 canonical English country rate pages at build time;
+    // alias redirects and localized views render on demand via ISR.
+    if (locale !== "en") return [];
+    return DEFAULT_RATE_CONFIG.emsCountries.map((c) => ({
+        country: countryToSlug(c.name),
+    }));
+}
 
 export async function generateMetadata({
     params,
 }: {
     params: Promise<{ locale: string; country: string }>;
 }): Promise<Metadata> {
-    const { locale, country: rawCountry } = await params;
+    const { country: rawCountry } = await params;
     const resolved = resolveCountryFromSlug(rawCountry);
     if (!resolved) {
         return { title: "Country Postage Rates Not Found" };
     }
 
-    const seo1kg = buildInternationalRateSeoData(resolved.country, 1000, locale);
+    const seo1kg = buildInternationalRateSeoData(resolved.country, 1000, "en");
     const priceSnippet = seo1kg.cheapest
         ? `1kg from ${formatLkrPlain(seo1kg.cheapest.result.totalCost)}`
         : "2026 Tariffs";
@@ -37,11 +54,11 @@ export async function generateMetadata({
     return {
         title,
         description,
-        alternates: buildLocalizedAlternates(`/rates/${resolved.canonicalSlug}`, locale),
+        alternates: buildEnglishCanonicalAlternates(`/rates/${resolved.canonicalSlug}`),
         openGraph: {
             title,
             description,
-            url: buildLocalizedUrl(`/rates/${resolved.canonicalSlug}`, locale),
+            url: buildLocalizedUrl(`/rates/${resolved.canonicalSlug}`, "en"),
         },
     };
 }
@@ -52,6 +69,7 @@ export default async function CountryRatesPage({
     params: Promise<{ locale: string; country: string }>;
 }) {
     const { locale, country: rawCountry } = await params;
+    setRequestLocale(locale);
     const resolved = resolveCountryFromSlug(rawCountry);
 
     if (!resolved) {

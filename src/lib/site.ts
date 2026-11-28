@@ -56,6 +56,7 @@ export function buildLocalizedUrl(pathname: string, locale: string = "en"): stri
 
 /**
  * Generates Next.js `metadata.alternates` with self-referencing canonical and hreflang tags.
+ * Use on genuinely trilingual routes (EN / SI / TA).
  */
 export function buildLocalizedAlternates(
     pathname: string,
@@ -73,6 +74,30 @@ export function buildLocalizedAlternates(
             ta: taUrl,
             "x-default": enUrl,
         },
+    };
+}
+
+/**
+ * Canonicalizes English-only routes to their default English URL without emitting
+ * duplicate `si`/`ta` hreflang alternates that waste crawl budget.
+ */
+export function buildEnglishCanonicalAlternates(
+    pathname: string
+): NonNullable<Metadata["alternates"]> {
+    return {
+        canonical: buildLocalizedUrl(pathname, "en"),
+    };
+}
+
+/**
+ * Consolidates programmatic sub-variants (e.g., `/rates/taiwan/500g`) to a parent
+ * canonical page (e.g., `/rates/taiwan`) so search engines don't flag thin duplicates.
+ */
+export function buildCanonicalToPathAlternates(
+    canonicalPathname: string
+): NonNullable<Metadata["alternates"]> {
+    return {
+        canonical: buildLocalizedUrl(canonicalPathname, "en"),
     };
 }
 

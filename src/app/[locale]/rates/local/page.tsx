@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { setRequestLocale } from "next-intl/server";
 import { Link } from "@/navigation";
 import {
     DEFAULT_RATE_CONFIG,
@@ -7,30 +8,25 @@ import {
 } from "@/lib/postage-rates";
 import { formatLkrPlain } from "@/lib/rates-seo";
 import { safeJsonLd } from "@/lib/security";
-import { buildLocalizedAlternates, buildLocalizedUrl } from "@/lib/site";
+import { buildEnglishCanonicalAlternates, buildLocalizedUrl } from "@/lib/site";
 import PostageCalculator from "@/components/PostageCalculator";
 
 export const revalidate = 86400;
 
 const LOCAL_WEIGHTS = [30, 100, 250, 500, 1000, 2000, 5000, 10000];
 
-export async function generateMetadata({
-    params,
-}: {
-    params: Promise<{ locale: string }>;
-}): Promise<Metadata> {
-    const { locale } = await params;
+export async function generateMetadata(): Promise<Metadata> {
     const title = "Sri Lanka Post Domestic & SLP Courier Rates 2026 — Letters & Parcels";
     const description =
         "Official 2026 Sri Lanka Post local postage rates for Ordinary Letters, Registered Mail, Parcels, and SL Post (SLP) Courier by weight.";
     return {
         title,
         description,
-        alternates: buildLocalizedAlternates("/rates/local", locale),
+        alternates: buildEnglishCanonicalAlternates("/rates/local"),
         openGraph: {
             title,
             description,
-            url: buildLocalizedUrl("/rates/local", locale),
+            url: buildLocalizedUrl("/rates/local", "en"),
         },
     };
 }
@@ -41,6 +37,7 @@ export default async function LocalRatesPage({
     params: Promise<{ locale: string }>;
 }) {
     const { locale } = await params;
+    setRequestLocale(locale);
 
     const rows = LOCAL_WEIGHTS.map((weightGrams) => {
         const quotes = calculateAllDomesticServices(DEFAULT_RATE_CONFIG, weightGrams, {

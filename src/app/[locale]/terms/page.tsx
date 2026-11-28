@@ -1,21 +1,16 @@
 import type { Metadata } from "next";
 import { setRequestLocale } from "next-intl/server";
 import { Link } from "@/navigation";
-import { buildLocalizedAlternates, getContactEmail } from "@/lib/site";
+import { buildEnglishCanonicalAlternates, getContactEmail } from "@/lib/site";
 
 export const revalidate = 86400;
 
-export async function generateMetadata({
-    params,
-}: {
-    params: Promise<{ locale: string }>;
-}): Promise<Metadata> {
-    const { locale } = await params;
+export async function generateMetadata(): Promise<Metadata> {
     return {
         title: "Terms of Use",
         description:
             "Terms of Use for Lanka Post Directory web application and Android app, covering data disclaimers, community contributions, acceptable use, and advertising disclosures.",
-        alternates: buildLocalizedAlternates("/terms", locale),
+        alternates: buildEnglishCanonicalAlternates("/terms"),
     };
 }
 

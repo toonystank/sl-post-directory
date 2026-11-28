@@ -1,28 +1,43 @@
+import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 import { Link } from "@/navigation";
 import { hasDatabaseUrl, prisma } from "@/lib/prisma";
-import { loadLocalOffices } from "@/lib/local-sqlite";
+import { getLocalDivisionNames, loadLocalOffices } from "@/lib/local-sqlite";
 import { safeJsonLd } from "@/lib/security";
 import {
-    buildLocalizedAlternates,
+    buildEnglishCanonicalAlternates,
     buildLocalizedUrl,
     formatSriLankaPhone,
     getDefaultOpenGraphImages,
     getOgLocale,
     normalizePostalCode,
+    slugifyDivision,
 } from "@/lib/site";
 import { ArrowRight, MapPin } from "lucide-react";
 
 export const revalidate = 86400;
 export const dynamicParams = true;
 
-function slugifyDivision(name: string): string {
-    return name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "");
+export function generateStaticParams({
+    params: { locale },
+}: {
+    params: { locale: string };
+}) {
+    // Pre-render all canonical English division hub pages at build time;
+    // localized views render on demand via ISR while canonicalizing to English.
+    if (locale !== "en") return [];
+    const seen = new Set<string>();
+    const result: { division: string }[] = [];
+    for (const name of getLocalDivisionNames()) {
+        const slug = slugifyDivision(name);
+        if (slug && !seen.has(slug)) {
+            seen.add(slug);
+            result.push({ division: slug });
+        }
+    }
+    return result;
 }
 
 interface DivisionOfficeRow {
@@ -34,10 +49,31 @@ interface DivisionOfficeRow {
     phone: string;
 }
 
-async function getDivisionData(divisionSlug: string): Promise<{
+interface DivisionDirectoryData {
     divisionName: string;
     offices: DivisionOfficeRow[];
-} | null> {
+    otherDivisions: { name: string; slug: string }[];
+}
+
+function buildOtherDivisions(
+    allNames: string[],
+    currentSlug: string
+): { name: string; slug: string }[] {
+    const seen = new Set<string>([currentSlug]);
+    const list: { name: string; slug: string }[] = [];
+    for (const raw of allNames) {
+        const name = raw.trim();
+        const slug = slugifyDivision(name);
+        if (!name || !slug || seen.has(slug)) continue;
+        seen.add(slug);
+        list.push({ name, slug });
+    }
+    return list.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+const getDivisionData = cache(async function getDivisionData(
+    divisionSlug: string
+): Promise<DivisionDirectoryData | null> {
     const cleanSlug = decodeURIComponent(divisionSlug).trim().toLowerCase();
     if (!cleanSlug) return null;
 
@@ -48,6 +84,7 @@ async function getDivisionData(divisionSlug: string): Promise<{
                 distinct: ["value"],
                 select: { value: true },
             });
+            const allDivisionNames = distinctDivisions.map((d) => d.value).filter(Boolean);
             const matched = distinctDivisions.find(
                 (d) => slugifyDivision(d.value) === cleanSlug
             );
@@ -85,10 +122,11 @@ async function getDivisionData(divisionSlug: string): Promise<{
                             r.fields.find((f) => f.name === "Phone" || f.name === "Telephone")?.value
                         ),
                     })),
+                    otherDivisions: buildOtherDivisions(allDivisionNames, cleanSlug),
                 };
             }
         } catch {
-            // Fall through to local SQLite
+            // Fall through to local dataset
         }
     }
 
@@ -103,43 +141,52 @@ async function getDivisionData(divisionSlug: string): Promise<{
 
     return {
         divisionName,
-        offices: matchedLocal.map((o) => ({
-            id: o.id,
-            slug: o.slug,
-            name: o.name,
-            postalCode: normalizePostalCode(o.postalCode),
-            type: o.fields.find((f) => f.name === "Type")?.value || "Post Office",
-            phone: formatSriLankaPhone(
-                o.fields.find((f) => f.name === "Phone" || f.name === "Telephone")?.value
-            ),
-        })),
+        offices: matchedLocal
+            .map((o) => ({
+                id: o.id,
+                slug: o.slug,
+                name: o.name,
+                postalCode: normalizePostalCode(o.postalCode),
+                type: o.fields.find((f) => f.name === "Type")?.value || "Post Office",
+                phone: formatSriLankaPhone(
+                    o.fields.find((f) => f.name === "Phone" || f.name === "Telephone")?.value
+                ),
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name)),
+        otherDivisions: buildOtherDivisions(getLocalDivisionNames(), cleanSlug),
     };
-}
+});
 
 export async function generateMetadata({
     params,
 }: {
     params: Promise<{ locale: string; division: string }>;
 }): Promise<Metadata> {
-    const { locale, division } = await params;
+    const { division } = await params;
     const data = await getDivisionData(division);
     if (!data) {
         return { title: "District Post Offices Not Found" };
     }
 
     const slug = slugifyDivision(data.divisionName);
+    const coded = data.offices.map((o) => o.postalCode).filter(Boolean).sort();
+    const rangeHint =
+        coded.length >= 2 && coded[0] !== coded[coded.length - 1]
+            ? ` (Codes ${coded[0]}–${coded[coded.length - 1]})`
+            : "";
     const title = `${data.divisionName} Post Offices & Postal Codes (${data.offices.length} Offices)`;
-    const description = `Complete list of ${data.offices.length} Sri Lanka post offices and 5-digit postal codes in ${data.divisionName}, with telephone numbers and opening hours.`;
+    const description = `Complete directory of ${data.offices.length} Sri Lanka post offices and 5-digit postal codes in ${data.divisionName}${rangeHint}, with telephone numbers, office types, and opening hours.`;
+    const canonicalUrl = buildLocalizedUrl(`/district/${slug}`, "en");
 
     return {
         title,
         description,
-        alternates: buildLocalizedAlternates(`/district/${slug}`, locale),
+        alternates: buildEnglishCanonicalAlternates(`/district/${slug}`),
         openGraph: {
             title,
             description,
-            url: buildLocalizedUrl(`/district/${slug}`, locale),
-            locale: getOgLocale(locale),
+            url: canonicalUrl,
+            locale: getOgLocale("en"),
             images: getDefaultOpenGraphImages(title),
         },
     };
@@ -159,14 +206,41 @@ export default async function DistrictOfficesPage({
     }
 
     const slug = slugifyDivision(data.divisionName);
+    const canonicalUrl = buildLocalizedUrl(`/district/${slug}`, "en");
+    const mainOfficesCount = data.offices.filter((o) => !/sub post/i.test(o.type)).length;
+    const subOfficesCount = data.offices.length - mainOfficesCount;
+    const sortedCodes = data.offices.map((o) => o.postalCode).filter(Boolean).sort();
+    const codeRange =
+        sortedCodes.length >= 2 && sortedCodes[0] !== sortedCodes[sortedCodes.length - 1]
+            ? `${sortedCodes[0]} – ${sortedCodes[sortedCodes.length - 1]}`
+            : sortedCodes[0] || null;
+
     const breadcrumbJsonLd = {
         "@context": "https://schema.org",
         "@type": "BreadcrumbList",
         itemListElement: [
-            { "@type": "ListItem", position: 1, name: "Home", item: buildLocalizedUrl("/", locale) },
-            { "@type": "ListItem", position: 2, name: "Browse Directory", item: buildLocalizedUrl("/browse", locale) },
-            { "@type": "ListItem", position: 3, name: data.divisionName, item: buildLocalizedUrl(`/district/${slug}`, locale) },
+            { "@type": "ListItem", position: 1, name: "Home", item: buildLocalizedUrl("/", "en") },
+            { "@type": "ListItem", position: 2, name: "Browse Directory", item: buildLocalizedUrl("/browse", "en") },
+            { "@type": "ListItem", position: 3, name: data.divisionName, item: canonicalUrl },
         ],
+    };
+
+    const collectionJsonLd = {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        name: `${data.divisionName} Post Offices & Postal Codes`,
+        url: canonicalUrl,
+        description: `Directory of ${data.offices.length} post offices in ${data.divisionName}, Sri Lanka.`,
+        mainEntity: {
+            "@type": "ItemList",
+            numberOfItems: data.offices.length,
+            itemListElement: data.offices.slice(0, 50).map((office, index) => ({
+                "@type": "ListItem",
+                position: index + 1,
+                name: office.postalCode ? `${office.name} (${office.postalCode})` : office.name,
+                url: buildLocalizedUrl(`/office/${office.slug}`, "en"),
+            })),
+        },
     };
 
     return (
@@ -174,6 +248,10 @@ export default async function DistrictOfficesPage({
             <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbJsonLd) }}
+            />
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: safeJsonLd(collectionJsonLd) }}
             />
 
             <header className="rounded-xl border-2 border-foreground bg-card p-5 sm:p-7 shadow-[4px_4px_0_0_hsl(var(--foreground))]">
@@ -185,15 +263,29 @@ export default async function DistrictOfficesPage({
                     {data.divisionName} Post Offices &amp; Postal Codes
                 </h1>
                 <p className="mt-2 text-sm sm:text-base text-muted-foreground">
-                    Showing all <strong>{data.offices.length}</strong> post offices and sub post offices in {data.divisionName}.
+                    Showing all <strong>{data.offices.length}</strong> postal locations in {data.divisionName}
+                    {mainOfficesCount > 0 ? ` (${mainOfficesCount} main & hub offices, ${subOfficesCount} sub post offices)` : ""}
+                    {codeRange ? ` covering postal codes ${codeRange}` : ""}.
                 </p>
-                <div className="mt-4">
+                <div className="mt-4 flex flex-wrap gap-2">
                     <Link
                         href={`/browse?division=${encodeURIComponent(data.divisionName)}`}
                         className="tap inline-flex items-center gap-1.5 rounded-lg border-2 border-foreground bg-secondary/40 px-3.5 py-2 text-xs sm:text-sm font-bold hover:bg-secondary/70"
                     >
                         Filter &amp; search {data.divisionName} interactively
                         <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                    </Link>
+                    <Link
+                        href="/calculator"
+                        className="tap inline-flex items-center gap-1.5 rounded-lg border border-foreground/40 bg-background px-3.5 py-2 text-xs sm:text-sm font-semibold hover:border-foreground"
+                    >
+                        2026 Postage Calculator
+                    </Link>
+                    <Link
+                        href="/track"
+                        className="tap inline-flex items-center gap-1.5 rounded-lg border border-foreground/40 bg-background px-3.5 py-2 text-xs sm:text-sm font-semibold hover:border-foreground"
+                    >
+                        Track SL Post Parcel
                     </Link>
                 </div>
             </header>
@@ -233,6 +325,25 @@ export default async function DistrictOfficesPage({
                     </tbody>
                 </table>
             </div>
+
+            {data.otherDivisions.length > 0 && (
+                <section aria-labelledby="other-divisions-heading" className="rounded-xl border-2 border-foreground/30 bg-card/60 p-5">
+                    <h2 id="other-divisions-heading" className="font-heading text-lg sm:text-xl font-extrabold [font-stretch:82%] mb-3">
+                        Other Sri Lanka Postal Divisions
+                    </h2>
+                    <div className="flex flex-wrap gap-2">
+                        {data.otherDivisions.map((div) => (
+                            <Link
+                                key={div.slug}
+                                href={`/district/${div.slug}`}
+                                className="tap rounded-full border border-foreground/40 bg-background px-3 py-1.5 text-xs font-semibold hover:border-foreground hover:bg-secondary/35 transition-colors"
+                            >
+                                {div.name}
+                            </Link>
+                        ))}
+                    </div>
+                </section>
+            )}
         </article>
     );
 }
